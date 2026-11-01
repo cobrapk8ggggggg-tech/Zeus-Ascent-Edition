@@ -77,7 +77,7 @@ import CoreGraphics
     }
     private func sweep(document:String,frame:WKFrameInfo?,ticket:UUID)async throws{
         guard let model,let tab else{return}
-        let owner=model.profile.id,prefs=preferences,translation=preferences.translation ?? TranslationPreferences()
+        let owner=model.profile.id,prefs=preferences,translation=preferences.resolvedTranslation(model.data.settings)
         let provider=model.data.settings.aiProviders?.first{$0.id==translation.providerID}
         let translationMark=ComicIdentity.settings(prefs,translation:translation,provider:provider)+"|"+prefs.engine.rawValue+"|local:\(prefs.localModel)|"+ComicLocalTranslator.modelIdentity
         let mark=translationMark+"|"+(prefs.fontName ?? "default")+"|\(prefs.fontScale)|"+(prefs.textColor ?? "auto")
@@ -125,6 +125,7 @@ import CoreGraphics
                     if let saved=readings[readingKey]{reading=saved}
                     else if persistent,let stored=await ComicMemory.shared.data(profile:owner,layer:.reading,key:readingKey),let saved=try? JSONDecoder().decode(ComicReading.self,from:stored){reading=saved}
                     else{reading=try await ComicOCR.shared.read(image,source:prefs.source == "auto" ? (resolvedScripts[document].flatMap{$0.1%3==0 ? nil:$0.0} ?? "auto"):prefs.source,mode:prefs.mode)
+                        try valid(ticket)
                         if persistent{do{try await ComicMemory.shared.save(JSONEncoder().encode(reading),profile:owner,layer:.reading,key:readingKey)}catch{storageNotice="تعذّر حفظ قراءة الصورة؛ ستظل الجلسة الحالية متاحة."}}
                     }
                     if readings.count>=8{readings.removeAll()};readings[readingKey]=reading
@@ -141,6 +142,7 @@ import CoreGraphics
                     if let saved=textResults[translationKey]{translated=saved}
                     else if persistent,let stored=await ComicMemory.shared.data(profile:owner,layer:.translation,key:translationKey),let saved=try? JSONDecoder().decode([TranslationSegment].self,from:stored){translated=saved}
                     else{translated=try await ComicTextTranslator.translate(segments,source:reading.language,target:translation.target,preferences:translation,provider:provider,secret:AISecretVault.read(profile:owner,provider:translation.secretKey(provider:provider)),local:prefs.localModel,engine:prefs.engine,engineSecret:AISecretVault.read(profile:owner,provider:"comic-"+prefs.engine.rawValue))
+                        try valid(ticket)
                         if persistent{do{try await ComicMemory.shared.save(JSONEncoder().encode(translated),profile:owner,layer:.translation,key:translationKey)}catch{storageNotice="تعذّر حفظ الترجمة على الجهاز."}}
                     }
                     if textResults.count>=64{textResults.removeAll()};textResults[translationKey]=translated
@@ -152,6 +154,7 @@ import CoreGraphics
                         // Only this core is applied. Recognition context is retained above/below.
                         let rect=CGRect(x:0,y:region.coreTop+offset,width:region.width,height:region.coreBottom-region.coreTop)
                         guard let crop=drawn.cropping(to:rect)else{throw ComicFailure.message("تعذّر قص منطقة الرسم.")};return try ComicPixels.png(crop)}.value
+                        try valid(ticket)
                         if persistent{do{try await ComicMemory.shared.save(rendered,profile:owner,layer:.rendered,key:renderedKey)}catch{storageNotice="تعذّر حفظ الصورة المترجمة؛ النص المحفوظ يظل متاحًا."}}
                     }
                     try valid(ticket);stage="عرض الترجمة"

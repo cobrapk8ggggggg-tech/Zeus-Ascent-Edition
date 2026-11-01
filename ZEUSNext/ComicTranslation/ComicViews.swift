@@ -11,7 +11,7 @@ struct ComicSettingsSheet:View {
     @State private var message:String?
     @State private var downloading=false
     private var prefs:ComicPreferences{model.data.settings.comicTranslation ?? ComicPreferences()}
-    private var translation:TranslationPreferences{prefs.translation ?? TranslationPreferences()}
+    private var translation:TranslationPreferences{prefs.resolvedTranslation(model.data.settings)}
     var body:some View{
         NavigationStack{Form{
             Section("ترجمة صور المواقع"){
@@ -54,7 +54,7 @@ struct ComicSettingsSheet:View {
                 Button("مسح حفظ صور هذا البروفايل",role:.destructive){let id=model.profile.id;Task{do{try await ComicMemory.shared.clear(profile:id);message="مُسحت النتائج المحفوظة."}catch{message=error.localizedDescription}}}
                 if let message{Text(message).font(.footnote)}
             }
-        }.navigationTitle("ترجمة الصور والمانهوا").toolbar{ToolbarItem(placement:.confirmationAction){Button("تم"){dismiss()}}}
+        }.navigationTitle("ترجمة الصور والمانهوا").toolbar{ToolbarItem(placement:.confirmationAction){Button("تم"){dismiss()}}}}
         .fileImporter(isPresented:$importingFont,allowedContentTypes:[.data]){result in do{let url=try result.get();let name=try ComicFonts.importFont(url);var p=prefs;p.fontName=name;save(p)}catch{message=error.localizedDescription}}
         .fileImporter(isPresented:$importingModel,allowedContentTypes:[.data]){result in Task{do{try await ComicLocalTranslator.shared.importModel(result.get());message="استُورد النموذج المحلي."}catch{message=error.localizedDescription}}}
     }

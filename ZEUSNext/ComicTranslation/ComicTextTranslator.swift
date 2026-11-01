@@ -17,7 +17,9 @@ enum ComicTextTranslator {
             PRECEDING_CONTEXT: \(try AIHTTP.string(context))
             INPUT_JSON: \(payload)
             """
-            let output=try await AIProviderService.shared.generate(prompt,config:provider,secret:secret,context:UUID())
+            let contextID=UUID()
+            defer{Task{await AIProviderService.shared.end(contextID)}}
+            let output=try await AIProviderService.shared.generate(prompt,config:provider,secret:secret,context:contextID)
             return try TextTranslationService.validateAIResponse(output,originals:input)
         }
         // Existing APIs remain unchanged. Images have their own preferences and batches.

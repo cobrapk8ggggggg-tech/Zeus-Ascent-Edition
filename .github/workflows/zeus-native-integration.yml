@@ -87,6 +87,7 @@ jobs:
       run: |
         set -euo pipefail
         bash deps/build_lame.sh 2>&1 | tee ../results/lame.log
+        if [ ! -d deps/ffmpeg-6.1.2 ]; then git clone --depth 1 --branch n6.1.2 https://github.com/FFmpeg/FFmpeg.git deps/ffmpeg-6.1.2; fi
         bash deps/build_ffmpeg.sh 2>&1 | tee ../results/ffmpeg.log
         bash deps/build_ish.sh 2>&1 | tee ../results/ish.log
         bash deps/prepare_alpine_rootfs.sh 2>&1 | tee ../results/rootfs.log

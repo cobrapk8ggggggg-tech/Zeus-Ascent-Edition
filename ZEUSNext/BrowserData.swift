@@ -272,7 +272,7 @@ enum BrowserDisk {
         try? FileManager.default.removeItem(at: folder(for: profile))
     }
     func delete(_ profile: BrowserProfile) async throws {
-        try await ComicMemory.shared.clear(profile: profile.id)
+        try await ComicMemory.shared.clear(profile: profile.id, deleting: true)
         guard active.isAdmin, !profile.isAdmin, profiles.count > 1 else { throw AccountError.permission }
         try await clearAndReleaseWebsiteStore(profile)
         for path in [folder(for: profile), downloads(for: profile), configurationFolder(profile)] where FileManager.default.fileExists(atPath: path.path) { try FileManager.default.removeItem(at: path) }
@@ -282,6 +282,7 @@ enum BrowserDisk {
         persistIndex()
     }
     func resetAll() async throws {
+        for profile in profiles { try await ComicMemory.shared.clear(profile: profile.id, deleting: true) }
         try await ComicMemory.shared.clearAll()
         await ComicLocalTranslator.shared.unload()
         guard active.isAdmin else { throw AccountError.permission }

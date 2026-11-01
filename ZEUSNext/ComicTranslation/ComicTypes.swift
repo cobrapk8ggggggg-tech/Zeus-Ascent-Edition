@@ -17,6 +17,11 @@ struct ComicPreferences: Codable, Equatable {
     var textColor: String?
     var engine: ComicOnlineEngine = .existing
     var translation: TranslationPreferences?
+    func resolvedTranslation(_ settings:BrowserSettings)->TranslationPreferences{
+        var value=translation ?? TranslationPreferences()
+        if value.cloudflare==nil{value.cloudflare=settings.translation?.cloudflare}
+        return value
+    }
 }
 struct ComicCandidate: Codable, Identifiable {
     var id: String
@@ -77,9 +82,10 @@ enum ComicIdentity {
 enum ComicGeometry {
     // Overlap is context, not output ownership. Every source row belongs to one core.
     static func regions(width: Int, height: Int, maximumPixels: Int = 8_000_000) -> [ComicRegion] {
-        guard width > 0, height > 0, width <= 16_384 else { return [] }
-        let overlap = min(256, max(32, width / 8))
-        let step = max(64, min(4096, maximumPixels / width - overlap * 2))
+        guard width > 0, height > 0, width <= 16_384, height <= 1_000_000, maximumPixels >= width else { return [] }
+        let rowBudget=maximumPixels/width
+        let overlap = min(256, max(16, width / 8), max(0,(rowBudget-64)/2))
+        let step = max(1, min(4096, rowBudget - overlap * 2))
         return stride(from: 0, to: height, by: step).map { top in
             let begin = max(0, top - overlap), end = min(height, top + step + overlap)
             return ComicRegion(y: begin, width: width, height: end - begin, coreTop: top - begin, coreBottom: min(height, top + step) - begin)

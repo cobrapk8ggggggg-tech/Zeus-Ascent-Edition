@@ -21,7 +21,7 @@ actor ComicLocalTranslator {
     func importModel(_ url:URL)throws{
         let scoped=url.startAccessingSecurityScopedResource();defer{if scoped{url.stopAccessingSecurityScopedResource()}}
         let size=try url.resourceValues(forKeys:[.fileSizeKey]).fileSize ?? 0
-        guard size>16,size<=2_147_483_648 else{throw ComicFailure.message("حد النموذج المحلي 2 GiB.")}
+        guard size>16,UInt64(size)<=min(2_147_483_648,ProcessInfo.processInfo.physicalMemory/3) else{throw ComicFailure.message("حد النموذج المحلي 2 GiB.")}
         let file=try FileHandle(forReadingFrom:url);defer{try? file.close()};guard try file.read(upToCount:4)==Data("GGUF".utf8)else{throw ComicFailure.message("هذا الملف ليس GGUF.")}
         let hash=try ComicModelFingerprint.hash(url)
         unload();try FileManager.default.createDirectory(at:ComicModelStore.root,withIntermediateDirectories:true)

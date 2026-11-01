@@ -2,6 +2,7 @@ import Foundation
 
 actor ComicMemory {
     static let shared = ComicMemory()
+    private var deleted=Set<UUID>()
     static let root = FileManager.default.urls(for:.applicationSupportDirectory,in:.userDomainMask)[0].appendingPathComponent("ZEUSComicMemory")
     enum Layer: String { case reading, translation, rendered
         var limit:Int { self == .rendered ? 256*1024*1024 : 32*1024*1024 }
@@ -13,6 +14,7 @@ actor ComicMemory {
         try? FileManager.default.setAttributes([.modificationDate:Date()],ofItemAtPath:url.path);return data
     }
     func save(_ data:Data,profile:UUID,layer:Layer,key:String)throws{
+        guard !deleted.contains(profile) else{throw CancellationError()}
         guard data.count<=layer.limit else{throw ComicFailure.message("الناتج يتجاوز سعة الحفظ.")}
         let url=path(profile:profile,layer:layer,key:key),folder=url.deletingLastPathComponent()
         try FileManager.default.createDirectory(at:folder,withIntermediateDirectories:true)
@@ -22,6 +24,6 @@ actor ComicMemory {
         for file in files where bytes+data.count>layer.limit{try FileManager.default.removeItem(at:file.0);bytes-=file.1}
         try data.write(to:url,options:[.atomic,.completeFileProtection])
     }
-    func clear(profile:UUID)throws{let folder=Self.root.appendingPathComponent(profile.uuidString);if FileManager.default.fileExists(atPath:folder.path){try FileManager.default.removeItem(at:folder)}}
+    func clear(profile:UUID,deleting:Bool=false)throws{if deleting{deleted.insert(profile)};let folder=Self.root.appendingPathComponent(profile.uuidString);if FileManager.default.fileExists(atPath:folder.path){try FileManager.default.removeItem(at:folder)}}
     func clearAll()throws{if FileManager.default.fileExists(atPath:Self.root.path){try FileManager.default.removeItem(at:Self.root)}}
 }
