@@ -44,6 +44,18 @@ Actions → "ZEUS integrated IPA - build and publish (no tests)" → Run workflo
 
 الدرجة الحية تظهر في artifacts كل تشغيل: `PARITY-CI.ar.md`.
 
+
+## سجل إصلاحات CI المجمعة (حتى آخر تحديث)
+
+| العطل | السبب الجذري | الإصلاح | الدليل |
+|---|---|---|---|
+| workflow الـ IPA يفشل فوراً | YAML مكسور (قائمة branches محشورة) | إصلاح السطر + تحقق pyyaml لكل الـ 11 | تشغيلة IPA بدأت فعلياً |
+| parity يفشل عند إقلاع المحاكي | قراءة GITHUB_ENV في نفس خطوة كتابته + بلا إعادة محاولة | فصل الخطوتين + إعادة محاولة (3 أجهزة × 2 محاولة + erase) | parity #4 و #7 أخضران |
+| بوابة الأدلة ترفض سجلاً ناجحاً | صيغة أسماء اختبارات Xcode 26 مختلفة | regex جديد مع fallback قديم — تحقق من السجل الحقيقي | 20/20 من artifact فعلي |
+| ربط الجهاز: `ish_emu not found` | استبدال LIBRARY_SEARCH_PATHS أفقد مسار deps/libs الأصلي | إلحاق بدل الاستبدال | IPA #7 أخضر (677de8) |
+| ربط الجهاز: رموز Auth مكررة | حزمة Auth ترتبط مرتين (مستقلة + داخل libZEUSBrowser.a) | حصر حزمة Auth بهدف المتصفح | Auth link check أخضر |
+| ربط الجهاز: ONNX مكرر | XCFramework + غلاف ObjC مرتبطان معاً | ربط الإطار عند المضيف دون تكرار الغلاف | IPA #7 أخضر (677de8) |
+
 ## مصادر المرجع
 
 - تحليل Ascent: `cobrapk8ggggggg-tech/Andriod` @ `rea/ascent-decompile-20261101`
