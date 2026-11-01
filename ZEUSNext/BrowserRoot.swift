@@ -206,7 +206,7 @@ struct BrowserRoot: View {
                     HStack(spacing: 0) {
                         actionButton(.home)
                         ScrollView(.horizontal, showsIndicators: false) { HStack(spacing: 18) { ForEach(model.data.bookmarks) { bookmark in Button(bookmark.title) { model.open(bookmark.url) }.font(.subheadline).lineLimit(1) } } }
-                        ScrollView(.horizontal, showsIndicators: false) { HStack(spacing: 0) { ForEach([BrowserAction.reader, .scripts, .downloads, .fullScreen, .twinHorizontal, .darkPage, .settings]) { actionButton($0) } } }.frame(maxWidth: sizeClass == .regular ? 270 : 140)
+                        ScrollView(.horizontal, showsIndicators: false) { HStack(spacing: 0) { ForEach([BrowserAction.translate, .translateImages, .reader, .scripts, .downloads, .fullScreen, .twinHorizontal, .darkPage, .settings]) { actionButton($0) } } }.frame(maxWidth: sizeClass == .regular ? 270 : 140)
                         actionButton(.tools)
                     }
                 }
@@ -236,7 +236,7 @@ struct BrowserRoot: View {
             if toolbarVisible {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 9) {
-                        ForEach([BrowserAction.assistant, .back, .forward, .reload, .home, .newTab, .library, .history, .reader, .gallery, .console, .scripts, .darkPage, .tools]) { item in actionButton(item); if [.home, .gallery, .profiles].contains(item) { Divider().frame(width: 30).overlay(theme.textColor.opacity(0.3)) } }
+                        ForEach([BrowserAction.assistant, .back, .forward, .reload, .home, .newTab, .library, .history, .translate, .translateImages, .reader, .gallery, .console, .scripts, .darkPage, .tools]) { item in actionButton(item); if [.home, .gallery, .profiles].contains(item) { Divider().frame(width: 30).overlay(theme.textColor.opacity(0.3)) } }
                     }.padding(.vertical, 14).padding(.horizontal, 8)
                 }.frame(width: 64).frame(maxHeight: 680).glassSurface(20)
                     .transition(.move(edge: .trailing)).padding(.vertical, 24)
@@ -308,7 +308,7 @@ struct BrowserRoot: View {
             }
             #endif
             assistantVisible = true
-        case .translateImages: imageTranslationSettings = true
+        case .translateImages: model.current?.comicTranslation?.start()
         case .translate: model.current?.translation?.translate()
         case .back: model.webView?.goBack(); case .forward: model.webView?.goForward(); case .reload: model.reload(); case .home: model.home(); case .newTab: _ = model.newTab(); topTray = false
         case .tabs: if layout == .original && customDesign == nil { withAnimation { topTray.toggle() } } else { panel = .tabs }

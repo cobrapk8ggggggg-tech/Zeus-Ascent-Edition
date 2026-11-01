@@ -45,6 +45,30 @@
       "sha256": "f757fa1c40e99edcf27e9cce879b93eb2a51fa46f5ef39095689b8c37dd75998"
     },
     {
+      "name": "cyrillic.onnx",
+      "bytes": 8048799,
+      "url": "https://huggingface.co/PaddlePaddle/cyrillic_PP-OCRv5_mobile_rec_onnx/resolve/2cef88145434beb8afa9dd82d77d799eb1ad7b29/inference.onnx",
+      "sha256": "5371ee1ddaa7983cc62d0818d99e982b6804638c85e4f960d59a574094e172e5"
+    },
+    {
+      "name": "cyrillic.yml",
+      "bytes": 6991,
+      "url": "https://huggingface.co/PaddlePaddle/cyrillic_PP-OCRv5_mobile_rec_onnx/resolve/2cef88145434beb8afa9dd82d77d799eb1ad7b29/inference.yml",
+      "sha256": "5c76cc91fa98410178a09f498db10050d0ec1634a660053d3005ab7be581f501"
+    },
+    {
+      "name": "greek.onnx",
+      "bytes": 7808735,
+      "url": "https://huggingface.co/PaddlePaddle/el_PP-OCRv5_mobile_rec_onnx/resolve/8152b89d2ee0e1d4c92decab75fe75e5e3d836b6/inference.onnx",
+      "sha256": "2acf17fcaea2bc81b878e311e6263b8885f48bb03796f75f9f30ed3242bbaa6d"
+    },
+    {
+      "name": "greek.yml",
+      "bytes": 3317,
+      "url": "https://huggingface.co/PaddlePaddle/el_PP-OCRv5_mobile_rec_onnx/resolve/8152b89d2ee0e1d4c92decab75fe75e5e3d836b6/inference.yml",
+      "sha256": "17d85b2fe2d2f24cd4ab07bcbc33e0c126859b956ced36e281dc65e2d0c1f0bf"
+    },
+    {
       "name": "arabic.onnx",
       "bytes": 7998947,
       "url": "https://huggingface.co/PaddlePaddle/arabic_PP-OCRv5_mobile_rec_onnx/resolve/14aaedcd75825982689ecf5cd64ab33ee083215a/inference.onnx",
@@ -55,6 +79,54 @@
       "bytes": 6165,
       "url": "https://huggingface.co/PaddlePaddle/arabic_PP-OCRv5_mobile_rec_onnx/resolve/14aaedcd75825982689ecf5cd64ab33ee083215a/inference.yml",
       "sha256": "21368419e6c016c31db55d316d59e11c128e1913e6e6fe10287084710043d3a6"
+    },
+    {
+      "name": "devanagari.onnx",
+      "bytes": 7912311,
+      "url": "https://huggingface.co/PaddlePaddle/devanagari_PP-OCRv5_mobile_rec_onnx/resolve/251aec19e36739540d35e2cc943f6aa7503b98e5/inference.onnx",
+      "sha256": "cb789212ce96c69d3e74728ae4309d179281d68cb3945d0616b67cafab41c986"
+    },
+    {
+      "name": "devanagari.yml",
+      "bytes": 5027,
+      "url": "https://huggingface.co/PaddlePaddle/devanagari_PP-OCRv5_mobile_rec_onnx/resolve/251aec19e36739540d35e2cc943f6aa7503b98e5/inference.yml",
+      "sha256": "9bd172dd26440c8ce94d1cde5d5baea6aefdc7cf3c5c8492e0beedef656d4e54"
+    },
+    {
+      "name": "thai.onnx",
+      "bytes": 7891015,
+      "url": "https://huggingface.co/PaddlePaddle/th_PP-OCRv5_mobile_rec_onnx/resolve/1d4adbbafb1034a2fd6618498575b81ea7b69f69/inference.onnx",
+      "sha256": "27618be66018f8598ac0a526a593f9f1cebf794e7eded93428e8fb016e537f5f"
+    },
+    {
+      "name": "thai.yml",
+      "bytes": 4667,
+      "url": "https://huggingface.co/PaddlePaddle/th_PP-OCRv5_mobile_rec_onnx/resolve/1d4adbbafb1034a2fd6618498575b81ea7b69f69/inference.yml",
+      "sha256": "f6ba7fefc38ca1ff398ddafa75d67d16e0b3757c4e6c833adffee98a981766c9"
+    },
+    {
+      "name": "tamil.onnx",
+      "bytes": 7885691,
+      "url": "https://huggingface.co/PaddlePaddle/ta_PP-OCRv5_mobile_rec_onnx/resolve/0db89798af0d5218fad9ea7ace0557526e9077f1/inference.onnx",
+      "sha256": "c6d2b682d2a0ea4cb1fccdba295976f93fd439964d16cdc666cadef531accbee"
+    },
+    {
+      "name": "tamil.yml",
+      "bytes": 4579,
+      "url": "https://huggingface.co/PaddlePaddle/ta_PP-OCRv5_mobile_rec_onnx/resolve/0db89798af0d5218fad9ea7ace0557526e9077f1/inference.yml",
+      "sha256": "88a28f5a1bb30cabe38a0985cb5e6619fa4f0c7c78e57a08274674228c5219a6"
+    },
+    {
+      "name": "telugu.onnx",
+      "bytes": 7898759,
+      "url": "https://huggingface.co/PaddlePaddle/te_PP-OCRv5_mobile_rec_onnx/resolve/f1197c83430241c58c64b0952b3a80366d04eeba/inference.onnx",
+      "sha256": "8238bfc46d4cffe720ed6706e3842802467343497428693ff2bfb4e6b3caa36b"
+    },
+    {
+      "name": "telugu.yml",
+      "bytes": 4795,
+      "url": "https://huggingface.co/PaddlePaddle/te_PP-OCRv5_mobile_rec_onnx/resolve/f1197c83430241c58c64b0952b3a80366d04eeba/inference.yml",
+      "sha256": "acebbe53f1831bf28ddfed75aedf58225d7aa5d09100c1d5a9140a2a53b137ce"
     },
     {
       "name": "quick.onnx",

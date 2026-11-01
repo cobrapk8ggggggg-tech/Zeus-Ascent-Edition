@@ -6,6 +6,7 @@ enum ComicReadingMode: String, Codable, CaseIterable { case fastest, balanced, c
     var title: String { switch self { case .fastest: return "الأسرع"; case .balanced: return "متوازن"; case .careful: return "دقيق" } }
 }
 struct ComicPreferences: Codable, Equatable {
+    static let sourceLanguages=TranslationPreferences.languages+[("el","Ελληνικά"),("hi","हिन्दी"),("th","ไทย"),("ta","தமிழ்"),("te","తెలుగు"),("uk","Українська")]
     var mode: ComicReadingMode = .fastest
     var source = "auto"
     var automatic = false

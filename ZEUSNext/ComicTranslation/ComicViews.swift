@@ -8,6 +8,7 @@ struct ComicSettingsSheet:View {
     @State private var importingFont=false
     @State private var importingModel=false
     @State private var key=""
+    @State private var clientID=""
     @State private var message:String?
     @State private var downloading=false
     private var prefs:ComicPreferences{model.data.settings.comicTranslation ?? ComicPreferences()}
@@ -18,7 +19,7 @@ struct ComicSettingsSheet:View {
                 Button("ترجمة الصور الآن",systemImage:"character.viewfinder"){model.current?.comicTranslation?.start();dismiss()}.accessibilityIdentifier("startImageTranslation")
                 Toggle("ترجمة الصور تلقائيًا",isOn:binding(\.automatic))
                 Picker("قراءة النص",selection:binding(\.mode)){ForEach(ComicReadingMode.allCases,id:\.self){Text($0.title).tag($0)}}
-                Picker("لغة المصدر",selection:binding(\.source)){Text("اكتشاف تلقائي").tag("auto");ForEach(TranslationPreferences.languages,id:\.0){Text($0.1).tag($0.0)}}
+                Picker("لغة المصدر",selection:binding(\.source)){Text("اكتشاف تلقائي").tag("auto");ForEach(ComicPreferences.sourceLanguages,id:\.0){Text($0.1).tag($0.0)}}
                 Picker("الترجمة إلى",selection:translationBinding(\.target)){ForEach(TranslationPreferences.languages,id:\.0){Text($0.1).tag($0.0)}}
                 Toggle("عرض الأصل أثناء تجهيز الترجمة",isOn:binding(\.showUntranslated));Toggle("تجهيز الصور التالية أثناء القراءة",isOn:binding(\.readAhead))
                 Text("هذا المسار مستقل عن ترجمة نص الصفحة. التعرف على النص محلي، وترسل النصوص فقط إلى المحرك المختار.").font(.footnote)
@@ -33,7 +34,7 @@ struct ComicSettingsSheet:View {
                         if translation.engine == .ai{Picker("المزود",selection:translationBinding(\.providerID)){Text("اختر مزودًا").tag(nil as UUID?);ForEach(model.data.settings.aiProviders ?? []){Text($0.name).tag(Optional($0.id))}}}
                         Text("تُستخدم حسابات ومفاتيح مزودي ZEUS المحفوظة في هذا البروفايل. الاختيار واللغة هنا مستقلان عن نصوص الصفحات.").font(.footnote)
                     }
-                    if prefs.engine.needsKey{SecureField("مفتاح الحساب",text:$key).textInputAutocapitalization(.never).autocorrectionDisabled();Button("حفظ في Keychain"){do{try AISecretVault.save(key,profile:model.profile.id,provider:"comic-"+prefs.engine.rawValue);key="";message="حُفظ المفتاح."}catch{message=error.localizedDescription}}}
+                    if prefs.engine.needsKey{if prefs.engine == .papago{TextField("Client ID",text:$clientID).textInputAutocapitalization(.never).autocorrectionDisabled()};SecureField("مفتاح الحساب",text:$key).textInputAutocapitalization(.never).autocorrectionDisabled();Button("حفظ في Keychain"){do{try AISecretVault.save(prefs.engine == .papago ? clientID+"\n"+key:key,profile:model.profile.id,provider:"comic-"+prefs.engine.rawValue);key="";message="حُفظ المفتاح."}catch{message=error.localizedDescription}}}
                     if prefs.engine == .papago{Text("Client ID في السطر الأول وClient Secret في الثاني.").font(.footnote)}
                 }
             }
@@ -55,6 +56,7 @@ struct ComicSettingsSheet:View {
                 if let message{Text(message).font(.footnote)}
             }
         }.navigationTitle("ترجمة الصور والمانهوا").toolbar{ToolbarItem(placement:.confirmationAction){Button("تم"){dismiss()}}}}
+        .onChange(of:prefs.engine){_,_ in key="";clientID=""}
         .fileImporter(isPresented:$importingFont,allowedContentTypes:[.data]){result in do{let url=try result.get();let name=try ComicFonts.importFont(url);var p=prefs;p.fontName=name;save(p)}catch{message=error.localizedDescription}}
         .fileImporter(isPresented:$importingModel,allowedContentTypes:[.data]){result in Task{do{try await ComicLocalTranslator.shared.importModel(result.get());message="استُورد النموذج المحلي."}catch{message=error.localizedDescription}}}
     }

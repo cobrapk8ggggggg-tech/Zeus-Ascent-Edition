@@ -18,6 +18,7 @@ jobs:
         with: {node-version: '22'}
       - run: npm ci --prefix .zeus-ci/comic
       - run: node --test .zeus-ci/comic/bridge.test.mjs
+      - run: python3 .zeus-ci/comic/compare_test.py
   decoder:
     runs-on: ubuntu-latest
     steps:

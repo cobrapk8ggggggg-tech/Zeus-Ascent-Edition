@@ -16,16 +16,17 @@ actor ComicOCR {
     func read(_ image:CGImage,source:String,mode:ComicReadingMode)async throws->ComicReading{
         try Task.checkCancellation()
         let detected=source == "auto" ? try await Self.detectScript(image) : source
-        let fast=try await Self.fast(image,source:detected)
+        let fastSupported=ComicModelStore.recognizer(detected)=="latin" || ["ja","zh","ko"].contains(where:detected.hasPrefix)
+        let fast=fastSupported ? try await Self.fast(image,source:detected):[]
         var lines=fast
         #if targetEnvironment(simulator)
         var runtime="Apple Vision (simulator only; ML Kit has no arm64 simulator slice)"
         #else
         var runtime="MLKit"
         #endif
-        if mode != .fastest || !["en","ja","zh","ko"].contains(where:{detected.hasPrefix($0)}) {
+        if mode != .fastest || !fastSupported {
             let accurate=try await ComicPaddle.shared.read(image,source:detected,careful:mode == .careful)
-            runtime="MLKit+Paddle/ONNX"
+            runtime=fastSupported ? "MLKit+Paddle/ONNX":"Paddle/ONNX"
             if mode == .careful{lines=accurate}else{
                 for line in accurate where !lines.contains(where:{$0.rect.intersection(line.rect).area/min(max(1,$0.rect.area),max(1,line.rect.area))>0.5}){lines.append(line)}
                 // A low-confidence fast line is replaced only by a stronger overlapping reading.

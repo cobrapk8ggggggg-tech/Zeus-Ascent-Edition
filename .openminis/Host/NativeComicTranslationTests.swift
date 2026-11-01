@@ -70,6 +70,11 @@ import UIKit
         let speeches=ComicGeometry.group(lines,source:"ko")
         XCTAssertEqual(speeches.count,2);XCTAssertTrue(speeches.contains{$0.lines.count==2})
     }
+    func testArabicOCRVisualOrderDoesNotReverseLatinTokensOrNumbers(){
+        XCTAssertEqual(ComicBidi.logicalFromVisual("ابحرم"),"مرحبا")
+        XCTAssertEqual(ComicBidi.logicalFromVisual(")ابحرم( ABC"),"ABC (مرحبا)")
+        XCTAssertEqual(ComicBidi.logicalFromVisual("12.5"),"12.5")
+    }
     func testActualLocalOCRReadsRasterText()async throws{
         let image=renderer(CGSize(width:640,height:180)).image{context in
             UIColor.white.setFill();context.fill(CGRect(x:0,y:0,width:640,height:180))

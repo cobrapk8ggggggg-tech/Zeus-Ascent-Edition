@@ -57,7 +57,8 @@ actor ComicPaddle {
             let (logits,s)=try infer(rotated,width:targetWidth,height:48,detector:false,session:recognizer)
             guard s.count==3 else{throw ComicFailure.message("أبعاد خرج قارئ النص غير صالحة.")}
             let result=Self.ctc(logits,steps:s[1],classes:s[2],dictionary:dictionary)
-            if !result.0.trimmingCharacters(in:CharacterSet.whitespacesAndNewlines).isEmpty{lines.append(ComicLine(text:result.0,confidence:result.1,rect:rect))}
+            let text=name=="arabic" ? ComicBidi.logicalFromVisual(result.0):result.0
+            if !text.trimmingCharacters(in:CharacterSet.whitespacesAndNewlines).isEmpty{lines.append(ComicLine(text:text,confidence:result.1,rect:rect))}
         }
         // Careful mode re-detects at native-sized overlapping crops, retaining lines
         // missed by a reduced global pass. The scheduler bounds image dimensions.

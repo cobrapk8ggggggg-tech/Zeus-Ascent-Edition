@@ -20,7 +20,8 @@ struct ToolsSheet: View {
                 }
                 ThemedSection("الصفحة") {
                     Button("وضع القراءة", systemImage: "text.alignright") { afterDismiss { model.readerMode() } }
-                    Button("ترجمة الصور والمانهوا", systemImage: "character.viewfinder") { imageTranslationSettings = true }.accessibilityIdentifier("imageTranslationButton")
+                    Button("ترجمة الصور والمانهوا", systemImage: "character.viewfinder") { afterDismiss { model.current?.comicTranslation?.start() } }
+                    Button("إعدادات ترجمة الصور", systemImage: "slider.horizontal.3") { imageTranslationSettings = true }.accessibilityIdentifier("imageTranslationButton")
                     Button("معرض صور الصفحة", systemImage: "photo.on.rectangle.angled") { afterDismiss { model.galleryMode() } }
                     Button("إضافة للمفضلة", systemImage: "bookmark") { model.bookmarkCurrent() }
                     Button("مشاركة الرابط", systemImage: "square.and.arrow.up") { if let url = URL(string: model.current?.url ?? ""), BrowserURL.isWeb(url) { afterDismiss { model.share = ShareItem(url: url) } } }

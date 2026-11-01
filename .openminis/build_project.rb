@@ -169,7 +169,7 @@ tests.source_build_phase.add_file_reference(group.new_file((browser + '.openmini
 tests.source_build_phase.add_file_reference(group.new_file((browser + '.openminis/Host/NativeCloudAccountTests.swift').to_s))
 tests.build_configurations.each do |config|
   app_config = app.build_configurations.find { |candidate| candidate.name == config.name }
-  %w[HEADER_SEARCH_PATHS FRAMEWORK_SEARCH_PATHS LIBRARY_SEARCH_PATHS].each do |key|
+  %w[HEADER_SEARCH_PATHS FRAMEWORK_SEARCH_PATHS LIBRARY_SEARCH_PATHS SWIFT_INCLUDE_PATHS].each do |key|
     config.build_settings[key] = app_config.build_settings[key] if app_config.build_settings[key]
   end
   config.build_settings.merge!({

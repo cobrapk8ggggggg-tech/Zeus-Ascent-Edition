@@ -23,7 +23,7 @@ spec = {
         'SwiftMath': {'url': 'https://github.com/mgriebling/SwiftMath', 'exactVersion': '1.7.3'},
     },
     'name': 'ZEUSNext', 'options': {'deploymentTarget': {'iOS': '18.1'}, 'developmentLanguage': 'ar'},
-    'settings': {'base': {'SWIFT_VERSION': '5.0', 'CODE_SIGNING_ALLOWED': 'NO'}},
+    'settings': {'base': {'SWIFT_VERSION': '5.0', 'CODE_SIGNING_ALLOWED': 'NO', 'SWIFT_INCLUDE_PATHS': '$(inherited) $(SRCROOT)/Native/ComicRuntime', 'LIBRARY_SEARCH_PATHS': '$(inherited) $(SRCROOT)/.zeus-ci/comic/build/$(PLATFORM_NAME)'}},
     'targets': {
         'ZEUSNext': {
             'type': 'application', 'platform': 'iOS', 'sources': [{'path': 'ZEUSNext', 'excludes': ['Resources/safari-rules.json', 'Resources/filter-metadata.json']}],

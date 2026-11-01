@@ -43,7 +43,7 @@ actor ComicModelStore {
         let name=Self.recognizer(source)
         for file in ["det.onnx",name+".onnx",name+".yml"]{_ = try await self.file(file,download:true)}
     }
-    static func recognizer(_ language:String)->String { if language.hasPrefix("ko"){return "korean"};if language.hasPrefix("ja")||language.hasPrefix("zh"){return "han"};if language.hasPrefix("ar"){return "arabic"};return "latin" }
+    static func recognizer(_ language:String)->String { if language.hasPrefix("ko"){return "korean"};if language.hasPrefix("ja")||language.hasPrefix("zh"){return "han"};if ["ar","fa","ur"].contains(where:language.hasPrefix){return "arabic"};if ["ru","uk","bg","sr"].contains(where:language.hasPrefix){return "cyrillic"};if language.hasPrefix("el"){return "greek"};if ["hi","mr","ne"].contains(where:language.hasPrefix){return "devanagari"};if language.hasPrefix("th"){return "thai"};if language.hasPrefix("ta"){return "tamil"};if language.hasPrefix("te"){return "telugu"};return "latin" }
     func removeAll()throws{try? FileManager.default.removeItem(at:Self.root)}
 }
 private final class ComicModelDownloadLimit:NSObject,URLSessionDownloadDelegate,@unchecked Sendable{
