@@ -4,11 +4,13 @@ import Combine
 
 enum BrowserPanel: String, Identifiable { case translation, tabs, profiles, account, downloads, settings, library, history, tools, scripts, console, forms; var id: String { rawValue } }
 enum BrowserAction: String, CaseIterable, Identifiable {
+    case translateImages
     case assistant, translate, back, forward, reload, home, newTab, tabs, library, history, reader, gallery, downloads, profiles, scripts, console, shield, share, settings, tools, bookmark, pinTab, twinHorizontal, twinVertical, savePage, printPage, darkPage, fullScreen, saveForm, fillForm
     var id: String { rawValue }
     var symbol: String {
         switch self {
         case .assistant: return "sparkles"
+        case .translateImages: return "character.viewfinder"
         case .translate: return "translate"
         case .saveForm: return "plus.rectangle.on.rectangle"; case .fillForm: return "square.and.pencil"
         case .bookmark: return "bookmark.badge.plus"; case .pinTab: return "pin"; case .twinHorizontal: return "rectangle.split.2x1"; case .twinVertical: return "rectangle.split.1x2"; case .savePage: return "doc"; case .printPage: return "printer"; case .darkPage: return "moon"; case .fullScreen: return "arrow.up.left.and.arrow.down.right"
@@ -18,6 +20,7 @@ enum BrowserAction: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .assistant: return "وكيل ZEUS"
+        case .translateImages: return "ترجمة الصور"
         case .translate: return "ترجمة الصفحة"
         case .saveForm: return "حفظ النموذج"; case .fillForm: return "ملء النماذج"
         case .bookmark: return "إضافة للمفضلة"; case .pinTab: return "تثبيت التبويب"; case .twinHorizontal: return "متصفح مزدوج أفقي"; case .twinVertical: return "متصفح مزدوج عمودي"; case .savePage: return "حفظ الصفحة"; case .printPage: return "طباعة"; case .darkPage: return "تعتيم الصفحة"; case .fullScreen: return "إخفاء الأشرطة"
@@ -37,6 +40,7 @@ struct BrowserRoot: View {
     @AppStorage("showCurrentUserAvatar") private var showCurrentUserAvatar = false
     @AppStorage("zeus.assistant.dockRight") private var assistantOnRight = false
     @State private var panel: BrowserPanel?
+    @State private var imageTranslationSettings = false
     @State private var profilePicker = false
     @State private var toolbarVisible = false
     @State private var topTray = false
@@ -94,7 +98,9 @@ struct BrowserRoot: View {
         .overlay(alignment: .top) { if model.current?.loading == true { ProgressView(value: max(0.05, model.current?.progress ?? 0)).progressViewStyle(.linear).tint(theme.accentColor).frame(height: 2).allowsHitTesting(false) } }
         .overlay(alignment: .top) { if !model.requiresUnlock, let page = model.current?.translation { TranslationCard(page: page, settings: { panel = .translation }).id(model.current?.id).animation(.spring(response: 0.45, dampingFraction: 0.82), value: page.offered) } }
         .browserTheme(theme)
-        .onChange(of: model.current?.id) { _, _ in model.current?.translation?.becameVisible() }
+        .overlay(alignment: .bottom) { if !model.requiresUnlock, let session = model.current?.comicTranslation { ComicTranslationCard(session: session, settings: { imageTranslationSettings = true }).id(model.current?.id) } }
+        .sheet(isPresented: $imageTranslationSettings) { ComicSettingsSheet(model: model) }
+        .onChange(of: model.current?.id) { _, _ in model.current?.translation?.becameVisible(); model.current?.comicTranslation?.becameVisible() }
         .fullScreenCover(item: $model.article) { ReaderSheet(model: model, article: $0).tint(theme.buttonTextColor) }
         .fullScreenCover(item: $model.gallery) { GallerySheet(model: model, gallery: $0).tint(theme.buttonTextColor) }
         .fullScreenCover(item: $model.formDraft) { FormDraftView(model: model, draft: $0) }
@@ -103,7 +109,7 @@ struct BrowserRoot: View {
         .onChange(of: model.notice?.id) { _, _ in if let notice = model.notice { model.notice = nil; BrowserPresentation.notice(notice.text) } }
         .onChange(of: model.requiresUnlock) { _, locked in if locked { assistantVisible = false; model.agent?.cancel(); model.agent = nil; profilePicker = false; panel = nil; model.article = nil; model.gallery = nil; model.formDraft = nil; model.share = nil; BrowserPresentation.dismissTools() } }
         .onChange(of: model.address) { _, value in if !addressFocused { draft = value } }
-        .onChange(of: scenePhase) { _, phase in if phase == .background { model.backgrounded() }; if phase == .active { model.becameActive() } }
+        .onChange(of: scenePhase) { _, phase in if phase == .background { model.backgrounded() }; if phase == .active { model.becameActive(); model.current?.comicTranslation?.becameVisible() } }
         .onReceive(model.profiles.$activeID.dropFirst()) { _ in assistantVisible = false; model.agent?.cancel(); model.agent = nil; profilePicker = false; panel = nil; model.article = nil; model.gallery = nil; model.formDraft = nil; model.share = nil; BrowserPresentation.dismissTools() }
         .onReceive(model.profiles.objectWillChange) { model.changed() }
         .onReceive(model.downloads.objectWillChange) { model.changed() }
@@ -302,6 +308,7 @@ struct BrowserRoot: View {
             }
             #endif
             assistantVisible = true
+        case .translateImages: imageTranslationSettings = true
         case .translate: model.current?.translation?.translate()
         case .back: model.webView?.goBack(); case .forward: model.webView?.goForward(); case .reload: model.reload(); case .home: model.home(); case .newTab: _ = model.newTab(); topTray = false
         case .tabs: if layout == .original && customDesign == nil { withAnimation { topTray.toggle() } } else { panel = .tabs }

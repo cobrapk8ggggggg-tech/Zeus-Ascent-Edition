@@ -4,6 +4,9 @@ from pathlib import Path
 settings = {
     'PRODUCT_BUNDLE_IDENTIFIER': 'tools.rea.ZEUSBrowserAnalysis',
     'SWIFT_VERSION': '5.0', 'SWIFT_STRICT_CONCURRENCY': 'minimal',
+    'SWIFT_INCLUDE_PATHS': '$(inherited) $(SRCROOT)/Native/ComicRuntime',
+    'LIBRARY_SEARCH_PATHS': '$(inherited) $(SRCROOT)/.zeus-ci/comic/build/$(PLATFORM_NAME)',
+    'OTHER_LDFLAGS': '$(inherited) -lzeuscomic -lc++ -framework Accelerate',
     'SWIFT_ENABLE_BARE_SLASH_REGEX': 'YES',
     'SWIFT_OBJC_BRIDGING_HEADER': 'ZEUSNext/OpenMinis/Native/OpenMinisBridge.h',
     'GENERATE_INFOPLIST_FILE': 'YES', 'CODE_SIGNING_ALLOWED': 'NO',
@@ -14,6 +17,8 @@ settings = {
 }
 spec = {
     'packages': {
+        'onnxruntime': {'url': 'https://github.com/microsoft/onnxruntime-swift-package-manager', 'exactVersion': '1.24.2'},
+        'Supabase': {'url': 'https://github.com/supabase/supabase-swift', 'exactVersion': '2.55.4'},
         'swift-cmark': {'url': 'https://github.com/swiftlang/swift-cmark', 'exactVersion': '0.4.0'},
         'SwiftMath': {'url': 'https://github.com/mgriebling/SwiftMath', 'exactVersion': '1.7.3'},
     },
@@ -23,7 +28,7 @@ spec = {
         'ZEUSNext': {
             'type': 'application', 'platform': 'iOS', 'sources': [{'path': 'ZEUSNext', 'excludes': ['Resources/safari-rules.json', 'Resources/filter-metadata.json']}],
             'settings': {'base': settings},
-            'dependencies': [{'package': 'swift-cmark', 'product': 'cmark-gfm'}, {'package': 'swift-cmark', 'product': 'cmark-gfm-extensions'}, {'package': 'SwiftMath'}],
+            'dependencies': [{'package': 'onnxruntime', 'product': 'onnxruntime'}, {'package': 'Supabase', 'product': 'Auth'}, {'package': 'swift-cmark', 'product': 'cmark-gfm'}, {'package': 'swift-cmark', 'product': 'cmark-gfm-extensions'}, {'package': 'SwiftMath'}],
             'info': {'path': '.zeus-ci/Generated-Info.plist', 'properties': {
                 'CFBundleDisplayName': 'ZEUS', 'UILaunchScreen': {},
                 'UISupportedInterfaceOrientations': ['UIInterfaceOrientationPortrait', 'UIInterfaceOrientationLandscapeLeft', 'UIInterfaceOrientationLandscapeRight'],
@@ -40,7 +45,7 @@ spec = {
             }},
         },
         'ZEUSNextTests': {
-            'type': 'bundle.unit-test', 'platform': 'iOS', 'sources': ['ZEUSNextTests'],
+            'type': 'bundle.unit-test', 'platform': 'iOS', 'sources': ['ZEUSNextTests', '.openminis/Host/NativeComicTranslationTests.swift'],
             'dependencies': [{'target': 'ZEUSNext'}],
             'settings': {'base': {'GENERATE_INFOPLIST_FILE': 'YES', 'PRODUCT_BUNDLE_IDENTIFIER': 'tools.zeus.tests', 'TEST_HOST': '$(BUILT_PRODUCTS_DIR)/ZEUSNext.app/ZEUSNext', 'BUNDLE_LOADER': '$(TEST_HOST)'}},
         },

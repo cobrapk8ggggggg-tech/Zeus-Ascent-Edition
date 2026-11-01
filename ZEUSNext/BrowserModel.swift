@@ -17,6 +17,7 @@ import LocalAuthentication
     var faviconURL: String?
     var filterTask: Task<Void, Never>?
     var translation: PageTranslation?
+    var comicTranslation: ComicTranslation?
     var lastUsed = Date()
     var pinned = false
     var groupID: UUID?
@@ -24,6 +25,7 @@ import LocalAuthentication
     var saved: SavedTab { SavedTab(id: id, title: title, url: url, pinned: pinned, groupID: groupID) }
     var isHome: Bool { url == "zeus://home" }
     func dispose() {
+        comicTranslation?.pause(); comicTranslation = nil
         translation?.stop(); translation = nil
         filterTask?.cancel(); filterTask = nil
         webView?.stopLoading()
@@ -166,6 +168,7 @@ struct WebDialog: Identifiable {
         }
         tab.webView = view; tab.driver = driver; driver.observe(view)
         let translation = PageTranslation(model: self, tab: tab); tab.translation = translation; translation.attach(to: view)
+        let comic = ComicTranslation(model: self, tab: tab); tab.comicTranslation = comic; comic.attach(to: view)
         // Page creation and tab selection never wait for a rule compiler or disk.
         tab.filterTask = Task { [weak self, weak tab, weak view] in
             guard let self else { return }
@@ -214,6 +217,7 @@ struct WebDialog: Identifiable {
     }
     func selectTab(_ tab: BrowserTab) {
         guard tabs.contains(where: { $0.id == tab.id }) else { return }
+        current?.comicTranslation?.pause()
         snapshotCurrent(); if twinFocused && twinTabID != nil && tab.id != selectedTabID { twinTabID = tab.id } else if tab.id == twinTabID { twinFocused = true } else { selectedTabID = tab.id; twinFocused = false }; tab.lastUsed = Date(); address = tab.isHome ? "" : tab.url; persist()
         Task { await ensureCurrentLoaded() }
     }
@@ -272,6 +276,7 @@ struct WebDialog: Identifiable {
         var changed = profile; changed.locked = locked; profiles.update(changed)
     }
     func backgrounded() {
+        for tab in tabs { tab.comicTranslation?.pause() }
         BrowserPresentation.cancel()
         leftAt = Date()
         cleanOnExit(profile)
@@ -347,6 +352,7 @@ struct WebDialog: Identifiable {
         leftAt = nil
     }
     func logout() {
+        for tab in tabs { tab.comicTranslation?.pause() }
         BrowserPresentation.cancel()
         dialog?.complete(nil); dialog = nil
         transitionEpoch = UUID()

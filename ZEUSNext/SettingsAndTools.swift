@@ -6,6 +6,7 @@ struct ToolsSheet: View {
     @Environment(\.browserTheme) private var theme
     @ObservedObject var model: BrowserModel
     @Environment(\.dismiss) private var dismiss
+    @State private var imageTranslationSettings = false
     @State private var scripts = false
     @State private var console = false
     @State private var find = ""
@@ -19,6 +20,7 @@ struct ToolsSheet: View {
                 }
                 ThemedSection("الصفحة") {
                     Button("وضع القراءة", systemImage: "text.alignright") { afterDismiss { model.readerMode() } }
+                    Button("ترجمة الصور والمانهوا", systemImage: "character.viewfinder") { imageTranslationSettings = true }.accessibilityIdentifier("imageTranslationButton")
                     Button("معرض صور الصفحة", systemImage: "photo.on.rectangle.angled") { afterDismiss { model.galleryMode() } }
                     Button("إضافة للمفضلة", systemImage: "bookmark") { model.bookmarkCurrent() }
                     Button("مشاركة الرابط", systemImage: "square.and.arrow.up") { if let url = URL(string: model.current?.url ?? ""), BrowserURL.isWeb(url) { afterDismiss { model.share = ShareItem(url: url) } } }
@@ -42,6 +44,7 @@ struct ToolsSheet: View {
                 }
             }.scrollContentBackground(.hidden).background { OrbitBackground(tint: theme.accentColor) }.navigationTitle("صندوق الأدوات").navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("تم") { dismiss() } } }
+                .sheet(isPresented: $imageTranslationSettings) { ComicSettingsSheet(model: model) }
                 .fullScreenCover(isPresented: $scripts) { ScriptsSheet(model: model) }
                 .fullScreenCover(isPresented: $console) { ConsoleSheet(model: model) }
                 .sheet(item: $systemURL) { SystemBrowser(url: $0.url).ignoresSafeArea() }
