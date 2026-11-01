@@ -20,6 +20,31 @@ def prepare(root: Path, sdk: str) -> dict:
     if actual != expected["commit"]:
         raise RuntimeError(f"Source revision mismatch: {actual}")
     patch_ish(root)
+    # SDK compatibility: Xcode 26.3's type checker times out on the
+    # heterogeneous debug-stats dictionary in DebugJSONRPC.swift (four inline
+    # ternaries mixed with typed literals). Precomputing each ternary into a
+    # typed local breaks the expression up without changing any value. Applied
+    # here — before the source manifest is recorded — so the recorded hash is
+    # the hash of exactly what builds, keeping verify_source honest.
+    debug_stats = root / "src/ios/Debug/DebugJSONRPC.swift"
+    if debug_stats.exists():
+        stats = debug_stats.read_text()
+        anchors = [
+            ("let decided = full &+ single\n        return [",
+             "let decided = full &+ single\n        let clusterHitRate = decided > 0 ? Double(full) * 100.0 / Double(decided) : 0\n        let avgClusterPages = decided > 0 ? Double(pagesCommitted) / Double(decided) : 0\n        let avgAnonPages = anonMmaps > 0 ? Double(anonPages) / Double(anonMmaps) : 0\n        return ["),
+            ('"clusterHitRatePct": decided > 0 ? Double(full) * 100.0 / Double(decided) : 0,',
+             '"clusterHitRatePct": clusterHitRate,'),
+            ('"avgPagesPerClusterCall": decided > 0 ? Double(pagesCommitted) / Double(decided) : 0,',
+             '"avgPagesPerClusterCall": avgClusterPages,'),
+            ('"avgPagesPerAnonMmap": anonMmaps > 0 ? Double(anonPages) / Double(anonMmaps) : 0,',
+             '"avgPagesPerAnonMmap": avgAnonPages,'),
+        ]
+        for before, after in anchors:
+            count = stats.count(before)
+            if count != 1:
+                raise RuntimeError(f"DebugJSONRPC SDK-compat anchor changed: count={count}")
+            stats = stats.replace(before, after)
+        debug_stats.write_text(stats)
     manifest = {}
     for file in sorted((root / "src/ios").rglob("*")):
         if file.is_file() and ".xcodeproj" not in str(file.relative_to(root)):
