@@ -60,7 +60,11 @@ project.root_object.package_references << ort_package
   build.product_ref = product; item.frameworks_build_phase.files << build
   item.build_configurations.each do |config|
     config.build_settings['SWIFT_INCLUDE_PATHS'] = ['$(inherited)', (browser + 'Native/ComicRuntime').to_s]
-    config.build_settings['LIBRARY_SEARCH_PATHS'] = ['$(inherited)', (browser + '.zeus-ci/comic/build/$(PLATFORM_NAME)').to_s]
+    # Append the comic runtime to the ORIGINAL search paths instead of
+    # replacing them: Minis' own "$(SRCROOT)/../../deps/libs" is where the
+    # iSH static libraries (libish_emu/libish/libfakefs) live, and dropping
+    # it broke every full-device link with "library 'ish_emu' not found".
+    config.build_settings['LIBRARY_SEARCH_PATHS'] = Array(config.build_settings['LIBRARY_SEARCH_PATHS']) + [(browser + '.zeus-ci/comic/build/$(PLATFORM_NAME)').to_s]
     config.build_settings['OTHER_LDFLAGS'] = Array(config.build_settings['OTHER_LDFLAGS']) + ['$(inherited)', '-lzeuscomic', '-lz', '-lc++', '-framework', 'Accelerate']
   end
 end
