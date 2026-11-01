@@ -61,7 +61,7 @@ import UIKit
         }
         let line=ComicLine(text:"HELLO",confidence:1,rect:CGRect(x:88,y:40,width:120,height:40))
         let speech=ComicSpeech(id:"0",text:"HELLO",lines:[line],rect:CGRect(x:55,y:20,width:210,height:90),vertical:false,balloon:true)
-        let output=try ComicPixels.render(try XCTUnwrap(raster.cgImage),speeches:[speech],translated:["0":"مرحبًا يا صديقي"],target:"ar",fontName:nil,fontScale:1,textColor:"163B72")
+        let output=try ComicPixels.render(try XCTUnwrap(raster.cgImage),speeches:[speech],translations:[TranslationSegment(id:"0",text:"مرحبًا يا صديقي")],target:"ar",fontName:nil,fontScale:1,textColor:"163B72")
         let pixels=try XCTUnwrap(ComicPixels.rgba(output,width:320,height:200))
         var blue=0,outside=0
         for y in 0..<200{for x in 0..<320{let i=(y*320+x)*4

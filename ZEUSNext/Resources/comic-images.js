@@ -20,7 +20,7 @@
   function sourceOf(r) { return r.original?.source || (r.kind==='canvas' ? 'canvas:'+r.id : r.kind==='background' ? absolute((/url\(["']?(.*?)["']?\)/.exec(r.el.style.backgroundImage)||[])[1]||'') : r.el.currentSrc || r.el.src || ''); }
   function release(r) {
     if (r.held) { if(r.el.style.getPropertyValue('filter')==='blur(18px) saturate(0.7)'||r.el.style.getPropertyValue('filter')==='blur(18px) saturate(.7)')putCSS(r.el,'filter',r.held);r.held=null; }
-    r.holdUntil=0;
+    r.holdUntil=0;observer.takeRecords();
   }
   function setStyle(r,name,value){r.el.style.setProperty(name,value,'important');(r.written||(r.written={}))[name]=css(r.el,name);}
   function reset(r,restore=true) {

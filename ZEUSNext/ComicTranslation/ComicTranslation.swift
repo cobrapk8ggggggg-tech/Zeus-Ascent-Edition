@@ -212,8 +212,8 @@ import CoreGraphics
         }catch{
             try valid(ticket)
             guard candidate.kind=="image",let tab,let model,let url=URL(string:candidate.source),["https","http"].contains(url.scheme),candidate.width>0,candidate.height>0 else{throw error}
-            let data:Data
-            if let cached=fetched[candidate.source]{data=cached}else{data=try await ComicImageFetch.fetch(url,view:tab.webView,store:model.profiles.websiteDataStore(for:model.profile));fetched[candidate.source]=data;fetchedOrder.removeAll{$0==candidate.source};fetchedOrder.append(candidate.source)
+            let data:Data,cacheKey=candidate.source+"|"+candidate.id+"|"+candidate.revision+"|"+(frame?.request.url?.absoluteString ?? tab.url)
+            if let cached=fetched[cacheKey]{data=cached}else{data=try await ComicImageFetch.fetch(url,view:tab.webView,store:model.profiles.websiteDataStore(for:model.profile));fetched[cacheKey]=data;fetchedOrder.removeAll{$0==cacheKey};fetchedOrder.append(cacheKey)
                 while fetchedOrder.count>4||fetched.values.reduce(0,{$0+$1.count})>33_554_432{let old=fetchedOrder.removeFirst();fetched[old]=nil}}
             return try await Task.detached{let crop=try ComicPixels.decodeRegion(data,region:region,expectedHeight:candidate.height);return try ComicPixels.png(crop)}.value
         }
