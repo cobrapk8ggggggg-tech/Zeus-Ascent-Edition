@@ -85,6 +85,26 @@ project.targets.each do |item|
     config.build_settings['LD_MAP_FILE_PATH'] = '$(TARGET_TEMP_DIR)/$(PRODUCT_NAME)-LinkMap-$(CURRENT_ARCH).txt'
   end
 end
+# CocoaPods workspaces resolve even unlinked root package references. Removing
+# the obsolete product alone leaves a dependency absent from the reviewed lock.
+project.root_object.package_references.to_a.each do |reference|
+  if reference.respond_to?(:repositoryURL) && reference.repositoryURL.to_s.include?('/RealTimeCutVADLibrary')
+    reference.remove_from_project
+  end
+end
+# Preserve the original search paths and flags while inheriting the device
+# ML Kit SDK paths supplied by CocoaPods' base configurations.
+[target, app].each do |item|
+  item.build_configurations.each do |config|
+    %w[FRAMEWORK_SEARCH_PATHS HEADER_SEARCH_PATHS OTHER_SWIFT_FLAGS].each do |key|
+      value = config.build_settings[key]
+      next if value.nil? || value.to_s.include?('$(inherited)')
+      config.build_settings[key] = value.is_a?(Array) ? ['$(inherited)', *value] : "$(inherited) #{value}"
+    end
+  end
+end
+app.build_configurations.each { |config| config.build_settings['ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES'] = '$(inherited)' }
+
 Dir.glob((browser + '.openminis/Host/*.swift').to_s).reject { |path| path.end_with?('Tests.swift') }.sort.each do |path|
   name = File.basename(path)
   bridge = project.main_group.new_file((native + 'src/ios' + name).to_s)
