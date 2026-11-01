@@ -23,7 +23,7 @@ actor ComicPaddle {
         let size=width*height;var tensor=[Float](repeating:0,count:size*3)
         let mean:[Float]=detector ? [0.485,0.456,0.406]:[0.5,0.5,0.5]
         let std:[Float]=detector ? [0.229,0.224,0.225]:[0.5,0.5,0.5]
-        for i in 0..<size{for channel in 0..<3{tensor[channel*size+i]=(Float(rgba[i*4+channel])/255-mean[channel])/std[channel]}}
+        for i in 0..<size{for channel in 0..<3{tensor[channel*size+i]=(Float(rgba[i*4+(2-channel)])/255-mean[channel])/std[channel]}}
         let data=tensor.withUnsafeBufferPointer{NSMutableData(bytes:$0.baseAddress!,length:$0.count*MemoryLayout<Float>.size)}
         let value=try ORTValue(tensorData:data,elementType:.float,shape:[1,3,NSNumber(value:height),NSNumber(value:width)])
         let inputs=try session.inputNames(),outputs=try session.outputNames()

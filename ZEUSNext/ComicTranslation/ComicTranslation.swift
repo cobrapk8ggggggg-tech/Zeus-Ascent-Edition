@@ -152,7 +152,7 @@ import ImageIO
             try valid(ticket)
             guard candidate.kind=="image",let tab,let model,let url=URL(string:candidate.source),["https","http"].contains(url.scheme),candidate.width>0,candidate.height>0 else{throw error}
             let data=try await ComicImageFetch.fetch(url,view:tab.webView,store:model.profiles.websiteDataStore(for:model.profile))
-            return try await Task.detached{let full=try ComicPixels.decode(data);guard full.width==candidate.width,full.height==candidate.height,let crop=full.cropping(to:region.rect)else{throw ComicFailure.message("تغيرت أبعاد الصورة؛ لم تُطبق ترجمة بإحداثيات خاطئة.")};return try ComicPixels.png(crop)}.value
+            return try await Task.detached{let crop=try ComicPixels.decodeRegion(data,region:region);return try ComicPixels.png(crop)}.value
         }
     }
     private func apply(_ data:Data,candidate:ComicCandidate,region:[String:Int],mark:String,generation:Int,frame:WKFrameInfo?,ticket:UUID)async throws->Bool{

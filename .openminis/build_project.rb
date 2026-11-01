@@ -61,7 +61,7 @@ project.root_object.package_references << ort_package
   item.build_configurations.each do |config|
     config.build_settings['SWIFT_INCLUDE_PATHS'] = ['$(inherited)', (browser + 'Native/ComicRuntime').to_s]
     config.build_settings['LIBRARY_SEARCH_PATHS'] = ['$(inherited)', (browser + '.zeus-ci/comic/build/$(PLATFORM_NAME)').to_s]
-    config.build_settings['OTHER_LDFLAGS'] = Array(config.build_settings['OTHER_LDFLAGS']) + ['$(inherited)', '-lzeuscomic', '-lc++', '-framework', 'Accelerate']
+    config.build_settings['OTHER_LDFLAGS'] = Array(config.build_settings['OTHER_LDFLAGS']) + ['$(inherited)', '-lzeuscomic', '-lz', '-lc++', '-framework', 'Accelerate']
   end
 end
 # Strip the actual binaries/dependency graph, not just visible media buttons.

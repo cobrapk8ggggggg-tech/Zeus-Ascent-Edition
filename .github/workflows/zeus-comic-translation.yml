@@ -18,6 +18,14 @@ jobs:
         with: {node-version: '22'}
       - run: npm ci --prefix .zeus-ci/comic
       - run: node --test .zeus-ci/comic/bridge.test.mjs
+  decoder:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update -qq && sudo apt-get install -y libjpeg-dev libpng-dev libwebp-dev
+      - run: python3 -m pip install pillow==11.3.0
+      - run: g++ -std=c++17 -shared -fPIC Native/ComicRuntime/ComicRegionDecoder.cpp -o /tmp/libcomicdecoder.so $(pkg-config --cflags --libs libjpeg libpng libwebp)
+      - run: python3 .zeus-ci/comic/decoder.test.py /tmp/libcomicdecoder.so
   ios:
     runs-on: macos-15
     timeout-minutes: 65

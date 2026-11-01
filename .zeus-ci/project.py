@@ -6,7 +6,7 @@ settings = {
     'SWIFT_VERSION': '5.0', 'SWIFT_STRICT_CONCURRENCY': 'minimal',
     'SWIFT_INCLUDE_PATHS': '$(inherited) $(SRCROOT)/Native/ComicRuntime',
     'LIBRARY_SEARCH_PATHS': '$(inherited) $(SRCROOT)/.zeus-ci/comic/build/$(PLATFORM_NAME)',
-    'OTHER_LDFLAGS': '$(inherited) -lzeuscomic -lc++ -framework Accelerate',
+    'OTHER_LDFLAGS': '$(inherited) -lzeuscomic -lz -lc++ -framework Accelerate',
     'SWIFT_ENABLE_BARE_SLASH_REGEX': 'YES',
     'SWIFT_OBJC_BRIDGING_HEADER': 'ZEUSNext/OpenMinis/Native/OpenMinisBridge.h',
     'GENERATE_INFOPLIST_FILE': 'YES', 'CODE_SIGNING_ALLOWED': 'NO',
