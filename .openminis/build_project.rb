@@ -32,13 +32,16 @@ target.build_configurations.each do |config|
 end
 app.add_dependency(target)
 app.frameworks_build_phase.add_file_reference(target.product_reference)
+# Auth belongs only to the browser target. No host source imports Auth.
+# Giving the app a second package product duplicates the same Auth objects
+# already archived by Xcode into libZEUSBrowser.a (4209 duplicate symbols).
 # Only Auth is linked; files and sync use bounded URLSession transfers. Pin the
 # SDK rather than following an unreviewed branch or a floating major version.
 auth_package = project.new(Xcodeproj::Project::Object::XCRemoteSwiftPackageReference)
 auth_package.repositoryURL = 'https://github.com/supabase/supabase-swift.git'
 auth_package.requirement = { 'kind' => 'exactVersion', 'version' => '2.55.4' }
 project.root_object.package_references << auth_package
-[target, app].each do |item|
+[target].each do |item|
   auth_product = project.new(Xcodeproj::Project::Object::XCSwiftPackageProductDependency)
   auth_product.package = auth_package
   auth_product.product_name = 'Auth'
