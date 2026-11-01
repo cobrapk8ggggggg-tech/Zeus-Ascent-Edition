@@ -46,23 +46,6 @@ def embed(native, browser, report):
             "let recentLimit = min(10, max(0, Self.maxSkillMetadataCount - picked.count))")
     replace(skill_store, "let maxUndisclosed = 100 - selected.count",
             "let maxUndisclosed = max(0, 100 - selected.count)")
-    # Xcode 26.3's type checker times out on the heterogeneous debug-stats
-    # dictionary that mixes four inline ternaries with typed literals.
-    # Precomputing each ternary into a typed local breaks the expression up
-    # without changing any value it produces.
-    debug_stats = source / "Debug/DebugJSONRPC.swift"
-    replace(debug_stats,
-            "let decided = full &+ single\n        return [",
-            "let decided = full &+ single\n        let clusterHitRate = decided > 0 ? Double(full) * 100.0 / Double(decided) : 0\n        let avgClusterPages = decided > 0 ? Double(pagesCommitted) / Double(decided) : 0\n        let avgAnonPages = anonMmaps > 0 ? Double(anonPages) / Double(anonMmaps) : 0\n        return [")
-    replace(debug_stats,
-            '"clusterHitRatePct": decided > 0 ? Double(full) * 100.0 / Double(decided) : 0,',
-            '"clusterHitRatePct": clusterHitRate,')
-    replace(debug_stats,
-            '"avgPagesPerClusterCall": decided > 0 ? Double(pagesCommitted) / Double(decided) : 0,',
-            '"avgPagesPerClusterCall": avgClusterPages,')
-    replace(debug_stats,
-            '"avgPagesPerAnonMmap": anonMmaps > 0 ? Double(anonPages) / Double(anonMmaps) : 0,',
-            '"avgPagesPerAnonMmap": avgAnonPages,')
     generated = browser / ".openminis/build"
     generated.mkdir(parents=True, exist_ok=True)
 
