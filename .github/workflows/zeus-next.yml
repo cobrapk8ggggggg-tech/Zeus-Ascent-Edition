@@ -210,6 +210,7 @@ jobs:
 'on':
   push:
     branches:
+    - main
     - feature/openminis-native-20261023
     paths:
     - ZEUSNext/**
