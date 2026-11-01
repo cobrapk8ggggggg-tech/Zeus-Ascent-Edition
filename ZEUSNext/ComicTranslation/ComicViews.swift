@@ -12,6 +12,7 @@ struct ComicSettingsSheet:View {
     @State private var customColor=""
     @State private var message:String?
     @State private var downloading=false
+    @State private var redraw:Task<Void,Never>?
     private var prefs:ComicPreferences{model.data.settings.comicTranslation ?? ComicPreferences()}
     private var translation:TranslationPreferences{prefs.resolvedTranslation(model.data.settings)}
     var body:some View{
@@ -44,7 +45,7 @@ struct ComicSettingsSheet:View {
                 Button("استيراد TTF / OTF / TTC"){importingFont=true}
                 HStack{Text("حجم الخط");Slider(value:binding(\.fontScale),in:0.5...1.5,step:0.05);Text("\(Int(prefs.fontScale*100))٪")}
                 Text("يُضبط الحجم داخل مساحة الفقاعة. تغيير الرسم يعيد استخدام النص والترجمة المحفوظين.").font(.footnote)
-                Picker("لون الكلام",selection:binding(\.textColor)){Text("تلقائي حسب الخلفية").tag(nil as String?);Text("أسود").tag(Optional("101010"));Text("أبيض").tag(Optional("FAFAFA"));Text("أزرق داكن").tag(Optional("163B72"));Text("أحمر داكن").tag(Optional("8B2020"))}
+                Picker("لون الكلام",selection:binding(\.textColor)){Text("تلقائي حسب الخلفية").tag(nil as String?);Text("أسود").tag(Optional("101010"));Text("أبيض").tag(Optional("FAFAFA"));Text("أزرق داكن").tag(Optional("163B72"));Text("أحمر داكن").tag(Optional("8B2020"));if let value=prefs.textColor,!["101010","FAFAFA","163B72","8B2020"].contains(value){Text("مخصص").tag(Optional(value))}}
                 TextField("لون مخصص مثل #163B72",text:$customColor).textInputAutocapitalization(.never).autocorrectionDisabled()
                 Button("تطبيق اللون"){var p=prefs;p.textColor=customColor.isEmpty ? nil:customColor;save(p)}.disabled(!customColor.isEmpty && ComicPixels.color(customColor)==nil)
             }
@@ -63,7 +64,7 @@ struct ComicSettingsSheet:View {
         .fileImporter(isPresented:$importingFont,allowedContentTypes:[.data]){result in do{let url=try result.get();let name=try ComicFonts.importFont(url);var p=prefs;p.fontName=name;save(p)}catch{message=error.localizedDescription}}
         .fileImporter(isPresented:$importingModel,allowedContentTypes:[.data]){result in Task{do{try await ComicLocalTranslator.shared.importModel(result.get());message="استُورد النموذج المحلي."}catch{message=error.localizedDescription}}}
     }
-    private func save(_ value:ComicPreferences){model.data.settings.comicTranslation=value;model.persist();if model.current?.comicTranslation?.active==true{model.current?.comicTranslation?.pause();model.current?.comicTranslation?.start()}}
+    private func save(_ value:ComicPreferences){model.data.settings.comicTranslation=value;model.persist();if let session=model.current?.comicTranslation,session.active{session.pause();redraw?.cancel();redraw=Task{do{try await Task.sleep(for:.milliseconds(250));try Task.checkCancellation();if session.active{session.start()}}catch{}}}}
     private func binding<T>(_ path:WritableKeyPath<ComicPreferences,T>)->Binding<T>{Binding(get:{prefs[keyPath:path]},set:{var p=prefs;p[keyPath:path]=$0;save(p)})}
     private func translationBinding<T>(_ path:WritableKeyPath<TranslationPreferences,T>)->Binding<T>{Binding(get:{translation[keyPath:path]},set:{var t=translation;t[keyPath:path]=$0;var p=prefs;p.translation=t;save(p)})}
     private func translationBinding(_ path:WritableKeyPath<TranslationPreferences,Bool?>,default fallback:Bool)->Binding<Bool>{Binding(get:{translation[keyPath:path] ?? fallback},set:{var t=translation;t[keyPath:path]=$0;var p=prefs;p.translation=t;save(p)})}

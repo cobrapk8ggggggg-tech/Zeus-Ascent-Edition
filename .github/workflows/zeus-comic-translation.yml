@@ -69,7 +69,12 @@ jobs:
           assert choices
           with open(os.environ['GITHUB_ENV'],'a') as f:f.write('COMIC_SIMULATOR='+choices[0]['udid']+'\n')
           PY
+      - name: Boot selected simulator before tests
+        if: matrix.sdk == 'iphonesimulator'
+        timeout-minutes: 6
+        run: |
           xcrun simctl boot "$COMIC_SIMULATOR" || true
+          xcrun simctl bootstatus "$COMIC_SIMULATOR" -b
       - name: Start deterministic provider fixture
         if: matrix.sdk == 'iphonesimulator'
         run: |
@@ -85,7 +90,7 @@ jobs:
         run: |
           mkdir -p results
           git rev-parse HEAD > results/source-commit.txt
-          if [ -d results/comic.xcresult ]; then
+          if [ -f results/comic.xcresult/Info.plist ]; then
             xcrun xcresulttool get test-results summary --path results/comic.xcresult > results/summary.json
           fi
       - uses: actions/upload-artifact@v4

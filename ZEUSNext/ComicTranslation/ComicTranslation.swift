@@ -60,7 +60,7 @@ import CoreGraphics
         guard let view=tab?.webView else{throw CancellationError()}
         return try await view.callAsyncJavaScript(code,arguments:args,in:frame?.isMainFrame==true ? nil:frame,contentWorld:Self.world) ?? NSNull()
     }
-    func start(){guard let model,let tab,!tab.isHome,!model.requiresUnlock,model.profile.id==tab.profileID else{return};active=true;paused=false;error=nil;failed.removeAll();schedule()}
+    func start(){guard let model,let tab,!tab.isHome,!model.requiresUnlock,model.profile.id==tab.profileID else{return};ComicFonts.registerAll();active=true;paused=false;error=nil;failed.removeAll();schedule()}
     func navigationStarted(){pause();active=false;completed=0;ocrRuns=0;done.removeAll();failed.removeAll();frames.removeAll();documents.removeAll();readings.removeAll();textResults.removeAll();speechTexts.removeAll();fetched.removeAll();resolvedScripts.removeAll();error=nil}
     func pause(){paused=true;epoch=UUID();work?.cancel();work=nil;running=false;pending=false;for frame in frames.values{Task{_ = try? await call("globalThis.zeusComic?.releaseAll?.()",frame:frame)}}}
     func becameVisible(){if active||preferences.automatic{start()}}

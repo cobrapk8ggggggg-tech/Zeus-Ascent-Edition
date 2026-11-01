@@ -103,16 +103,21 @@ enum ComicGeometry {
         let lines = input.filter { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && $0.rect.width > 0 && $0.rect.height > 0 }
         var groups: [[ComicLine]] = []
         for line in lines.sorted(by: { $0.rect.minY < $1.rect.minY }) {
-            let index = groups.indices.min { a, b in abs(groups[a].last!.rect.midY - line.rect.midY) < abs(groups[b].last!.rect.midY - line.rect.midY) }
-            if let i = index, let last = groups[i].last {
-                let gap = line.rect.minY - last.rect.maxY
-                let overlap = min(line.rect.maxX, last.rect.maxX) - max(line.rect.minX, last.rect.minX)
+            // Select among compatible groups: a nearer adjacent balloon must not
+            // hide the correct group above this line.
+            let compatible=groups.indices.filter{i in
+                guard let last=groups[i].last else{return false}
+                let gap=line.rect.minY-last.rect.maxY
+                let overlap=min(line.rect.maxX,last.rect.maxX)-max(line.rect.minX,last.rect.minX)
                 let vertical=line.rect.height>line.rect.width*1.5 && last.rect.height>last.rect.width*1.5
-                let columnGap=max(line.rect.minX-last.rect.maxX,last.rect.minX-line.rect.maxX)
-                let verticalOverlap=min(line.rect.maxY,last.rect.maxY)-max(line.rect.minY,last.rect.minY)
-                if vertical && columnGap<max(line.rect.width,last.rect.width)*1.1 && verticalOverlap>min(line.rect.height,last.rect.height)*0.6{groups[i].append(line);continue}
-                if !vertical && gap >= -min(line.rect.height,last.rect.height) * 0.5 && gap < max(line.rect.height,last.rect.height) * 1.1 && overlap > min(line.rect.width,last.rect.width) * 0.4 { groups[i].append(line); continue }
+                if vertical{
+                    let columnGap=max(line.rect.minX-last.rect.maxX,last.rect.minX-line.rect.maxX)
+                    let verticalOverlap=min(line.rect.maxY,last.rect.maxY)-max(line.rect.minY,last.rect.minY)
+                    return columnGap<max(line.rect.width,last.rect.width)*1.1 && verticalOverlap>min(line.rect.height,last.rect.height)*0.6
+                }
+                return gap >= -min(line.rect.height,last.rect.height)*0.5 && gap<max(line.rect.height,last.rect.height)*1.1 && overlap>min(line.rect.width,last.rect.width)*0.4
             }
+            if let i=compatible.min(by:{abs(groups[$0].last!.rect.midY-line.rect.midY)<abs(groups[$1].last!.rect.midY-line.rect.midY)}){groups[i].append(line);continue}
             groups.append([line])
         }
         let japanese = source.hasPrefix("ja")

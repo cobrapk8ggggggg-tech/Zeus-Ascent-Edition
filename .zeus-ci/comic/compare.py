@@ -5,7 +5,7 @@ mode and samples. Each sample contains id, language, expected, recognized,
 missed_lines, seam_errors, displayed, first_balloon_ms and completed_ms.
 No expected field or unmeasured metric is silently invented.
 """
-import argparse, json, sys, unicodedata
+import argparse, json, sys, unicodedata, math, re
 
 def cer(expected,actual):
     expected=''.join(unicodedata.normalize('NFC',expected).split())
@@ -25,12 +25,19 @@ def compare(baseline,candidate):
     problems=[]
     for key in ['dataset_sha256','comparison_pair','mode']:
         if not baseline.get(key) or baseline.get(key)!=candidate.get(key):problems.append('mismatched_or_missing_'+key)
+    if not re.fullmatch(r'[a-fA-F0-9]{64}',str(baseline.get('dataset_sha256',''))):problems.append('invalid_dataset_sha256')
     if baseline.get('physical_device') is not True or candidate.get('physical_device') is not True:problems.append('physical_devices_required')
     required={'id','language','expected','recognized','missed_lines','seam_errors','displayed','first_balloon_ms','completed_ms'}
     def rows(d):
         result={}
         for row in d.get('samples',[]):
-            if not required<=row.keys():problems.append('incomplete_sample');continue
+            if not isinstance(row,dict) or not required<=row.keys():problems.append('incomplete_sample');continue
+            strings=['id','language','expected','recognized']
+            metrics=['missed_lines','seam_errors','first_balloon_ms','completed_ms']
+            if (not all(isinstance(row[k],str) for k in strings) or not row['id'] or not row['expected'].strip()
+                or type(row['displayed']) is not bool or any(type(row[k]) not in [int,float] or not math.isfinite(row[k]) or row[k]<0 for k in metrics)
+                or row['completed_ms']<row['first_balloon_ms']):
+                problems.append('invalid_sample');continue
             if row['id'] in result:problems.append('duplicate_sample')
             result[row['id']]=row
         return result
