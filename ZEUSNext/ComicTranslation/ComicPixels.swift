@@ -31,7 +31,7 @@ enum ComicPixels {
             guard area.width>3,area.height>3 else{continue}
             let background=backgroundColor(pixels,width:image.width,height:image.height,rect:area)
             // Prepare layout before erasing any source text. Failed fit leaves the original.
-            guard let layout=layout(text,rect:area.insetBy(dx:2,dy:2),target:target,fontName:fontName,fontScale:fontScale)else{continue}
+            guard let layout=layout(text,rect:area.insetBy(dx:2,dy:2),target:target,fontName:fontName,fontScale:fontScale)else{throw ComicFailure.message("لم يتسع النص للفقاعة؛ بقي الأصل دون مسح.")}
             // Erase foreground components only inside detected source lines. Uniform
             // fills are confined to the text masks; balloon borders remain untouched.
             clean(context,pixels:pixels,width:image.width,height:image.height,speech:speech,background:background)
@@ -49,12 +49,18 @@ enum ComicPixels {
     static func layout(_ text:String,rect:CGRect,target:String,fontName:String?,fontScale:Double)->TextLayout?{
         guard rect.width>2,rect.height>2 else{return nil}
         let style=NSMutableParagraphStyle();style.alignment = .center;style.baseWritingDirection=TranslationPreferences.rtl(target) ? .rightToLeft:.leftToRight;style.lineBreakMode = .byWordWrapping
-        var low:CGFloat=6,high=min(96,rect.height)*CGFloat(min(2,max(0.5,fontScale))),best:TextLayout?
+        var low:CGFloat=6,high=min(96,rect.height),best:TextLayout?
         for _ in 0..<9{let size=(low+high)/2,font=CTFontCreateWithName((fontName ?? "ArialMT")as CFString,size,nil)
             let value=NSAttributedString(string:text,attributes:[NSAttributedString.Key(kCTFontAttributeName as String):font,.paragraphStyle:style])
             let setter=CTFramesetterCreateWithAttributedString(value);var fit=CFRange();let measured=CTFramesetterSuggestFrameSizeWithConstraints(setter,CFRange(),nil,CGSize(width:rect.width,height:CGFloat.greatestFiniteMagnitude),&fit)
             if measured.height<=rect.height && measured.width<=rect.width+0.5 && fit.length==value.length{best=TextLayout(text:value,height:ceil(measured.height),size:size);low=size}else{high=size}
-        };return best
+        }
+        guard let best else{return nil}
+        let chosen=min(best.size,max(6,best.size*CGFloat(min(1.5,max(0.5,fontScale)))*0.8))
+        let font=CTFontCreateWithName((fontName ?? "ArialMT")as CFString,chosen,nil)
+        let text=NSAttributedString(string:text,attributes:[NSAttributedString.Key(kCTFontAttributeName as String):font,.paragraphStyle:style])
+        let measured=CTFramesetterSuggestFrameSizeWithConstraints(CTFramesetterCreateWithAttributedString(text),CFRange(),nil,CGSize(width:rect.width,height:CGFloat.greatestFiniteMagnitude),nil)
+        return TextLayout(text:text,height:ceil(measured.height),size:chosen)
     }
     private static func backgroundColor(_ pixels:[UInt8],width:Int,height:Int,rect:CGRect)->(CGFloat,CGFloat,CGFloat){
         var bins:[Int:(Int,Int,Int,Int)]=[:]

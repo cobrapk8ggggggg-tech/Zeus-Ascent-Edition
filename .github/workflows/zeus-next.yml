@@ -141,6 +141,7 @@ jobs:
         python3 browser/.openminis/embed_native.py upstream browser results/native-adapters.json
         gem install xcodeproj --version 1.27.0 --no-document
         ruby browser/.openminis/build_project.rb upstream browser
+        bash browser/.zeus-ci/comic/build_runtime.sh iphonesimulator
     - name: Build the native browser and integration tests
       run: |
         set -euo pipefail

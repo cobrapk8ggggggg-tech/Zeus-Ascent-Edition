@@ -8,12 +8,32 @@ import UIKit
 #endif
 
 @MainActor final class NativeComicTranslationTests:XCTestCase{
+    private func renderer(_ size:CGSize)->UIGraphicsImageRenderer{let format=UIGraphicsImageRendererFormat();format.scale=1;return UIGraphicsImageRenderer(size:size,format:format)}
     func testRegionsOwnEveryRowExactlyOnceAndBoundPixels(){
         let regions=ComicGeometry.regions(width:1500,height:70000)
         XCTAssertGreaterThan(regions.count,10)
         var previous=0
         for region in regions{XCTAssertLessThanOrEqual(region.width*region.height,8_000_000);XCTAssertEqual(region.y+region.coreTop,previous);previous=region.y+region.coreBottom;XCTAssertLessThan(region.coreTop,region.coreBottom)}
         XCTAssertEqual(previous,70000);XCTAssertTrue(ComicGeometry.regions(width:0,height:1).isEmpty)
+    }
+    func testStripNeverCrossesUnloadedPanelAndPreservesPixelOrder()throws{
+        func candidate(_ id:String,_ y:Double,pending:Bool=false)->ComicCandidate{ComicCandidate(id:id,source:"https://example.invalid/"+id,kind:"image",width:200,height:400,x:0,y:y,w:200,h:400,pending:pending,revision:"0")}
+        let a=candidate("a",0),b=candidate("b",400),c=candidate("c",800)
+        XCTAssertEqual(ComicWindow.neighbours(of:b,in:[a,b,c]).before?.id,"a")
+        let gap=candidate("gap",400,pending:true)
+        XCTAssertNil(ComicWindow.neighbours(of:a,in:[a,gap,c]).after)
+        func image(_ color:UIColor)->CGImage{renderer(CGSize(width:20,height:20)).image{ctx in color.setFill();ctx.fill(CGRect(x:0,y:0,width:20,height:20))}.cgImage!}
+        let joined=try ComicWindow.join(image(.green),before:image(.red),after:image(.blue))
+        XCTAssertEqual(joined.offset,20);XCTAssertEqual(joined.image.height,60)
+        let pixels=try XCTUnwrap(ComicPixels.rgba(joined.image,width:20,height:60))
+        XCTAssertGreaterThan(pixels[0],200);XCTAssertGreaterThan(pixels[(40*20)*4+2],200)
+    }
+    func testNativeTallPNGRegionMatchesOriginal()throws{
+        let image=renderer(CGSize(width:100,height:12000)).image{ctx in UIColor.red.setFill();ctx.fill(CGRect(x:0,y:0,width:100,height:12000))}
+        let data=try XCTUnwrap(image.pngData()),region=ComicRegion(y:11000,width:100,height:1000,coreTop:0,coreBottom:1000)
+        let decoded=try ComicPixels.decodeRegion(data,region:region)
+        XCTAssertEqual(decoded.width,100);XCTAssertEqual(decoded.height,1000)
+        let pixels=try XCTUnwrap(ComicPixels.rgba(decoded,width:100,height:1000));XCTAssertGreaterThan(pixels[0],200)
     }
     func testCTCBlankRepeatedGlyphAndDictionaryValidation()throws{
         let dictionary=try ComicPaddle.dictionary("Global:\n  character_dict:\n  - 'ا'\n  - 'ب'\n")
@@ -39,7 +59,7 @@ import UIKit
         XCTAssertEqual(ComicPreferences().mode,.fastest)
     }
     func testActualWebKitSwapRestoreAndStaleResults()async throws{
-        let image=UIGraphicsImageRenderer(size:CGSize(width:200,height:100)).image{c in UIColor.white.setFill();c.fill(CGRect(x:0,y:0,width:200,height:100));("ORIGINAL" as NSString).draw(at:CGPoint(x:20,y:30),withAttributes:[.foregroundColor:UIColor.black,.font:UIFont.systemFont(ofSize:20)])}
+        let image=renderer(CGSize(width:200,height:100)).image{c in UIColor.white.setFill();c.fill(CGRect(x:0,y:0,width:200,height:100));("ORIGINAL" as NSString).draw(at:CGPoint(x:20,y:30),withAttributes:[.foregroundColor:UIColor.black,.font:UIFont.systemFont(ofSize:20)])}
         let original=try XCTUnwrap(image.pngData()).base64EncodedString(),replacement=try XCTUnwrap(ComicPixels.png(XCTUnwrap(image.cgImage))).base64EncodedString()
         let controller=WKUserContentController();controller.addUserScript(WKUserScript(source:ComicTranslation.script,injectionTime:.atDocumentEnd,forMainFrameOnly:false,in:ComicTranslation.world))
         let config=WKWebViewConfiguration();config.userContentController=controller;let view=WKWebView(frame:CGRect(x:0,y:0,width:390,height:700),configuration:config)

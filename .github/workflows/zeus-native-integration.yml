@@ -11,6 +11,7 @@ name: ZEUS native browser integration tests
     - feature/zeus-ipad-layout-studio-20261025
     - feature/zeus-cloud-account-20261026
     - feature/zeus-android-lab-20261030
+    - feature/zeus-manhwa-translation-20261101
     paths:
     - ZEUSNext/**
     - .openminis/**
@@ -108,6 +109,8 @@ jobs:
         python3 browser/.openminis/embed_native.py upstream browser results/native-adapters.json
         gem install xcodeproj --version 1.27.0 --no-document
         ruby browser/.openminis/build_project.rb upstream browser
+    - name: Build the comic image and local model runtime
+      run: bash browser/.zeus-ci/comic/build_runtime.sh iphonesimulator
     - uses: actions/cache/restore@v4
       id: swift_cache
       with:

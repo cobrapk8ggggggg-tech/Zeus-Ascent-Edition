@@ -39,7 +39,7 @@
       if(o.styles)for(const [name,value] of Object.entries(o.styles))putCSS(r.el,name,value);
     }
     for(const u of r.urls)URL.revokeObjectURL(u);
-    r.urls.clear();r.parts.clear();r.original=null;r.mark=null;r.renderMark=null;r.canvasMark=null;
+    r.urls.clear();r.parts.clear();r.original=null;r.captureSource=null;r.mark=null;r.renderMark=null;r.canvasMark=null;
   }
   function fingerprint(el) { try { const c=document.createElement('canvas');c.width=c.height=16;c.getContext('2d').drawImage(el,0,0,16,16);return Array.from(c.getContext('2d').getImageData(0,0,16,16).data).join(','); }catch{return '';} }
   function scan(wake=true) {
@@ -65,7 +65,7 @@
   }
   function live(id,revision) { const r=records.get(id);if(!r||!r.el.isConnected||String(r.revision)!==String(revision))throw Error('stale image');return r; }
   async function capture(id,revision,region) {
-    const r=live(id,revision);if(r.original && r.kind!=='canvas'){const original=new Image();original.src=r.original.source;await original.decode();r.captureSource=original;}
+    const r=live(id,revision);if(r.original && !r.captureSource && r.kind!=='canvas'){const original=new Image();original.src=r.original.source;await original.decode();r.captureSource=original;}
     let image=r.original?.canvas || r.captureSource || r.el;
     if(r.kind==='background'){image=new Image();image.crossOrigin='anonymous';image.src=sourceOf(r);await image.decode();}
     const c=document.createElement('canvas');c.width=region.width;c.height=region.height;
@@ -76,7 +76,7 @@
     if(transfers.size>=6)throw Error('transfer limit');
     transfers.set(token,{bytes,at:Date.now()});return {token,length:bytes.length,width:c.width,height:c.height};
   }
-  function take(token,offset,count){const transfer=transfers.get(token);if(!transfer||count>65536||offset<0)throw Error('missing transfer');let result='';for(const b of transfer.bytes.subarray(offset,offset+count))result+=String.fromCharCode(b);return btoa(result);}
+  function take(token,offset,count){const transfer=transfers.get(token);if(!transfer||count>65536||offset<0)throw Error('missing transfer');let result='';for(const b of transfer.bytes.subarray(offset,offset+count))result+=String.fromCharCode(b);transfer.at=Date.now();return btoa(result);}
   function begin(id,revision) {
     const r=live(id,revision);if(r.original)return r;
     const el=r.el,styles={};for(const n of ['background-image','background-size','background-position','background-repeat','background-origin','background-clip','object-position','object-fit','opacity','transition'])styles[n]=css(el,n);
@@ -85,12 +85,12 @@
     if(r.kind==='canvas'){const c=document.createElement('canvas');c.width=el.width;c.height=el.height;c.getContext('2d').drawImage(el,0,0);r.original.canvas=c;}
     return r;
   }
-  function hold(id,revision) {const r=live(id,revision);if(!r.held){r.held=css(r.el,'filter');r.el.style.setProperty('filter','blur(18px) saturate(.7)','important');}r.holdUntil=Date.now()+180000;}
+  function hold(id,revision) {const r=live(id,revision);if(!r.held){r.held=css(r.el,'filter');r.el.style.setProperty('filter','blur(18px) saturate(.7)','important');}r.holdUntil=Date.now()+180000;observer.takeRecords();}
   async function apply(id,revision,data,region,mark,expectedGeneration) {
     if(expectedGeneration!==generation)return false;
-    const r=live(id,revision),beforeSource=sourceOf(r),image=new Image(),bytes=Uint8Array.from(atob(data),v=>v.charCodeAt(0));
+    const r=live(id,revision),beforeSource=sourceOf(r),image=new Image(),bytes=typeof data==='string'?Uint8Array.from(atob(data),v=>v.charCodeAt(0)):data;
     let url=URL.createObjectURL(new Blob([bytes],{type:'image/png'}));
-    try{image.src=url;await image.decode();}catch{URL.revokeObjectURL(url);url='data:image/png;base64,'+data;image.src=url;try{await image.decode();}catch{return false;}}
+    try{image.src=url;await image.decode();}catch{URL.revokeObjectURL(url);let raw='';for(const byte of bytes)raw+=String.fromCharCode(byte);url='data:image/png;base64,'+btoa(raw);image.src=url;try{await image.decode();}catch{return false;}}
     if(expectedGeneration!==generation||sourceOf(r)!==beforeSource||!r.el.isConnected){URL.revokeObjectURL(url);return false;}
     begin(id,revision);r.urls.add(url);
     const el=r.el;
@@ -112,7 +112,7 @@
       el.style.setProperty('background-repeat','no-repeat','important');el.style.setProperty('background-origin','content-box','important');el.style.setProperty('background-clip','content-box','important');
       if(r.kind==='image'){el.style.setProperty('object-fit','none','important');el.style.setProperty('object-position','-100000px -100000px','important');}
     }
-    r.renderMark=mark;release(r);return true;
+    r.renderMark=mark;release(r);observer.takeRecords();return true;
   }
   function restore(){generation++;active=false;for(const r of records.values())reset(r);transfers.clear();}
   function start(){active=true;return generation;}
@@ -125,7 +125,7 @@
   setInterval(()=>{for(const r of records.values())if(r.holdUntil&&r.holdUntil<Date.now())release(r);for(const [id,t]of transfers)if(Date.now()-t.at>30000)transfers.delete(id);},5000);
   function outputStart(token,length){if(length>33554432||length<1||outputs.size>=4)throw Error("output limit");outputs.set(token,{bytes:new Uint8Array(length),offset:0});}
   function outputPart(token,offset,data){const o=outputs.get(token);if(!o||offset!==o.offset||data.length>65536)throw Error("output offset");const b=Uint8Array.from(atob(data),v=>v.charCodeAt(0));if(offset+b.length>o.bytes.length)throw Error("output overflow");o.bytes.set(b,offset);o.offset+=b.length;}
-  async function outputApply(token,id,revision,region,mark,generation){const o=outputs.get(token);if(!o||o.offset!==o.bytes.length)throw Error("incomplete output");let data="";for(const b of o.bytes)data+=String.fromCharCode(b);outputs.delete(token);return apply(id,revision,btoa(data),region,mark,generation);}
+  async function outputApply(token,id,revision,region,mark,generation){const o=outputs.get(token);if(!o||o.offset!==o.bytes.length)throw Error("incomplete output");outputs.delete(token);return apply(id,revision,o.bytes,region,mark,generation);}
   globalThis.zeusComic={outputStart,outputPart,outputApply,outputDrop:t=>outputs.delete(t),releaseAll:()=>{for(const r of records.values())release(r);},documentID,scan,capture,take,drop:t=>transfers.delete(t),apply,hold,release:id=>{const r=records.get(id);if(r)release(r);},start,resume,restore,mark:(id,revision,mark)=>{live(id,revision).mark=mark;},has:(id,revision,mark)=>{const r=live(id,revision);return r.mark===mark;}};
   notify('ready');
 })();

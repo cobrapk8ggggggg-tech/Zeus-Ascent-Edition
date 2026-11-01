@@ -38,6 +38,10 @@ actor ComicOCR {
         let samples=try vision(image,languages:["ko-KR","ja-JP","zh-Hans","en-US"],accurate:false)
         let text=samples.map(\.text).joined(separator:" ")
         let recognizer=NLLanguageRecognizer();recognizer.processString(text)
+        let scalars=text.unicodeScalars
+        if scalars.contains(where:{(0xAC00...0xD7AF).contains($0.value)}){return "ko"}
+        if scalars.contains(where:{(0x3040...0x30FF).contains($0.value)}){return "ja"}
+        if scalars.filter({(0x4E00...0x9FFF).contains($0.value)}).count>=2{return "zh"}
         return recognizer.dominantLanguage?.rawValue ?? "en"
     }
     private static func fast(_ image:CGImage,source:String)async throws->[ComicLine]{

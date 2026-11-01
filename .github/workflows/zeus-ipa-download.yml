@@ -94,10 +94,14 @@ jobs:
           python3 browser/.openminis/embed_native.py upstream browser results/native-adapters.json
           gem install xcodeproj --version 1.27.0 --no-document
           ruby browser/.openminis/build_project.rb upstream browser
+          brew install cmake ninja cocoapods
+          bash browser/.zeus-ci/comic/build_runtime.sh iphoneos
+          ruby browser/.zeus-ci/comic/install_pods.rb upstream/src/ios/Minis.xcodeproj Minis ZEUSBrowser
+          (cd upstream/src/ios && pod install)
       - name: Build iOS device application (no simulator tests)
         run: |
           set -euo pipefail
-          xcodebuild -project upstream/src/ios/Minis.xcodeproj -scheme Minis \
+          xcodebuild -workspace upstream/src/ios/Minis.xcworkspace -scheme Minis \
             -configuration Release -destination 'generic/platform=iOS' -sdk iphoneos \
             -derivedDataPath "$RUNNER_TEMP/ZEUSNativeDevice" \
             -onlyUsePackageVersionsFromResolvedFile build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO ARCHS=arm64 \

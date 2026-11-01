@@ -1,9 +1,11 @@
 import Foundation
+import CryptoKit
 import ZeusComicRuntime
 
 actor ComicLocalTranslator {
     static let shared=ComicLocalTranslator()
     static let modelURL=ComicModelStore.root.appendingPathComponent("translation.gguf")
+    nonisolated static var modelIdentity:String{(try? String(contentsOf:modelURL.appendingPathExtension("sha256"),encoding:.utf8)) ?? "none"}
     private var handle:UnsafeMutableRawPointer?
     func unload(){if let handle{zeus_comic_unload(handle)};handle=nil}
     func translate(_ input:[TranslationSegment],source:String,target:String,context:[String])throws->[TranslationSegment]{
@@ -21,9 +23,13 @@ actor ComicLocalTranslator {
         let size=try url.resourceValues(forKeys:[.fileSizeKey]).fileSize ?? 0
         guard size>16,size<=2_147_483_648 else{throw ComicFailure.message("حد النموذج المحلي 2 GiB.")}
         let file=try FileHandle(forReadingFrom:url);defer{try? file.close()};guard try file.read(upToCount:4)==Data("GGUF".utf8)else{throw ComicFailure.message("هذا الملف ليس GGUF.")}
+        let hash=try ComicModelFingerprint.hash(url)
         unload();try FileManager.default.createDirectory(at:ComicModelStore.root,withIntermediateDirectories:true)
         let part=Self.modelURL.appendingPathExtension("part");try? FileManager.default.removeItem(at:part);try FileManager.default.copyItem(at:url,to:part)
         if FileManager.default.fileExists(atPath:Self.modelURL.path){_ = try FileManager.default.replaceItemAt(Self.modelURL,withItemAt:part)}else{try FileManager.default.moveItem(at:part,to:Self.modelURL)}
+        try hash.write(to:Self.modelURL.appendingPathExtension("sha256"),atomically:true,encoding:.utf8)
         var folder=ComicModelStore.root;var values=URLResourceValues();values.isExcludedFromBackup=true;try folder.setResourceValues(values)
     }
 }
+
+private enum ComicModelFingerprint{static func hash(_ url:URL)throws->String{let file=try FileHandle(forReadingFrom:url);defer{try? file.close()};var hash=SHA256();while let data=try file.read(upToCount:1_048_576),!data.isEmpty{hash.update(data:data)};return hash.finalize().map{String(format:"%02x",$0)}.joined()}}
