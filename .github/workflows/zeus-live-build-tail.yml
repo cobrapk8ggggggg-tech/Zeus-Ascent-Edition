@@ -1,0 +1,21 @@
+name: Inspect current IPA build tail
+on:
+  push:
+    branches: [fix/unsigned-ipa-20261101]
+    paths: [.github/workflows/zeus-live-build-tail.yml]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Read the tail of the active device build
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$REPO/actions/jobs/124968737259/logs" > live-build.log
+          wc -c live-build.log
+          tail -n 75 live-build.log
