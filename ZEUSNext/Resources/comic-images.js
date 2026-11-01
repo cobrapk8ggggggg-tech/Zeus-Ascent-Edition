@@ -61,6 +61,7 @@
     }
     for(const el of document.querySelectorAll('canvas,[style*="background-image"]')) {
       const kind=el.tagName==='CANVAS'?'canvas':'background',r=record(el,kind),box=el.getBoundingClientRect();
+      if(kind==='canvas'&&r.original&&fingerprint(el)!==r.canvasMark){reset(r,false);r.revision++;}
       if(box.width<64||box.height<24||box.bottom< -viewport||box.top>viewport*3||r.parts.size)continue;
       items.push({id:r.id,source:shortSource(sourceOf(r),r.id,r.revision),kind,width:el.width||Math.round(box.width),height:el.height||Math.round(box.height),x:box.left+scrollX,y:box.top+scrollY,w:box.width,h:box.height,pending:false,revision:String(r.revision)});
     }
@@ -72,6 +73,7 @@
     const r=live(id,revision);if(r.original && !r.captureSource && r.kind!=='canvas'){const original=new Image();original.src=r.original.source;await original.decode();r.captureSource=original;}
     let image=r.original?.canvas || r.captureSource || r.el;
     if(r.kind==='background'){image=new Image();image.crossOrigin='anonymous';image.src=sourceOf(r);await image.decode();}
+    if(r.kind==='canvas')r.captureFingerprint=fingerprint(r.el);
     const c=document.createElement('canvas');c.width=region.width;c.height=region.height;
     if(c.width*c.height>8000000)throw Error('pixel limit');
     c.getContext('2d').drawImage(image,region.x,region.y,region.width,region.height,0,0,c.width,c.height);
@@ -95,7 +97,7 @@
     const r=live(id,revision),beforeSource=sourceOf(r),image=new Image(),bytes=typeof data==='string'?Uint8Array.from(atob(data),v=>v.charCodeAt(0)):data;
     let url=URL.createObjectURL(new Blob([bytes],{type:'image/png'}));
     try{image.src=url;await image.decode();}catch{URL.revokeObjectURL(url);let raw='';for(const byte of bytes)raw+=String.fromCharCode(byte);url='data:image/png;base64,'+btoa(raw);image.src=url;try{await image.decode();}catch{return false;}}
-    if(expectedGeneration!==generation||sourceOf(r)!==beforeSource||!r.el.isConnected){URL.revokeObjectURL(url);return false;}
+    if(expectedGeneration!==generation||String(r.revision)!==String(revision)||sourceOf(r)!==beforeSource||!r.el.isConnected||(r.kind==='canvas'&&r.captureFingerprint&&fingerprint(r.el)!==r.captureFingerprint)){URL.revokeObjectURL(url);return false;}
     begin(id,revision);r.urls.add(url);
     const el=r.el;
     if(r.kind==='canvas') {

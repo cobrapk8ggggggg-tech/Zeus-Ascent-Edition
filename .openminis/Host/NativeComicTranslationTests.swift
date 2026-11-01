@@ -35,6 +35,14 @@ import UIKit
         XCTAssertEqual(decoded.width,100);XCTAssertEqual(decoded.height,1000)
         let pixels=try XCTUnwrap(ComicPixels.rgba(decoded,width:100,height:1000));XCTAssertGreaterThan(pixels[0],200)
     }
+    func testTallImageScrollJumpPrioritizesVisibleRegion(){
+        let candidate=ComicCandidate(id:"long",source:"https://example.invalid/long.png",kind:"image",width:1000,height:70000,x:0,y:0,w:1000,h:70000,pending:false,revision:"0")
+        let regions=ComicGeometry.regions(width:1000,height:70000)
+        let queued=ComicGeometry.prioritized(regions,candidate:candidate,scroll:50000,viewport:800,readAhead:false)
+        XCTAssertFalse(queued.isEmpty)
+        XCTAssertTrue(queued.allSatisfy{$0.y+$0.coreBottom>=50000&&$0.y+$0.coreTop<=50800})
+        XCTAssertFalse(queued.contains{$0.y==0})
+    }
     func testCTCBlankRepeatedGlyphAndDictionaryValidation()throws{
         let dictionary=try ComicPaddle.dictionary("Global:\n  character_dict:\n  - 'ا'\n  - 'ب'\n")
         let result=ComicPaddle.ctc([0,1,0,0, 0,1,0,0, 1,0,0,0, 0,1,0,0, 0,0,1,0],steps:5,classes:4,dictionary:dictionary)
@@ -46,10 +54,42 @@ import UIKit
         XCTAssertLessThanOrEqual(layout.height,90);XCTAssertGreaterThan(layout.size,6)
         XCTAssertNil(ComicPixels.color("<script>"));XCTAssertNotNil(ComicPixels.color("#163B72"))
     }
+    func testBalloonInteriorProtectsBordersAndProvidesRoomForArabic()throws{
+        let image=renderer(CGSize(width:300,height:220)).image{context in
+            UIColor.darkGray.setFill();context.fill(CGRect(x:0,y:0,width:300,height:220))
+            UIColor.white.setFill();UIBezierPath(ovalIn:CGRect(x:50,y:30,width:200,height:160)).fill()
+            UIColor.black.setFill();context.fill(CGRect(x:110,y:90,width:80,height:4))
+        }.cgImage!
+        let pixels=try XCTUnwrap(ComicPixels.rgba(image,width:300,height:220))
+        let interior=try XCTUnwrap(ComicBalloons.interior(CGRect(x:100,y:80,width:100,height:40),pixels:pixels,width:300,height:220))
+        XCTAssertGreaterThan(interior.width,150);XCTAssertGreaterThan(interior.height,100)
+        XCTAssertGreaterThan(interior.minX,45);XCTAssertLessThan(interior.maxX,255)
+    }
     func testGroupingDoesNotJoinAdjacentBalloons(){
         let lines=[ComicLine(text:"첫 줄",confidence:1,rect:CGRect(x:10,y:10,width:80,height:20)),ComicLine(text:"둘째 줄",confidence:1,rect:CGRect(x:10,y:35,width:80,height:20)),ComicLine(text:"다른 말",confidence:1,rect:CGRect(x:200,y:12,width:80,height:20))]
         let speeches=ComicGeometry.group(lines,source:"ko")
         XCTAssertEqual(speeches.count,2);XCTAssertTrue(speeches.contains{$0.lines.count==2})
+    }
+    func testActualLocalOCRReadsRasterText()async throws{
+        let image=renderer(CGSize(width:640,height:180)).image{context in
+            UIColor.white.setFill();context.fill(CGRect(x:0,y:0,width:640,height:180))
+            ("HELLO WORLD" as NSString).draw(at:CGPoint(x:60,y:60),withAttributes:[.font:UIFont.systemFont(ofSize:52),.foregroundColor:UIColor.black])
+        }.cgImage!
+        let result=try await ComicOCR.shared.read(image,source:"en",mode:.fastest)
+        XCTAssertTrue(result.lines.map(\.text).joined(separator:" ").uppercased().contains("HELLO"))
+    }
+    func testActualPinnedPaddleModelReadsRasterText()async throws{
+        try await ComicModelStore.shared.prepare(source:"en")
+        let image=renderer(CGSize(width:640,height:180)).image{context in
+            UIColor.white.setFill();context.fill(CGRect(x:0,y:0,width:640,height:180))
+            ("HELLO WORLD" as NSString).draw(at:CGPoint(x:60,y:60),withAttributes:[.font:UIFont.systemFont(ofSize:52),.foregroundColor:UIColor.black])
+        }.cgImage!
+        let lines=try await ComicPaddle.shared.read(image,source:"en",careful:false)
+        XCTAssertTrue(lines.map(\.text).joined(separator:" ").uppercased().contains("HELLO"))
+    }
+    func testDeletedProfileCannotReceiveLateCacheWrites()async throws{
+        let owner=UUID();try await ComicMemory.shared.clear(profile:owner,deleting:true)
+        do{try await ComicMemory.shared.save(Data("late".utf8),profile:owner,layer:.translation,key:"key");XCTFail("deleted profile accepted a late result")}catch is CancellationError{}catch{XCTFail(error.localizedDescription)}
     }
     func testImageSettingsAreIndependentOfPageTranslation()throws{
         var data=ProfileData();var page=TranslationPreferences();page.target="fr";data.settings.translation=page

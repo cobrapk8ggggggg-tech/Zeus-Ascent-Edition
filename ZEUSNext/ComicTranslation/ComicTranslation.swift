@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 import WebKit
 import UIKit
 import ImageIO
@@ -92,8 +93,9 @@ import CoreGraphics
         // Bounded sweep; rescan geometry before the next window after a scroll.
         for candidate in ordered.prefix(prefs.readAhead ? 16:4){
             try valid(ticket)
-            let regions=ComicGeometry.regions(width:candidate.width,height:candidate.height,maximumPixels:7_000_000)
-            if regions.isEmpty{failed.insert(candidate.id);continue}
+            let allRegions=ComicGeometry.regions(width:candidate.width,height:candidate.height,maximumPixels:7_000_000)
+            let regions=ComicGeometry.prioritized(allRegions,candidate:candidate,scroll:envelope.scroll,viewport:envelope.viewport,readAhead:prefs.readAhead)
+            if allRegions.isEmpty{failed.insert(candidate.id);continue}
             for region in regions{
                 let job="\(document)|\(candidate.id)|\(candidate.revision)|\(region.y)|\(mark)"
                 if done.contains(job)||failed.contains(job){continue}
@@ -119,7 +121,7 @@ import CoreGraphics
                     let window=try await Task.detached{try ComicWindow.join(center,before:before,after:after)}.value
                     let image=window.image,offset=window.offset
                     let imageHash=try await Task.detached{ComicIdentity.hash(try ComicPixels.png(image))}.value
-                    let readingKey=imageHash+"|ocr-v2|\(prefs.source)|\(prefs.mode.rawValue)"
+                    let readingKey=imageHash+"|ocr-v3|\(prefs.source)|\(prefs.mode.rawValue)"
                     stage="قراءة الفقاعات"
                     let reading:ComicReading
                     if let saved=readings[readingKey]{reading=saved}
@@ -147,7 +149,7 @@ import CoreGraphics
                     }
                     if textResults.count>=64{textResults.removeAll()};textResults[translationKey]=translated
                     try valid(ticket);stage="تنظيف الفقاعات ورسم العربية"
-                    let renderedKey=translationKey+"|render-v1|\(prefs.fontName ?? "default")|\(prefs.fontScale)|\(prefs.textColor ?? "auto")"
+                    let renderedKey=translationKey+"|render-v2|\(prefs.fontName ?? "default")|\(prefs.fontScale)|\(prefs.textColor ?? "auto")"
                     let rendered:Data
                     if persistent,let stored=await ComicMemory.shared.data(profile:owner,layer:.rendered,key:renderedKey){rendered=stored}
                     else{rendered=try await Task.detached{let drawn=try ComicPixels.render(image,speeches:core,translations:translated,target:translation.target,fontName:prefs.fontName,fontScale:prefs.fontScale,textColor:prefs.textColor)

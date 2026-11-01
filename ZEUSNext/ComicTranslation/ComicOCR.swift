@@ -32,7 +32,7 @@ actor ComicOCR {
                 lines=lines.map{line in accurate.filter{$0.rect.intersection(line.rect).area/max(1,line.rect.area)>0.5&&$0.confidence>line.confidence}.max(by:{$0.confidence<$1.confidence}) ?? line}
             }
         }
-        return ComicReading(lines:lines,speeches:ComicGeometry.group(lines,source:detected),language:detected,runtime:runtime)
+        return ComicReading(lines:lines,speeches:ComicBalloons.speeches(lines,image:image,source:detected),language:detected,runtime:runtime)
     }
     private static func detectScript(_ image:CGImage)async throws->String{
         let samples=try vision(image,languages:["ko-KR","ja-JP","zh-Hans","en-US"],accurate:true)

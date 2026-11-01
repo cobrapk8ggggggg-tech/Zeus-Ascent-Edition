@@ -26,7 +26,7 @@ enum ComicPixels {
         // CG image coordinates are top-left. CoreGraphics/CoreText are bottom-left.
         for speech in speeches {
             guard let text=translated[speech.id],!text.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty else{continue}
-            let pad=max(2,min(speech.rect.width,speech.rect.height)*0.08)
+            let pad=speech.balloon ? 0:max(2,min(speech.rect.width,speech.rect.height)*0.08)
             let area=speech.rect.insetBy(dx:-pad,dy:-pad).intersection(CGRect(x:0,y:0,width:image.width,height:image.height)).integral
             guard area.width>3,area.height>3 else{continue}
             let background=backgroundColor(pixels,width:image.width,height:image.height,rect:area)

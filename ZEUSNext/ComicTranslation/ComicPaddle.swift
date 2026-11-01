@@ -52,12 +52,12 @@ actor ComicPaddle {
             let scaleX=CGFloat(image.width)/CGFloat(mapWidth),scaleY=CGFloat(image.height)/CGFloat(mapHeight)
             let rect=CGRect(x:box.minX*scaleX,y:box.minY*scaleY,width:box.width*scaleX,height:box.height*scaleY).integral.intersection(CGRect(x:0,y:0,width:image.width,height:image.height))
             guard let cut=image.cropping(to:rect),cut.width>2,cut.height>2 else{continue}
-            let rotated=cut.height>cut.width*1.5 ? ComicPixels.rotated(cut):cut
+            let rotated=Double(cut.height)>Double(cut.width)*1.5 ? ComicPixels.rotated(cut):cut
             let targetWidth=max(8,min(4096,Int(ceil(Double(rotated.width)*48/Double(rotated.height)))))
             let (logits,s)=try infer(rotated,width:targetWidth,height:48,detector:false,session:recognizer)
             guard s.count==3 else{throw ComicFailure.message("أبعاد خرج قارئ النص غير صالحة.")}
             let result=Self.ctc(logits,steps:s[1],classes:s[2],dictionary:dictionary)
-            if !result.0.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty{lines.append(ComicLine(text:result.0,confidence:result.1,rect:rect))}
+            if !result.0.trimmingCharacters(in:CharacterSet.whitespacesAndNewlines).isEmpty{lines.append(ComicLine(text:result.0,confidence:result.1,rect:rect))}
         }
         // Careful mode re-detects at native-sized overlapping crops, retaining lines
         // missed by a reduced global pass. The scheduler bounds image dimensions.

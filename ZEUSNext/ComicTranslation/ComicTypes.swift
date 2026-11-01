@@ -65,6 +65,7 @@ struct ComicSpeech: Codable, Equatable {
     var lines: [ComicLine]
     var rect: CGRect
     var vertical: Bool
+    var balloon: Bool = false
 }
 struct ComicReading: Codable { var lines: [ComicLine]; var speeches: [ComicSpeech]; var language: String; var runtime: String }
 struct ComicCachedResult: Codable { var version = 1; var reading: ComicReading; var translations: [TranslationSegment] }
@@ -91,6 +92,12 @@ enum ComicGeometry {
             return ComicRegion(y: begin, width: width, height: end - begin, coreTop: top - begin, coreBottom: min(height, top + step) - begin)
         }
     }
+    static func prioritized(_ regions:[ComicRegion],candidate:ComicCandidate,scroll:Double,viewport:Double,readAhead:Bool)->[ComicRegion]{
+        guard candidate.height>0,viewport>0 else{return []}
+        func bounds(_ r:ComicRegion)->(Double,Double){let scale=candidate.h/Double(candidate.height);return(candidate.y+Double(r.y+r.coreTop)*scale,candidate.y+Double(r.y+r.coreBottom)*scale)}
+        func distance(_ r:ComicRegion)->Double{let (top,bottom)=bounds(r);return max(0,top-scroll-viewport,scroll-bottom)}
+        return regions.filter{r in let(top,bottom)=bounds(r);return bottom>=scroll-(readAhead ? viewport:0)&&top<=scroll+viewport*(readAhead ? 8:1)}.sorted{distance($0)<distance($1)}
+    }
     static func group(_ input: [ComicLine], source: String) -> [ComicSpeech] {
         let lines = input.filter { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && $0.rect.width > 0 && $0.rect.height > 0 }
         var groups: [[ComicLine]] = []
@@ -99,7 +106,11 @@ enum ComicGeometry {
             if let i = index, let last = groups[i].last {
                 let gap = line.rect.minY - last.rect.maxY
                 let overlap = min(line.rect.maxX, last.rect.maxX) - max(line.rect.minX, last.rect.minX)
-                if gap >= -min(line.rect.height,last.rect.height) * 0.5 && gap < max(line.rect.height,last.rect.height) * 1.1 && overlap > min(line.rect.width,last.rect.width) * 0.4 { groups[i].append(line); continue }
+                let vertical=line.rect.height>line.rect.width*1.5 && last.rect.height>last.rect.width*1.5
+                let columnGap=max(line.rect.minX-last.rect.maxX,last.rect.minX-line.rect.maxX)
+                let verticalOverlap=min(line.rect.maxY,last.rect.maxY)-max(line.rect.minY,last.rect.minY)
+                if vertical && columnGap<max(line.rect.width,last.rect.width)*1.1 && verticalOverlap>min(line.rect.height,last.rect.height)*0.6{groups[i].append(line);continue}
+                if !vertical && gap >= -min(line.rect.height,last.rect.height) * 0.5 && gap < max(line.rect.height,last.rect.height) * 1.1 && overlap > min(line.rect.width,last.rect.width) * 0.4 { groups[i].append(line); continue }
             }
             groups.append([line])
         }
