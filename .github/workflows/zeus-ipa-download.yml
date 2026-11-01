@@ -2,7 +2,7 @@ name: ZEUS integrated IPA - build and publish (no tests)
 run-name: IPA from ${{ github.ref_name }} (${{ github.sha }})
 on:
   push:
-    branches: [build/zeus-unsigned-ipa-repair-20261023, feature/zeus-project-agent-20261023, feature/zeus-direct-integrations-20261023, feature/zeus-ipad-layout-studio-20261025, feature/zeus-cloud-account-20261026, feature/zeus-android-lab-20261030]
+    branches: [feature/zeus-manhwa-translation-20261101, build/zeus-unsigned-ipa-repair-20261023, feature/zeus-project-agent-20261023, feature/zeus-direct-integrations-20261023, feature/zeus-ipad-layout-studio-20261025, feature/zeus-cloud-account-20261026, feature/zeus-android-lab-20261030]
     paths: [.github/workflows/zeus-ipa-download.yml, .openminis/**, ZEUSNext/**]
   workflow_dispatch:
     inputs:
@@ -68,6 +68,7 @@ jobs:
         run: |
           set -euo pipefail
           bash deps/build_lame.sh 2>&1 | tee ../results/lame.log
+          if [ ! -d deps/ffmpeg-6.1.2 ]; then git clone --depth 1 --branch n6.1.2 https://github.com/FFmpeg/FFmpeg.git deps/ffmpeg-6.1.2; fi
           bash deps/build_ffmpeg.sh 2>&1 | tee ../results/ffmpeg.log
           bash deps/build_ish.sh 2>&1 | tee ../results/ish.log
           bash deps/prepare_alpine_rootfs.sh 2>&1 | tee ../results/rootfs.log
@@ -98,6 +99,8 @@ jobs:
           bash browser/.zeus-ci/comic/build_runtime.sh iphoneos
           ruby browser/.zeus-ci/comic/install_pods.rb upstream/src/ios/Minis.xcodeproj Minis ZEUSBrowser
           (cd upstream/src/ios && pod install)
+          mkdir -p upstream/src/ios/Minis.xcworkspace/xcshareddata/swiftpm
+          cp browser/.openminis/Package.resolved upstream/src/ios/Minis.xcworkspace/xcshareddata/swiftpm/Package.resolved
       - name: Build iOS device application (no simulator tests)
         run: |
           set -euo pipefail
@@ -106,7 +109,7 @@ jobs:
             -derivedDataPath "$RUNNER_TEMP/ZEUSNativeDevice" \
             -onlyUsePackageVersionsFromResolvedFile build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO ARCHS=arm64 \
             2>&1 | tee results/device-build.log
-          cp upstream/src/ios/Minis.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved results/Package.resolved
+          cp upstream/src/ios/Minis.xcworkspace/xcshareddata/swiftpm/Package.resolved results/Package.resolved
       - name: Package unsigned IPA and verify its contents
         run: |
           set -euo pipefail
