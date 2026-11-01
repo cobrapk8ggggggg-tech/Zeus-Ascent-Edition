@@ -46,8 +46,7 @@ jobs:
           python3 .zeus-ci/project.py
           xcodegen generate --spec zeus-project.json
           mkdir -p results
-      - name: Select and boot a simulator
-        timeout-minutes: 6
+      - name: Select an iPhone simulator
         run: |
           python3 - <<'PY'
           import json,subprocess,os
@@ -56,6 +55,9 @@ jobs:
           assert choices
           with open(os.environ['GITHUB_ENV'],'a') as f:f.write('COMIC_SIMULATOR='+choices[0]['udid']+'\n')
           PY
+      - name: Boot the selected simulator
+        timeout-minutes: 6
+        run: |
           xcrun simctl boot "$COMIC_SIMULATOR" || true
           xcrun simctl bootstatus "$COMIC_SIMULATOR" -b
       - name: Start deterministic provider fixture
