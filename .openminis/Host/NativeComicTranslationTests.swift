@@ -127,6 +127,45 @@ import UIKit
         let stale = try await view.callAsyncJavaScript("return await zeusComic.apply(id,revision,data,region,mark,generation)",arguments:arguments,in:nil,contentWorld:ComicTranslation.world) as? Bool
         XCTAssertEqual(stale,false)
     }
+    func testEndToEndImagesDoNotTranslateDOMAndFontChangesReuseOCRAndProvider()async throws{
+        let root=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let model=BrowserModel(profiles:ProfileStore(root:root,downloadsRoot:root.appendingPathComponent("Downloads")),useBackgroundDownloads:false)
+        model.data.settings.shieldsEnabled=false
+        var provider=AIProviderConfiguration();provider.baseURL="http://127.0.0.1:8765/v1";provider.model="comic-"+UUID().uuidString;model.data.settings.aiProviders=[provider]
+        var preferences=ComicPreferences();preferences.source="en";preferences.showUntranslated=true
+        var translation=TranslationPreferences();translation.engine = .ai;translation.providerID=provider.id;preferences.translation=translation;model.data.settings.comicTranslation=preferences
+        let tab=try XCTUnwrap(model.current);tab.url="http://127.0.0.1:8765/comic-end-to-end"
+        let prepared=await model.prepare(tab),view=try XCTUnwrap(prepared),session=try XCTUnwrap(tab.comicTranslation)
+        let scene=try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap{$0 as? UIWindowScene}.first)
+        let window=UIWindow(windowScene:scene);window.frame=scene.screen.bounds;window.rootViewController=UIViewController();view.frame=window.bounds;window.rootViewController?.view.addSubview(view);window.windowLevel = .normal+1;window.makeKeyAndVisible()
+        defer{tab.dispose();window.isHidden=true;try? FileManager.default.removeItem(at:root)}
+        let source=renderer(CGSize(width:640,height:240)).image{context in UIColor.white.setFill();context.fill(CGRect(x:0,y:0,width:640,height:240));("HELLO WORLD" as NSString).draw(at:CGPoint(x:100,y:80),withAttributes:[.font:UIFont.systemFont(ofSize:48),.foregroundColor:UIColor.black])}
+        let encoded=try XCTUnwrap(source.pngData()).base64EncodedString()
+        view.loadHTMLString("<html><body><p id='text'>Original page text stays unchanged.</p><img id='comic' style='width:100%;height:auto' src='data:image/png;base64,\(encoded)'></body></html>",baseURL:URL(string:tab.url))
+        var deadline=Date().addingTimeInterval(20)
+        while Date()<deadline{if (try? await view.callAsyncJavaScript("return !!globalThis.zeusComic && document.images[0]?.complete",arguments:[:],in:nil,contentWorld:ComicTranslation.world))as? Bool==true{break};try await Task.sleep(for:.milliseconds(100))}
+        session.start();deadline=Date().addingTimeInterval(35)
+        while Date()<deadline && (session.running||session.completed==0) && session.error==nil{try await Task.sleep(for:.milliseconds(100))}
+        XCTAssertNil(session.error);XCTAssertGreaterThan(session.completed,0)
+        let unchanged=try await view.evaluateJavaScript("document.querySelector('#text').textContent")as? String
+        XCTAssertEqual(unchanged,"Original page text stays unchanged.")
+        let sourceBefore=try await view.evaluateJavaScript("document.images[0].src")as? String
+        XCTAssertTrue(sourceBefore?.hasPrefix("blob:")==true)
+        let endpoint=URL(string:"http://127.0.0.1:8765/translation-requests?model="+provider.model)!
+        let (firstData,_)=try await URLSession.shared.data(from:endpoint)
+        let before=try XCTUnwrap(JSONSerialization.jsonObject(with:firstData)as? [[String]])
+        XCTAssertFalse(before.isEmpty);let ocrBefore=session.ocrRuns,completeBefore=session.completed
+        preferences.fontScale=0.65;preferences.textColor="163B72";model.data.settings.comicTranslation=preferences
+        session.pause();session.start();deadline=Date().addingTimeInterval(25)
+        while Date()<deadline && (session.running||session.completed==completeBefore) && session.error==nil{try await Task.sleep(for:.milliseconds(100))}
+        XCTAssertNil(session.error);XCTAssertGreaterThan(session.completed,completeBefore);XCTAssertEqual(session.ocrRuns,ocrBefore)
+        let (secondData,_)=try await URLSession.shared.data(from:endpoint),after=try XCTUnwrap(JSONSerialization.jsonObject(with:secondData)as? [[String]])
+        XCTAssertEqual(before.count,after.count,"Changing lettering must not spend another translation request")
+        await session.restore()
+        let original=try await view.evaluateJavaScript("document.images[0].src")as? String
+        XCTAssertTrue(original?.hasPrefix("data:image/png")==true)
+        try await ComicMemory.shared.clear(profile:model.profile.id)
+    }
     func testOCRAndTranslationCachesAreSeparateAndProfileScoped()async throws{
         let first=UUID(),second=UUID(),bytes=Data("reading".utf8)
         try await ComicMemory.shared.save(bytes,profile:first,layer:.reading,key:"same")

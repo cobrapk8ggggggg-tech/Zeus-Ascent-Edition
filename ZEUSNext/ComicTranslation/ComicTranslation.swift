@@ -19,6 +19,7 @@ import CoreGraphics
     @Published var running=false
     @Published var paused=false
     @Published var completed=0
+    private(set) var ocrRuns=0
     @Published var stage=""
     @Published var error:String?
     @Published var storageNotice:String?
@@ -31,6 +32,7 @@ import CoreGraphics
     private var pending=false
     private var readings:[String:ComicReading]=[:]
     private var textResults:[String:[TranslationSegment]]=[:]
+    private var speechTexts:[String:String]=[:]
     private var fetched:[String:Data]=[:]
     private var fetchedOrder:[String]=[]
     private var resolvedScripts:[String:(String,Int)]=[:]
@@ -59,7 +61,7 @@ import CoreGraphics
         return try await view.callAsyncJavaScript(code,arguments:args,in:frame?.isMainFrame==true ? nil:frame,contentWorld:Self.world) ?? NSNull()
     }
     func start(){guard let model,let tab,!tab.isHome,!model.requiresUnlock,model.profile.id==tab.profileID else{return};active=true;paused=false;error=nil;failed.removeAll();schedule()}
-    func navigationStarted(){pause();active=false;completed=0;done.removeAll();failed.removeAll();frames.removeAll();documents.removeAll();readings.removeAll();textResults.removeAll();fetched.removeAll();resolvedScripts.removeAll();error=nil}
+    func navigationStarted(){pause();active=false;completed=0;ocrRuns=0;done.removeAll();failed.removeAll();frames.removeAll();documents.removeAll();readings.removeAll();textResults.removeAll();speechTexts.removeAll();fetched.removeAll();resolvedScripts.removeAll();error=nil}
     func pause(){paused=true;epoch=UUID();work?.cancel();work=nil;running=false;pending=false;for frame in frames.values{Task{_ = try? await call("globalThis.zeusComic?.releaseAll?.()",frame:frame)}}}
     func becameVisible(){if active||preferences.automatic{start()}}
     func restore()async{pause();active=false;for frame in frames.values{_ = try? await call("globalThis.zeusComic?.restore()",frame:frame)};_ = try? await call("globalThis.zeusComic?.restore()",frame:nil);done.removeAll();failed.removeAll();completed=0;error=nil}
@@ -126,11 +128,11 @@ import CoreGraphics
                     let reading:ComicReading
                     if let saved=readings[readingKey]{reading=saved}
                     else if persistent,let stored=await ComicMemory.shared.data(profile:owner,layer:.reading,key:readingKey),let saved=try? JSONDecoder().decode(ComicReading.self,from:stored){reading=saved}
-                    else{reading=try await ComicOCR.shared.read(image,source:prefs.source == "auto" ? (resolvedScripts[document].flatMap{$0.1%3==0 ? nil:$0.0} ?? "auto"):prefs.source,mode:prefs.mode)
+                    else{ocrRuns+=1;reading=try await ComicOCR.shared.read(image,source:prefs.source == "auto" ? (resolvedScripts[document].flatMap{$0.1%3==0 ? nil:$0.0} ?? "auto"):prefs.source,mode:prefs.mode)
                         try valid(ticket)
                         if persistent{do{try await ComicMemory.shared.save(JSONEncoder().encode(reading),profile:owner,layer:.reading,key:readingKey)}catch{storageNotice="تعذّر حفظ قراءة الصورة؛ ستظل الجلسة الحالية متاحة."}}
                     }
-                    if readings.count>=8{readings.removeAll()};readings[readingKey]=reading
+                    if readings.count>=128{readings.removeAll()};readings[readingKey]=reading
                     let vote=resolvedScripts[document];resolvedScripts[document]=(reading.language,(vote?.1 ?? 0)+1)
                     try valid(ticket)
                     // A speech touching this core is rendered from its complete context,
@@ -143,7 +145,7 @@ import CoreGraphics
                     let translated:[TranslationSegment]
                     if let saved=textResults[translationKey]{translated=saved}
                     else if persistent,let stored=await ComicMemory.shared.data(profile:owner,layer:.translation,key:translationKey),let saved=try? JSONDecoder().decode([TranslationSegment].self,from:stored){translated=saved}
-                    else{translated=try await ComicTextTranslator.translate(segments,source:reading.language,target:translation.target,preferences:translation,provider:provider,secret:AISecretVault.read(profile:owner,provider:translation.secretKey(provider:provider)),local:prefs.localModel,engine:prefs.engine,engineSecret:AISecretVault.read(profile:owner,provider:"comic-"+prefs.engine.rawValue))
+                    else{translated=try await translateSpeeches(segments,reading:reading,namespace:translationMark+"|"+ComicIdentity.hash(envelope.url),profile:owner,persistent:persistent,preferences:prefs,translation:translation,provider:provider,ticket:ticket)
                         try valid(ticket)
                         if persistent{do{try await ComicMemory.shared.save(JSONEncoder().encode(translated),profile:owner,layer:.translation,key:translationKey)}catch{storageNotice="تعذّر حفظ الترجمة على الجهاز."}}
                     }
@@ -173,6 +175,31 @@ import CoreGraphics
         for candidate in ordered{let regions=ComicGeometry.regions(width:candidate.width,height:candidate.height,maximumPixels:7_000_000);if !regions.isEmpty&&regions.allSatisfy({done.contains("\(document)|\(candidate.id)|\(candidate.revision)|\($0.y)|\(mark)")}){_ = try? await call("zeusComic.mark(id,revision,mark)",args:["id":candidate.id,"revision":candidate.revision,"mark":mark],frame:frame)}}
         _=tab
     }
+    private func translateSpeeches(_ segments:[TranslationSegment],reading:ComicReading,namespace:String,profile:UUID,persistent:Bool,preferences:ComicPreferences,translation:TranslationPreferences,provider:AIProviderConfiguration?,ticket:UUID)async throws->[TranslationSegment]{
+        let namespace=namespace+"|"+reading.language
+        func key(_ text:String)->String{ComicIdentity.hash(namespace+"\0"+text)}
+        var values:[String:String]=[:]
+        for segment in segments{if let value=speechTexts[key(segment.text)]{values[segment.text]=value}}
+        if persistent{let saved=await ComicMemory.shared.lookupText(segments,namespace:namespace,profile:profile);values.merge(saved){_,saved in saved}}
+        try valid(ticket)
+        var unique=Set<String>()
+        let missing=segments.filter{values[$0.text]==nil&&unique.insert($0.text).inserted}
+        if !missing.isEmpty{
+            let preceding=reading.speeches.prefix(while:{$0.id != missing.first?.id}).suffix(4).map(\.text)
+            let response=try await ComicTextTranslator.translate(missing,source:reading.language,target:translation.target,preferences:translation,provider:provider,secret:AISecretVault.read(profile:profile,provider:translation.secretKey(provider:provider)),local:preferences.localModel,engine:preferences.engine,engineSecret:AISecretVault.read(profile:profile,provider:"comic-"+preferences.engine.rawValue),context:preceding)
+            try valid(ticket)
+            let originals=Dictionary(uniqueKeysWithValues:missing.map{($0.id,$0.text)})
+            var fresh:[String:String]=[:]
+            for item in response{if let original=originals[item.id]{fresh[original]=item.text}}
+            guard fresh.count==missing.count else{throw ComicFailure.message("رد الترجمة لا يطابق الفقاعات.")}
+            values.merge(fresh){_,new in new}
+            if persistent,!(await ComicMemory.shared.saveText(fresh,namespace:namespace,profile:profile)){storageNotice="تعذّر حفظ بعض النصوص؛ قد تحتاج مساحة إضافية."}
+        }
+        try valid(ticket)
+        if speechTexts.count>=8000{speechTexts.removeAll()}
+        for (text,value)in values{speechTexts[key(text)]=value}
+        return try segments.map{segment in guard let value=values[segment.text]else{throw ComicFailure.message("ترجمة ناقصة.")};return TranslationSegment(id:segment.id,text:value)}
+    }
     private func capture(_ candidate:ComicCandidate,region:ComicRegion,frame:WKFrameInfo?,ticket:UUID)async throws->Data{
         do{
             let result=try await call("return await zeusComic.capture(id,revision,region)",args:["id":candidate.id,"revision":candidate.revision,"region":["x":region.x,"y":region.y,"width":region.width,"height":region.height]],frame:frame)as? [String:Any]
@@ -187,7 +214,7 @@ import CoreGraphics
             let data:Data
             if let cached=fetched[candidate.source]{data=cached}else{data=try await ComicImageFetch.fetch(url,view:tab.webView,store:model.profiles.websiteDataStore(for:model.profile));fetched[candidate.source]=data;fetchedOrder.removeAll{$0==candidate.source};fetchedOrder.append(candidate.source)
                 while fetchedOrder.count>4||fetched.values.reduce(0,{$0+$1.count})>33_554_432{let old=fetchedOrder.removeFirst();fetched[old]=nil}}
-            return try await Task.detached{let crop=try ComicPixels.decodeRegion(data,region:region);return try ComicPixels.png(crop)}.value
+            return try await Task.detached{let crop=try ComicPixels.decodeRegion(data,region:region,expectedHeight:candidate.height);return try ComicPixels.png(crop)}.value
         }
     }
     private func apply(_ data:Data,candidate:ComicCandidate,region:[String:Int],mark:String,generation:Int,frame:WKFrameInfo?,ticket:UUID)async throws->Bool{

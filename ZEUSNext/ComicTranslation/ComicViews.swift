@@ -9,6 +9,7 @@ struct ComicSettingsSheet:View {
     @State private var importingModel=false
     @State private var key=""
     @State private var clientID=""
+    @State private var customColor=""
     @State private var message:String?
     @State private var downloading=false
     private var prefs:ComicPreferences{model.data.settings.comicTranslation ?? ComicPreferences()}
@@ -44,7 +45,8 @@ struct ComicSettingsSheet:View {
                 HStack{Text("حجم الخط");Slider(value:binding(\.fontScale),in:0.5...1.5,step:0.05);Text("\(Int(prefs.fontScale*100))٪")}
                 Text("يُضبط الحجم داخل مساحة الفقاعة. تغيير الرسم يعيد استخدام النص والترجمة المحفوظين.").font(.footnote)
                 Picker("لون الكلام",selection:binding(\.textColor)){Text("تلقائي حسب الخلفية").tag(nil as String?);Text("أسود").tag(Optional("101010"));Text("أبيض").tag(Optional("FAFAFA"));Text("أزرق داكن").tag(Optional("163B72"));Text("أحمر داكن").tag(Optional("8B2020"))}
-                TextField("لون مخصص مثل #163B72",text:Binding(get:{prefs.textColor ?? ""},set:{var p=prefs;p.textColor=$0.isEmpty ? nil:$0;save(p)})).textInputAutocapitalization(.never)
+                TextField("لون مخصص مثل #163B72",text:$customColor).textInputAutocapitalization(.never).autocorrectionDisabled()
+                Button("تطبيق اللون"){var p=prefs;p.textColor=customColor.isEmpty ? nil:customColor;save(p)}.disabled(!customColor.isEmpty && ComicPixels.color(customColor)==nil)
             }
             Section("نماذج OCR والحفظ"){
                 Button(downloading ? "جارٍ تنزيل النماذج والتحقق منها…":"تنزيل نماذج اللغة المحددة"){
@@ -56,6 +58,7 @@ struct ComicSettingsSheet:View {
                 if let message{Text(message).font(.footnote)}
             }
         }.navigationTitle("ترجمة الصور والمانهوا").toolbar{ToolbarItem(placement:.confirmationAction){Button("تم"){dismiss()}}}}
+        .onAppear{customColor=prefs.textColor ?? ""}
         .onChange(of:prefs.engine){_,_ in key="";clientID=""}
         .fileImporter(isPresented:$importingFont,allowedContentTypes:[.data]){result in do{let url=try result.get();let name=try ComicFonts.importFont(url);var p=prefs;p.fontName=name;save(p)}catch{message=error.localizedDescription}}
         .fileImporter(isPresented:$importingModel,allowedContentTypes:[.data]){result in Task{do{try await ComicLocalTranslator.shared.importModel(result.get());message="استُورد النموذج المحلي."}catch{message=error.localizedDescription}}}

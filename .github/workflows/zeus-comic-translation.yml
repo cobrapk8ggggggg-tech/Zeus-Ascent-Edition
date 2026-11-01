@@ -70,6 +70,11 @@ jobs:
           with open(os.environ['GITHUB_ENV'],'a') as f:f.write('COMIC_SIMULATOR='+choices[0]['udid']+'\n')
           PY
           xcrun simctl boot "$COMIC_SIMULATOR" || true
+      - name: Start deterministic provider fixture
+        if: matrix.sdk == 'iphonesimulator'
+        run: |
+          python3 .zeus-ci/fixture_server.py > results/fixture.log 2>&1 &
+          curl --fail --max-time 5 --retry 10 --retry-connrefused http://127.0.0.1:8765/ > /dev/null
       - name: Test actual WebKit bridge and pixel rendering
         if: matrix.sdk == 'iphonesimulator'
         run: |

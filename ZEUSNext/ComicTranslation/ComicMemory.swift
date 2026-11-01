@@ -24,6 +24,17 @@ actor ComicMemory {
         for file in files where bytes+data.count>layer.limit{try FileManager.default.removeItem(at:file.0);bytes-=file.1}
         try data.write(to:url,options:[.atomic,.completeFileProtection])
     }
+    func lookupText(_ segments:[TranslationSegment],namespace:String,profile:UUID)async->[String:String]{
+        guard !deleted.contains(profile)else{return [:]}
+        return await TranslationMemory.shared.lookup(segments,namespace:namespace,folder:Self.root.appendingPathComponent(profile.uuidString))
+    }
+    func saveText(_ values:[String:String],namespace:String,profile:UUID)async->Bool{
+        guard !deleted.contains(profile)else{return false}
+        let success=await TranslationMemory.shared.save(values,namespace:namespace,folder:Self.root.appendingPathComponent(profile.uuidString))
+        if deleted.contains(profile){try? clear(profile:profile,deleting:true);return false}
+        var root=Self.root;var metadata=URLResourceValues();metadata.isExcludedFromBackup=true;try? root.setResourceValues(metadata)
+        return success
+    }
     func clear(profile:UUID,deleting:Bool=false)throws{if deleting{deleted.insert(profile)};let folder=Self.root.appendingPathComponent(profile.uuidString);if FileManager.default.fileExists(atPath:folder.path){try FileManager.default.removeItem(at:folder)}}
     func clearAll()throws{if FileManager.default.fileExists(atPath:Self.root.path){try FileManager.default.removeItem(at:Self.root)}}
 }

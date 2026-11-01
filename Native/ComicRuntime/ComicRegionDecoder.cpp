@@ -7,7 +7,7 @@
 #include <jpeglib.h>
 #include <png.h>
 #include <webp/decode.h>
-static bool permitted(int fullw,int fullh,int x,int y,int w,int h){return fullw>0&&fullh>0&&fullw<=16384&&fullh<=1000000&&x==0&&w==fullw&&y>=0&&h>0&&y<=fullh-h&&static_cast<int64_t>(w)*h<=8000000;}
+static bool permitted(int fullw,int fullh,int x,int y,int w,int h){return fullw>0&&fullh>0&&fullw<=16384&&fullh<=1000000&&static_cast<int64_t>(fullw)*fullh<=256000000&&x==0&&w==fullw&&y>=0&&h>0&&y<=fullh-h&&static_cast<int64_t>(w)*h<=8000000;}
 struct JPEGError{jpeg_error_mgr base;jmp_buf jump;};
 static void jpegFailure(j_common_ptr c){longjmp(reinterpret_cast<JPEGError*>(c->err)->jump,1);}
 static uint8_t *jpegRegion(const uint8_t *bytes,size_t size,int x,int y,int w,int h){
@@ -43,8 +43,8 @@ static uint8_t *pngRegion(const uint8_t *bytes,size_t size,int x,int y,int w,int
     int passes=png_set_interlace_handling(p);png_read_update_info(p,info);
     if(png_get_rowbytes(p,info)!=static_cast<size_t>(w)*4)png_error(p,"unexpected row size");
     output=static_cast<uint8_t*>(std::calloc(static_cast<size_t>(w)*h,4));row=static_cast<uint8_t*>(std::calloc(w,4));if(!output||!row)png_error(p,"out of memory");
-    for(int pass=0;pass<passes;pass++)for(int r=0;r<height;r++){auto *destination=r>=y&&r<y+h?output+static_cast<size_t>(r-y)*w*4:row;png_read_row(p,destination,nullptr);}
-    png_read_end(p,info);png_destroy_read_struct(&p,&info,nullptr);std::free(row);return output;
+    for(int pass=0;pass<passes;pass++)for(int r=0;r<(passes==1?y+h:height);r++){auto *destination=r>=y&&r<y+h?output+static_cast<size_t>(r-y)*w*4:row;png_read_row(p,destination,nullptr);}
+    if(passes>1)png_read_end(p,info);png_destroy_read_struct(&p,&info,nullptr);std::free(row);return output;
 }
 extern "C" unsigned char *zeus_comic_decode_region(const unsigned char *bytes,unsigned long size,int x,int y,int w,int h){
     if(!bytes||size<12||size>33554432||w<=0||h<=0||static_cast<int64_t>(w)*h>8000000)return nullptr;

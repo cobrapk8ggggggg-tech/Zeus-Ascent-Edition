@@ -22,3 +22,4 @@ android-results/
 Pods/
 *.xcworkspace/
 node_modules/
+__pycache__/

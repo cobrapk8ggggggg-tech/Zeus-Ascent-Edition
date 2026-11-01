@@ -10,13 +10,17 @@ enum ComicPixels {
     static func rgba(_ image:CGImage,width:Int,height:Int)->[UInt8]?{guard let c=context(width:width,height:height)else{return nil};c.interpolationQuality = .high;c.draw(image,in:CGRect(x:0,y:0,width:width,height:height));return c.data.map{Array(UnsafeBufferPointer(start:$0.assumingMemoryBound(to:UInt8.self),count:width*height*4))}}
     static func rotated(_ image:CGImage)->CGImage{guard let c=context(width:image.height,height:image.width)else{return image};c.translateBy(x:CGFloat(image.height),y:0);c.rotate(by:.pi/2);c.draw(image,in:CGRect(x:0,y:0,width:image.width,height:image.height));return c.makeImage() ?? image}
     static func decode(_ data:Data)throws->CGImage{guard let source=CGImageSourceCreateWithData(data as CFData,[kCGImageSourceShouldCache:false]as CFDictionary),let properties=CGImageSourceCopyPropertiesAtIndex(source,0,nil)as? [CFString:Any],let width=properties[kCGImagePropertyPixelWidth]as? Int,let height=properties[kCGImagePropertyPixelHeight]as? Int,width>0,height>0,width<=16_384,Int64(width)*Int64(height)<=16_000_000,let image=CGImageSourceCreateImageAtIndex(source,0,[kCGImageSourceShouldCacheImmediately:true]as CFDictionary)else{throw ComicFailure.message("تعذّر فك الصورة ضمن حد الذاكرة؛ لم تُخفض دقتها بصمت.")};return image}
-    static func decodeRegion(_ data:Data,region:ComicRegion)throws->CGImage{
+    static func decodeRegion(_ data:Data,region:ComicRegion,expectedHeight:Int?=nil)throws->CGImage{
+        if let source=CGImageSourceCreateWithData(data as CFData,[kCGImageSourceShouldCache:false]as CFDictionary),let properties=CGImageSourceCopyPropertiesAtIndex(source,0,nil)as? [CFString:Any]{
+            let width=(properties[kCGImagePropertyPixelWidth]as? NSNumber)?.intValue,height=(properties[kCGImagePropertyPixelHeight]as? NSNumber)?.intValue
+            guard width==region.width,expectedHeight==nil||height==expectedHeight else{throw ComicFailure.message("تغيرت أبعاد الصورة؛ لم تُستخدم إحداثيات لا تطابق الأصل.")}
+        }
         let pointer=data.withUnsafeBytes{buffer in zeus_comic_decode_region(buffer.bindMemory(to:UInt8.self).baseAddress,UInt(data.count),Int32(region.x),Int32(region.y),Int32(region.width),Int32(region.height))}
         if let pointer{
             let pixels=Data(bytesNoCopy:pointer,count:region.width*region.height*4,deallocator:.custom{p,_ in zeus_comic_free_pixels(p.assumingMemoryBound(to:UInt8.self))})
             guard let provider=CGDataProvider(data:pixels as CFData),let result=CGImage(width:region.width,height:region.height,bitsPerComponent:8,bitsPerPixel:32,bytesPerRow:region.width*4,space:CGColorSpace(name:CGColorSpace.sRGB)!,bitmapInfo:CGBitmapInfo(rawValue:CGImageAlphaInfo.last.rawValue),provider:provider,decode:nil,shouldInterpolate:false,intent:.defaultIntent)else{throw ComicFailure.message("فشل إنشاء منطقة الصورة.")};return result
         }
-        let image=try decode(data);guard let crop=image.cropping(to:region.rect)else{throw ComicFailure.message("تعذّر فك المنطقة المطلوبة.")};return crop
+        let image=try decode(data);guard image.width==region.width,expectedHeight==nil||image.height==expectedHeight,let crop=image.cropping(to:region.rect)else{throw ComicFailure.message("تعذّر فك المنطقة المطلوبة.")};return crop
     }
     static func png(_ image:CGImage)throws->Data{let output=NSMutableData();guard let destination=CGImageDestinationCreateWithData(output,"public.png" as CFString,1,nil)else{throw ComicFailure.message("تعذّر ترميز الصورة.")};CGImageDestinationAddImage(destination,image,nil);guard CGImageDestinationFinalize(destination)else{throw ComicFailure.message("فشل ترميز الصورة.")};return output as Data}
     static func render(_ image:CGImage,speeches:[ComicSpeech],translations:[TranslationSegment],target:String,fontName:String?,fontScale:Double,textColor:String? = nil)throws->CGImage{

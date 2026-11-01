@@ -1,7 +1,9 @@
 /* ZEUS image translation bridge. Independent implementation; runs in an isolated WKContentWorld. */
 (() => {
   if (globalThis.zeusComic) return;
-  const documentID = crypto.randomUUID();
+  // randomUUID is unavailable on ordinary HTTP pages; getRandomValues still is.
+  const uuid = () => globalThis.crypto?.randomUUID?.() || Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2,'0')).join('');
+  const documentID = uuid();
   const records = new Map(), ids = new WeakMap(), transfers = new Map();
   const outputs=new Map();
   let sequence = 0, generation = 0, active = false, observerTimer, viewportTimer;
@@ -78,7 +80,7 @@
     if(c.width*c.height>8000000)throw Error('pixel limit');
     c.getContext('2d').drawImage(image,region.x,region.y,region.width,region.height,0,0,c.width,c.height);
     const blob=await new Promise(resolve=>c.toBlob(resolve,'image/png'));if(!blob||blob.size>33554432)throw Error('capture too large');
-    const bytes=new Uint8Array(await blob.arrayBuffer()),token=crypto.randomUUID();
+    const bytes=new Uint8Array(await blob.arrayBuffer()),token=uuid();
     if(transfers.size>=6)throw Error('transfer limit');
     transfers.set(token,{bytes,at:Date.now()});return {token,length:bytes.length,width:c.width,height:c.height};
   }
