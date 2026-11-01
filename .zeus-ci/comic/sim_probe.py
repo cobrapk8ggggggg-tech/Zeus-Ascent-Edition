@@ -26,7 +26,11 @@ END_TO_END = "testEndToEndImagesDoNotTranslateDOMAndFontChangesReuseOCRAndProvid
 
 def main(log_path, out_path):
     text = Path(log_path).read_text(errors="replace") if Path(log_path).exists() else ""
-    tests = re.findall(r"Test Case 'NativeComicTranslationTests/(\w+)' (passed|failed)", text)
+    # Xcode 26.x: Test Case '-[ZEUSNextTests.NativeComicTranslationTests name]' passed (1.2 seconds).
+    tests = re.findall(r"Test Case '-\[ZEUSNextTests\.NativeComicTranslationTests (\w+)\]' (passed|failed)", text)
+    if not tests:
+        # Older format: Test Case 'NativeComicTranslationTests/name' passed.
+        tests = re.findall(r"Test Case 'NativeComicTranslationTests/(\w+)' (passed|failed)", text)
     passed = {name for name, verdict in tests if verdict == "passed"}
     failed = {name for name, verdict in tests if verdict == "failed"}
     missing = [name for name in CORE if name not in passed and name not in failed]
