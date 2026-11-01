@@ -1,0 +1,25 @@
+name: Free macOS runners from superseded IPA revisions
+on:
+  push:
+    branches: [fix/unsigned-ipa-20261101]
+    paths: [.github/workflows/zeus-cancel-stale-ipa.yml]
+permissions:
+  contents: read
+  actions: write
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cancel only the two known superseded builds
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          for run in 41346246791 41343435353; do
+            sha=$(gh api "repos/$REPO/actions/runs/$run" --jq '.head_sha')
+            state=$(gh api "repos/$REPO/actions/runs/$run" --jq '.status')
+            if { [ "$sha" = ca32b1f9c9ed0637cb9a2dfaf53b893f4743dd53 ] || [ "$sha" = cbd2eb4a58543aab0ab4c5e3b0f88ae258422eb2 ]; } && [ "$state" != completed ]; then
+              gh api --method POST "repos/$REPO/actions/runs/$run/cancel"
+            fi
+          done
