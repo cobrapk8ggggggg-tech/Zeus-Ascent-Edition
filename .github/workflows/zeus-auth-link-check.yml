@@ -1,0 +1,66 @@
+name: Verify Auth static library linkage
+on:
+  push:
+    branches: [fix/unsigned-ipa-20261101]
+    paths: [.github/workflows/zeus-auth-link-check.yml]
+permissions:
+  contents: read
+jobs:
+  link:
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '26.3'
+      - run: gem install xcodeproj --version 1.27.0 --no-document
+      - name: Link an app through a static browser library importing the pinned Auth package
+        run: |
+          set -euo pipefail
+          mkdir probe
+          cd probe
+          cat > Browser.swift <<'SWIFT'
+          import Auth
+          public func authType() -> String { String(reflecting: AuthClient.self) }
+          SWIFT
+          cat > Host.swift <<'SWIFT'
+          import SwiftUI
+          import Browser
+          @main struct LinkProbe: App {
+              var body: some Scene { WindowGroup { Text(authType()) } }
+          }
+          SWIFT
+          ruby <<'RUBY'
+          require 'xcodeproj'
+          p = Xcodeproj::Project.new('Probe.xcodeproj')
+          browser = p.new_target(:static_library, 'Browser', :ios, '18.1')
+          app = p.new_target(:application, 'Host', :ios, '18.1')
+          browser.source_build_phase.add_file_reference(p.main_group.new_file('Browser.swift'))
+          app.source_build_phase.add_file_reference(p.main_group.new_file('Host.swift'))
+          app.add_dependency(browser)
+          app.frameworks_build_phase.add_file_reference(browser.product_reference)
+          [browser,app].each do |target|
+            target.build_configurations.each do |c|
+              c.build_settings.merge!({'SWIFT_VERSION'=>'5.0','DEFINES_MODULE'=>'YES','PRODUCT_BUNDLE_IDENTIFIER'=>'tools.zeus.LinkProbe','GENERATE_INFOPLIST_FILE'=>'YES','CODE_SIGNING_ALLOWED'=>'NO'})
+            end
+          end
+          package = p.new(Xcodeproj::Project::Object::XCRemoteSwiftPackageReference)
+          package.repositoryURL = 'https://github.com/supabase/supabase-swift.git'
+          package.requirement = {'kind'=>'exactVersion','version'=>'2.55.4'}
+          p.root_object.package_references << package
+          product = p.new(Xcodeproj::Project::Object::XCSwiftPackageProductDependency)
+          product.package = package; product.product_name = 'Auth'
+          browser.package_product_dependencies << product
+          build = p.new(Xcodeproj::Project::Object::PBXBuildFile)
+          build.product_ref = product; browser.frameworks_build_phase.files << build
+          p.save
+          scheme = Xcodeproj::XCScheme.new
+          scheme.add_build_target(app)
+          scheme.save_as(p.path,'Host')
+          RUBY
+          xcodebuild -project Probe.xcodeproj -scheme Host -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath "$RUNNER_TEMP/AuthLinkProbe" build CODE_SIGNING_ALLOWED=NO 2>&1 | tee link.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: auth-link-check
+          path: probe/link.log
