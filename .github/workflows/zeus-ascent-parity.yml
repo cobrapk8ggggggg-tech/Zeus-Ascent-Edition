@@ -1,7 +1,7 @@
 name: ZEUS-Ascent parity — tests, simulator and gap report
 on:
   push:
-    branches: [main]
+    branches: [main, edition/ascent-parity-20261101]
     paths: ['ZEUSNext/**', 'Native/ComicRuntime/**', '.zeus-ci/**', '.openminis/Host/NativeComicTranslationTests.swift', 'docs/comic-translation/**', '.github/workflows/zeus-ascent-parity.yml']
   workflow_dispatch:
 permissions:

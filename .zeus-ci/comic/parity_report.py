@@ -15,6 +15,7 @@ from pathlib import Path
 
 WEIGHTS = {"yes": 1.0, "yes-simulator-vision": 0.9, "yes-static-catalog": 0.95,
            "yes-bounded": 0.9, "improved-interior-wcag": 1.0, "improved-arabic-fallback": 1.0,
+           "improved-plain-outline-shadow": 1.0, "partial-diagonal-tails": 0.5,
            "yes-google-edge-mymemory": 0.95, "yes-user-key": 0.9, "yes-import": 0.9,
            "partial-inproc": 0.5, "missing": 0.0, "out-of-scope": None}
 

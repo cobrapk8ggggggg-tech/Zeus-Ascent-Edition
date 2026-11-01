@@ -152,10 +152,10 @@ import CoreGraphics
                     }
                     if textResults.count>=64{textResults.removeAll()};textResults[translationKey]=translated
                     try valid(ticket);stage="تنظيف الفقاعات ورسم العربية"
-                    let renderedKey=translationKey+"|render-v2|\(prefs.fontName ?? "default")|\(prefs.fontScale)|\(prefs.textColor ?? "auto")"
+                    let renderedKey=translationKey+"|render-v3|\(prefs.fontName ?? "default")|\(prefs.fontScale)|\(prefs.textColor ?? "auto")|\(prefs.inkStyleRaw ?? "plain")"
                     let rendered:Data
                     if persistent,let stored=await ComicMemory.shared.data(profile:owner,layer:.rendered,key:renderedKey){rendered=stored}
-                    else{rendered=try await Task.detached{let drawn=try ComicPixels.render(image,speeches:core,translations:translated,target:translation.target,fontName:prefs.fontName,fontScale:prefs.fontScale,textColor:prefs.textColor)
+                    else{rendered=try await Task.detached{let drawn=try ComicPixels.render(image,speeches:core,translations:translated,target:translation.target,fontName:prefs.fontName,fontScale:prefs.fontScale,textColor:prefs.textColor,ink:prefs.inkStyle)
                         // Only this core is applied. Recognition context is retained above/below.
                         let rect=CGRect(x:0,y:region.coreTop+offset,width:region.width,height:region.coreBottom-region.coreTop)
                         guard let crop=drawn.cropping(to:rect)else{throw ComicFailure.message("تعذّر قص منطقة الرسم.")};return try ComicPixels.png(crop)}.value

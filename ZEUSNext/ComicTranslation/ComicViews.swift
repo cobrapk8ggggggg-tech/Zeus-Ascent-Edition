@@ -42,10 +42,12 @@ struct ComicSettingsSheet:View {
                 }
             }
             Section("الخط والرسم"){
-                Picker("الخط",selection:binding(\.fontName)){Text("الافتراضي").tag(nil as String?);ForEach(ComicFonts.names,id:\.self){Text($0).tag(Optional($0))}}
+                Picker("الخط",selection:binding(\.fontName)){Text("الافتراضي الذكي").tag(nil as String?);ForEach(ComicFonts.systemNames,id:\.self){Text($0).tag(Optional($0))};ForEach(ComicFonts.names,id:\.self){Text($0).tag(Optional($0))}}
                 Button("استيراد TTF / OTF / TTC"){importingFont=true}
                 HStack{Text("حجم الخط");Slider(value:binding(\.fontScale),in:0.5...1.5,step:0.05);Text("\(Int(prefs.fontScale*100))٪")}
-                Text("يُضبط الحجم داخل مساحة الفقاعة. تغيير الرسم يعيد استخدام النص والترجمة المحفوظين.").font(.footnote)
+                Text("الافتراضي للعربية جيزة Pro تلقائيًا. يُضبط الحجم داخل مساحة الفقاعة، وتغيير الرسم يعيد استخدام النص والترجمة المحفوظين.").font(.footnote)
+                Picker("نمط الحبر",selection:binding(\.inkStyleRaw)){ForEach(ComicInkStyle.allCases,id:\.self){Text($0.title).tag(Optional($0.rawValue))}}
+                Text("المحدّد يرسم حوافًا بلون معاكس للنص على الخلفيات المزدحمة، والمظلّل يضيف ظلًا ناعمًا — كأنماط حبر أسنت للمانجا.").font(.footnote)
                 Picker("لون الكلام",selection:binding(\.textColor)){Text("تلقائي حسب الخلفية").tag(nil as String?);Text("أسود").tag(Optional("101010"));Text("أبيض").tag(Optional("FAFAFA"));Text("أزرق داكن").tag(Optional("163B72"));Text("أحمر داكن").tag(Optional("8B2020"));if let value=prefs.textColor,!["101010","FAFAFA","163B72","8B2020"].contains(value){Text("مخصص").tag(Optional(value))}}
                 TextField("لون مخصص مثل #163B72",text:$customColor).textInputAutocapitalization(.never).autocorrectionDisabled()
                 Button("تطبيق اللون"){var p=prefs;p.textColor=customColor.isEmpty ? nil:customColor;save(p)}.disabled(!customColor.isEmpty && ComicPixels.color(customColor)==nil)
@@ -77,6 +79,8 @@ struct ComicTranslationCard:View{
 }
 @MainActor enum ComicFonts{
     static let root=ComicModelStore.root.appendingPathComponent("Fonts")
+    // Arabic system faces available on every iOS device without importing anything.
+    static let systemNames=["GeezaPro","Damascus","Baghdad","AlBayan","Sana","Nadeem"]
     static var names:[String]{registerAll();return (try? FileManager.default.contentsOfDirectory(at:root,includingPropertiesForKeys:nil))?.compactMap{url in guard let descriptors=CTFontManagerCreateFontDescriptorsFromURL(url as CFURL)as? [CTFontDescriptor],let first=descriptors.first else{return nil};return CTFontDescriptorCopyAttribute(first,kCTFontNameAttribute)as? String}.sorted() ?? []}
     static func registerAll(){for url in (try? FileManager.default.contentsOfDirectory(at:root,includingPropertiesForKeys:nil)) ?? []{CTFontManagerRegisterFontsForURL(url as CFURL,.process,nil)}}
     static func importFont(_ url:URL)throws->String{

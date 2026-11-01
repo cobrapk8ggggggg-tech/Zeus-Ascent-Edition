@@ -71,6 +71,46 @@ import UIKit
         XCTAssertEqual(outside,0,"Arabic lettering must remain inside the original balloon")
         let attachment=XCTAttachment(image:UIImage(cgImage:output));attachment.name="Arabic lettering - actual pixels";attachment.lifetime = .keepAlways;add(attachment)
     }
+    func testDiagonalTailEstimatesAngleAndRotatedLetteringStaysInsideBounds()throws{
+        // A thought tail drifting down-right: three overlapping OCR lines.
+        func line(_ x:CGFloat,_ y:CGFloat)->ComicLine{ComicLine(text:"TAIL",confidence:0.9,rect:CGRect(x:x,y:y,width:110,height:20))}
+        let lines=[line(10,20),line(70,44),line(130,68)]
+        let grouped=ComicGeometry.group(lines,source:"en")
+        XCTAssertEqual(grouped.count,1,"overlapping diagonal lines form one speech")
+        XCTAssertEqual(grouped.first?.angle ?? 0,atan2(48,120),accuracy:0.02,"slope between first and last line centres is the tail angle")
+        // Bounded estimator: shallow drift and steep diagonals must stay unrotated.
+        XCTAssertEqual(ComicGeometry.estimateAngle([line(0,0),ComicLine(text:"TAIL",confidence:0.9,rect:CGRect(x:200,y:3,width:110,height:20))]),0,"sub-2° drift is noise")
+        XCTAssertEqual(ComicGeometry.estimateAngle([line(0,0),ComicLine(text:"TAIL",confidence:0.9,rect:CGRect(x:40,y:40,width:60,height:20))]),0,"steeper than 35° is a different shape, not a tail")
+        let speech=ComicSpeech(id:"tail",text:"TAIL\nTAIL\nTAIL",lines:lines,rect:CGRect(x:10,y:20,width:230,height:68),vertical:false,balloon:true,angle:ComicGeometry.estimateAngle(lines))
+        let image=renderer(CGSize(width:260,height:160)).image{context in UIColor.white.setFill();context.fill(CGRect(x:0,y:0,width:260,height:160))}.cgImage!
+        let drawn=try ComicPixels.render(image,speeches:[speech],translations:[TranslationSegment(id:"tail",text:"ترجمة")],target:"ar",fontName:nil,fontScale:1)
+        let pixels=try XCTUnwrap(ComicPixels.rgba(drawn,width:260,height:160))
+        var inside=0,outside=0
+        for y in 0..<160{for x in 0..<260{
+            let i=(y*260+x)*4,dark=Int(pixels[i])<128
+            if !dark{continue}
+            if speech.rect.insetBy(dx:-6,dy:-6).contains(CGPoint(x:x,y:y)){inside+=1}else{outside+=1}
+        }}
+        XCTAssertGreaterThan(inside,10,"rotated lettering must change pixels inside the speech area")
+        XCTAssertEqual(outside,0,"rotated lettering must never paint outside the speech it belongs to")
+        let attachment=XCTAttachment(image:UIImage(cgImage:drawn));attachment.name="Rotated tail lettering";attachment.lifetime = .keepAlways;add(attachment)
+    }
+    func testOutlineInkAddsOppositeStrokeOverNoisyBackground()throws{
+        // Dark striped SFX background: automatic ink is white, so the outline pass
+        // must add black stroke pixels the plain fill never produces.
+        func noisy()->CGImage{renderer(CGSize(width:200,height:100)).image{context in
+            UIColor(red:0.15,green:0.15,blue:0.18,alpha:1).setFill();context.fill(CGRect(x:0,y:0,width:200,height:100))
+            UIColor(red:0.3,green:0.3,blue:0.35,alpha:1).setFill()
+            for x in stride(from:0,to:200,by:6){context.fill(CGRect(x:x,y:0,width:2,height:100))}
+        }.cgImage!}
+        let speech=ComicSpeech(id:"sfx",text:"DOKI",lines:[ComicLine(text:"DOKI",confidence:0.9,rect:CGRect(x:40,y:30,width:120,height:40))],rect:CGRect(x:40,y:30,width:120,height:40),vertical:false,balloon:false)
+        func render(_ ink:ComicInkStyle)throws->CGImage{try ComicPixels.render(noisy(),speeches:[speech],translations:[TranslationSegment(id:"sfx",text:"دوكي")],target:"ar",fontName:nil,fontScale:1,ink:ink)}
+        let plain=try render(.plain),outlined=try render(.outline)
+        func dark(_ image:CGImage)throws->Int{let pixels=try XCTUnwrap(ComicPixels.rgba(image,width:200,height:100));var count=0
+            for y in Int(speech.rect.minY)..<Int(speech.rect.maxY){for x in Int(speech.rect.minX)..<Int(speech.rect.maxX){let i=(y*200+x)*4;if Int(pixels[i])<90{count+=1}}};return count}
+        XCTAssertGreaterThan(try dark(outlined),try dark(plain),"outline stroke must add opposite-ink pixels over the noisy background")
+        let attachment=XCTAttachment(image:UIImage(cgImage:outlined));attachment.name="Outline ink over SFX";attachment.lifetime = .keepAlways;add(attachment)
+    }
     func testBalloonInteriorProtectsBordersAndProvidesRoomForArabic()throws{
         let image=renderer(CGSize(width:300,height:220)).image{context in
             UIColor.darkGray.setFill();context.fill(CGRect(x:0,y:0,width:300,height:220))

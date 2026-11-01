@@ -14,7 +14,7 @@ enum ComicBalloons {
         var result=plates.map{plate,lines->ComicSpeech in
             let vertical=lines.allSatisfy{$0.rect.height>$0.rect.width*1.5}
             let ordered=lines.sorted{vertical ? $0.rect.midX>$1.rect.midX:$0.rect.minY<$1.rect.minY}
-            return ComicSpeech(id:"",text:ordered.map(\.text).joined(separator:vertical ? "":"\n"),lines:ordered,rect:safeRectangle(plate,pixels:pixels,width:image.width,height:image.height),vertical:vertical,balloon:true)
+            return ComicSpeech(id:"",text:ordered.map(\.text).joined(separator:vertical ? "":"\n"),lines:ordered,rect:safeRectangle(plate,pixels:pixels,width:image.width,height:image.height),vertical:vertical,balloon:true,angle:vertical ? nil:ComicGeometry.estimateAngle(lines))
         }
         result+=ComicGeometry.group(unplated,source:source)
         result.sort{a,b in if abs(a.rect.minY-b.rect.minY)<min(a.rect.height,b.rect.height)*0.35{return source.hasPrefix("ja") ? a.rect.midX>b.rect.midX:a.rect.midX<b.rect.midX};return a.rect.minY<b.rect.minY}

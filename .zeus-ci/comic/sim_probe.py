@@ -17,6 +17,8 @@ CORE = [
     "testArabicLetteringChangesActualPixelsInsideTheBalloon",
     "testArabicCoreTextFitsAndColorIsValidated",
     "testActualLocalOCRReadsRasterText",
+    "testDiagonalTailEstimatesAngleAndRotatedLetteringStaysInsideBounds",
+    "testOutlineInkAddsOppositeStrokeOverNoisyBackground",
 ]
 PADDLE = "testActualPinnedPaddleModelReadsRasterText"
 END_TO_END = "testEndToEndImagesDoNotTranslateDOMAndFontChangesReuseOCRAndProvider"

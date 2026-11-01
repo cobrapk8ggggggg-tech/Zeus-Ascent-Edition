@@ -5,6 +5,9 @@ import CryptoKit
 enum ComicReadingMode: String, Codable, CaseIterable { case fastest, balanced, careful
     var title: String { switch self { case .fastest: return "الأسرع"; case .balanced: return "متوازن"; case .careful: return "دقيق" } }
 }
+enum ComicInkStyle: String, Codable, CaseIterable { case plain, outline, shadow
+    var title: String { switch self { case .plain: return "عادي"; case .outline: return "محدّد (حواف بارزة)"; case .shadow: return "مظلّل" } }
+}
 struct ComicPreferences: Codable, Equatable {
     static let sourceLanguages=TranslationPreferences.languages+[("el","Ελληνικά"),("hi","हिन्दी"),("th","ไทย"),("ta","தமிழ்"),("te","తెలుగు"),("uk","Українська")]
     var mode: ComicReadingMode = .fastest
@@ -16,6 +19,8 @@ struct ComicPreferences: Codable, Equatable {
     var localModel = false
     var fontScale: Double = 1
     var textColor: String?
+    var inkStyleRaw: String?
+    var inkStyle: ComicInkStyle { get { ComicInkStyle(rawValue: inkStyleRaw ?? "") ?? .plain } set { inkStyleRaw = newValue.rawValue } }
     var engine: ComicOnlineEngine = .existing
     var translation: TranslationPreferences?
     func resolvedTranslation(_ settings:BrowserSettings)->TranslationPreferences{
@@ -67,6 +72,8 @@ struct ComicSpeech: Codable, Equatable {
     var rect: CGRect
     var vertical: Bool
     var balloon: Bool = false
+    // Optional so cached results from older revisions keep decoding.
+    var angle: Double? = nil
 }
 struct ComicReading: Codable { var lines: [ComicLine]; var speeches: [ComicSpeech]; var language: String; var runtime: String }
 struct ComicCachedResult: Codable { var version = 1; var reading: ComicReading; var translations: [TranslationSegment] }
@@ -99,6 +106,21 @@ enum ComicGeometry {
         func distance(_ r:ComicRegion)->Double{let (top,bottom)=bounds(r);return max(0,top-scroll-viewport,scroll-bottom)}
         return regions.filter{r in let(top,bottom)=bounds(r);return bottom>=scroll-(readAhead ? viewport:0)&&top<=scroll+viewport*(readAhead ? 8:1)}.sorted{distance($0)<distance($1)}
     }
+    static func estimateAngle(_ lines:[ComicLine])->Double{
+        // Diagonal lettering (thought tails, SFX streaks) is a real Ascent capability.
+        // Axis-aligned OCR boxes still carry the drift of the line cluster: the slope
+        // between the first and last line centres. Only confident, bounded tilt is
+        // adopted — noise must not rotate ordinary bubbles.
+        guard lines.count>=2,!lines.allSatisfy({$0.rect.height>$0.rect.width*1.5}) else{return 0}
+        let ordered=lines.sorted{$0.rect.midX<$1.rect.midX}
+        guard let first=ordered.first,let last=ordered.last else{return 0}
+        let dx=last.rect.midX-first.rect.midX,dy=last.rect.midY-first.rect.midY
+        guard abs(dx)>1 else{return 0}
+        let angle=atan2(dy,dx)
+        let spread=hypot(dx,dy),height=max(first.rect.height,last.rect.height)
+        guard spread>height*1.3,abs(angle)>=2*Double.pi/180,abs(angle)<=35*Double.pi/180 else{return 0}
+        return angle
+    }
     static func group(_ input: [ComicLine], source: String) -> [ComicSpeech] {
         let lines = input.filter { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && $0.rect.width > 0 && $0.rect.height > 0 }
         var groups: [[ComicLine]] = []
@@ -125,7 +147,7 @@ enum ComicGeometry {
             let bounds = group.reduce(CGRect.null) { $0.union($1.rect) }
             let vertical = group.allSatisfy { $0.rect.height > $0.rect.width * 1.5 }
             let ordered = group.sorted { vertical ? $0.rect.midX > $1.rect.midX : $0.rect.minY < $1.rect.minY }
-            return ComicSpeech(id: String(index), text: ordered.map(\.text).joined(separator: vertical ? "" : "\n"), lines: ordered, rect: bounds, vertical: vertical)
+            return ComicSpeech(id: String(index), text: ordered.map(\.text).joined(separator: vertical ? "" : "\n"), lines: ordered, rect: bounds, vertical: vertical, balloon: false, angle: vertical ? nil:ComicGeometry.estimateAngle(group))
         }.sorted { a,b in
             if abs(a.rect.minY-b.rect.minY) < min(a.rect.height,b.rect.height)*0.35 { return japanese ? a.rect.midX > b.rect.midX : a.rect.midX < b.rect.midX }
             return a.rect.minY < b.rect.minY
