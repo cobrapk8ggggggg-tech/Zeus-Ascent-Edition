@@ -13,11 +13,19 @@ import MLKitVision
 
 actor ComicOCR {
     static let shared=ComicOCR()
+    #if canImport(MLKitTextRecognition)
+    private var fastRecognizers:[String:TextRecognizer]=[:]
+    #endif
+    func purge(){
+        #if canImport(MLKitTextRecognition)
+        fastRecognizers.removeAll()
+        #endif
+    }
     func read(_ image:CGImage,source:String,mode:ComicReadingMode)async throws->ComicReading{
         try Task.checkCancellation()
         let detected=source == "auto" ? try await Self.detectScript(image) : source
         let fastSupported=ComicModelStore.recognizer(detected)=="latin" || ["ja","zh","ko"].contains(where:detected.hasPrefix)
-        let fast=fastSupported ? try await Self.fast(image,source:detected):[]
+        let fast=fastSupported ? try await self.fast(image,source:detected):[]
         var lines=fast
         #if targetEnvironment(simulator)
         var runtime="Apple Vision (simulator only; ML Kit has no arm64 simulator slice)"
@@ -45,17 +53,20 @@ actor ComicOCR {
         if scalars.filter({(0x4E00...0x9FFF).contains($0.value)}).count>=2{return "zh"}
         return recognizer.dominantLanguage?.rawValue ?? "en"
     }
-    private static func fast(_ image:CGImage,source:String)async throws->[ComicLine]{
+    private func fast(_ image:CGImage,source:String)async throws->[ComicLine]{
         #if canImport(MLKitTextRecognition)
         let recognizer: TextRecognizer
-        if source.hasPrefix("ko"){recognizer=TextRecognizer.textRecognizer(options:KoreanTextRecognizerOptions())}
+        let script=source.hasPrefix("ko") ? "ko":source.hasPrefix("ja") ? "ja":source.hasPrefix("zh") ? "zh":"latin"
+        if let saved=fastRecognizers[script]{recognizer=saved}
+        else if source.hasPrefix("ko"){recognizer=TextRecognizer.textRecognizer(options:KoreanTextRecognizerOptions())}
         else if source.hasPrefix("ja"){recognizer=TextRecognizer.textRecognizer(options:JapaneseTextRecognizerOptions())}
         else if source.hasPrefix("zh"){recognizer=TextRecognizer.textRecognizer(options:ChineseTextRecognizerOptions())}
         else{recognizer=TextRecognizer.textRecognizer(options:TextRecognizerOptions())}
+        if fastRecognizers[script]==nil{fastRecognizers.removeAll();fastRecognizers[script]=recognizer}
         let result=try await withCheckedThrowingContinuation{(c:CheckedContinuation<Text,Error>)in recognizer.process(VisionImage(image:UIImage(cgImage:image))){text,error in if let error{c.resume(throwing:error)}else if let text{c.resume(returning:text)}else{c.resume(throwing:ComicFailure.message("لم يُرجع OCR نتيجة."))}}}
         return result.blocks.flatMap(\.lines).map{ComicLine(text:$0.text,confidence:0.5,rect:$0.frame)}
         #elseif targetEnvironment(simulator)
-        return try vision(image,languages:[source == "auto" ? "en-US":source],accurate:true)
+        return try Self.vision(image,languages:[source == "auto" ? "en-US":source],accurate:true)
         #else
         // Standalone builds without the SDK remain diagnosable, not falsely labelled ML Kit.
         throw ComicFailure.message("هذا البناء لا يتضمن ML Kit. استخدم بناء ترجمة الصور الكامل.")

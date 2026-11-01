@@ -38,7 +38,7 @@ import CoreGraphics
     private var resolvedScripts:[String:(String,Int)]=[:]
     private var observer:NSObjectProtocol?
     var preferences:ComicPreferences{model?.data.settings.comicTranslation ?? ComicPreferences()}
-    init(model:BrowserModel,tab:BrowserTab){self.model=model;self.tab=tab;super.init();observer=NotificationCenter.default.addObserver(forName:UIApplication.didReceiveMemoryWarningNotification,object:nil,queue:.main){[weak self]_ in Task{@MainActor in self?.pause();await ComicPaddle.shared.purge();await ComicLocalTranslator.shared.unload()}}}
+    init(model:BrowserModel,tab:BrowserTab){self.model=model;self.tab=tab;super.init();observer=NotificationCenter.default.addObserver(forName:UIApplication.didReceiveMemoryWarningNotification,object:nil,queue:.main){[weak self]_ in Task{@MainActor in self?.pause();await ComicOCR.shared.purge();await ComicPaddle.shared.purge();await ComicLocalTranslator.shared.unload()}}}
     deinit{if let observer{NotificationCenter.default.removeObserver(observer)}}
     func attach(to view:WKWebView,installScript:Bool=true){
         ComicMessageRouter.shared.pages.setObject(self,forKey:view)
@@ -110,13 +110,14 @@ import CoreGraphics
                     let center=try await Task.detached{try ComicPixels.decode(bytes)}.value
                     let neighbours=ComicWindow.neighbours(of:candidate,in:envelope.items)
                     var before:CGImage?,after:CGImage?
-                    if region.y==0,let previous=neighbours.before{
-                        let height=min(256,previous.height),area=ComicRegion(y:previous.height-height,width:previous.width,height:height,coreTop:0,coreBottom:height)
+                    let contextRows=max(0,min(256,(8_000_000/center.width-center.height)/2))
+                    if contextRows>0,region.y==0,let previous=neighbours.before{
+                        let height=min(previous.height,max(1,contextRows*previous.width/center.width)),area=ComicRegion(y:previous.height-height,width:previous.width,height:height,coreTop:0,coreBottom:height)
                         let context=try await capture(previous,region:area,frame:frame,ticket:ticket)
                         before=try await Task.detached{try ComicPixels.decode(context)}.value
                     }
-                    if region.y+region.height==candidate.height,let next=neighbours.after{
-                        let height=min(256,next.height),area=ComicRegion(y:0,width:next.width,height:height,coreTop:0,coreBottom:height)
+                    if contextRows>0,region.y+region.height==candidate.height,let next=neighbours.after{
+                        let height=min(next.height,max(1,contextRows*next.width/center.width)),area=ComicRegion(y:0,width:next.width,height:height,coreTop:0,coreBottom:height)
                         let context=try await capture(next,region:area,frame:frame,ticket:ticket)
                         after=try await Task.detached{try ComicPixels.decode(context)}.value
                     }

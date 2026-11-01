@@ -81,10 +81,19 @@ jobs:
           python3 .zeus-ci/fixture_server.py > results/fixture.log 2>&1 &
           curl --fail --max-time 5 --retry 10 --retry-connrefused http://127.0.0.1:8765/ > /dev/null
       - name: Test actual WebKit bridge and pixel rendering
+        timeout-minutes: 20
         if: matrix.sdk == 'iphonesimulator'
         run: |
           set -o pipefail
-          xcodebuild -project ZEUSNext.xcodeproj -scheme ZEUSNext -sdk iphonesimulator -destination "platform=iOS Simulator,id=$COMIC_SIMULATOR" -derivedDataPath "$RUNNER_TEMP/ZeusComicSim" -resultBundlePath results/comic.xcresult -only-testing:ZEUSNextTests/NativeComicTranslationTests -parallel-testing-enabled NO test CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- 2>&1 | tee results/simulator.log
+          xcodebuild -project ZEUSNext.xcodeproj -scheme ZEUSNext -sdk iphonesimulator -destination "platform=iOS Simulator,id=$COMIC_SIMULATOR" -derivedDataPath "$RUNNER_TEMP/ZeusComicSim" -resultBundlePath results/comic.xcresult -only-testing:ZEUSNextTests/NativeComicTranslationTests -parallel-testing-enabled NO -test-timeouts-enabled YES -default-test-execution-time-allowance 90 -maximum-test-execution-time-allowance 120 test CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- 2>&1 | tee results/simulator.log
+      - name: Collect simulator diagnostics
+        if: always() && matrix.sdk == 'iphonesimulator'
+        timeout-minutes: 2
+        continue-on-error: true
+        run: |
+          xcrun simctl io "$COMIC_SIMULATOR" screenshot results/simulator.png || true
+          xcrun simctl spawn "$COMIC_SIMULATOR" launchctl list > results/processes.log || true
+          xcrun simctl spawn "$COMIC_SIMULATOR" log show --last 8m --style compact --predicate 'process == "ZEUSNext" OR process == "xctest" OR subsystem CONTAINS "testmanager"' > results/system.log || true
       - name: Export exact revision and result summary
         if: always()
         run: |

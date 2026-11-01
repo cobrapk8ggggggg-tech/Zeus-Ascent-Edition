@@ -19,7 +19,7 @@
   }
   function sourceOf(r) { return r.original?.source || (r.kind==='canvas' ? 'canvas:'+r.id : r.kind==='background' ? absolute((/url\(["']?(.*?)["']?\)/.exec(r.el.style.backgroundImage)||[])[1]||'') : r.el.currentSrc || r.el.src || ''); }
   function release(r) {
-    if (r.held) { putCSS(r.el,'filter',r.held);r.held=null; }
+    if (r.held) { if(r.el.style.getPropertyValue('filter')==='blur(18px) saturate(0.7)'||r.el.style.getPropertyValue('filter')==='blur(18px) saturate(.7)')putCSS(r.el,'filter',r.held);r.held=null; }
     r.holdUntil=0;
   }
   function setStyle(r,name,value){r.el.style.setProperty(name,value,'important');(r.written||(r.written={}))[name]=css(r.el,name);}
@@ -62,10 +62,11 @@
       items.push({id:r.id,source:shortSource(sourceOf(r),r.id,r.revision),kind:r.kind,width:r.original?.width||el.naturalWidth||0,height:r.original?.height||el.naturalHeight||0,x:box.left+scrollX,y:box.top+scrollY,w:box.width,h:box.height,pending:waiting,revision:String(r.revision)});
     }
     for(const el of document.querySelectorAll('canvas,[style*="background-image"]')) {
+      if(el.tagName==='IMG')continue; // Partial image overlays already have an image record.
       const kind=el.tagName==='CANVAS'?'canvas':'background',r=record(el,kind),box=el.getBoundingClientRect();
       if(kind==='canvas'&&r.original&&fingerprint(el)!==r.canvasMark){reset(r,false);r.revision++;}
-      if(box.width<64||box.height<24||box.bottom< -viewport||box.top>viewport*3||r.parts.size)continue;
-      items.push({id:r.id,source:shortSource(sourceOf(r),r.id,r.revision),kind,width:el.width||Math.round(box.width),height:el.height||Math.round(box.height),x:box.left+scrollX,y:box.top+scrollY,w:box.width,h:box.height,pending:false,revision:String(r.revision)});
+      if(box.width<64||box.height<24||box.bottom< -viewport||box.top>viewport*3)continue;
+      items.push({id:r.id,source:shortSource(sourceOf(r),r.id,r.revision),kind,width:r.original?.width||el.width||Math.round(box.width),height:r.original?.height||el.height||Math.round(box.height),x:box.left+scrollX,y:box.top+scrollY,w:box.width,h:box.height,pending:false,revision:String(r.revision)});
     }
     for(const [id,r] of records)if(!r.el.isConnected){reset(r,false);records.delete(id);}
     return {document:documentID,url:location.href,language:document.documentElement.lang||'',viewport,scroll:scrollY,items};
@@ -78,7 +79,21 @@
     if(r.kind==='canvas')r.captureFingerprint=fingerprint(r.el);
     const c=document.createElement('canvas');c.width=region.width;c.height=region.height;
     if(c.width*c.height>8000000)throw Error('pixel limit');
-    c.getContext('2d').drawImage(image,region.x,region.y,region.width,region.height,0,0,c.width,c.height);
+    const context=c.getContext('2d');
+    if(r.kind==='background'){
+      const style=getComputedStyle(r.el),box=r.el.getBoundingClientRect(),width=r.original?.width||Math.round(box.width),height=r.original?.height||Math.round(box.height);
+      const paint=r.original?.paint||{size:style.backgroundSize,position:style.backgroundPosition,repeat:style.backgroundRepeat},size=paint.size.trim(),values=size.split(/\s+/);
+      let dw=image.naturalWidth,dh=image.naturalHeight;
+      const dimension=(value,full)=>value?.endsWith('%')?parseFloat(value)*full/100:parseFloat(value);
+      if(size==='cover'||size==='contain'){const factor=(size==='cover'?Math.max:Math.min)(width/dw,height/dh);dw*=factor;dh*=factor;}
+      else{const w=dimension(values[0],width),h=dimension(values[1],height);if(Number.isFinite(w)){dw=w;dh=Number.isFinite(h)?h:image.naturalHeight*w/image.naturalWidth;}else if(Number.isFinite(h)){dh=h;dw=image.naturalWidth*h/image.naturalHeight;}}
+      if(!(dw>0&&dh>0))throw Error('unsupported background size');
+      const positions=paint.position.split(/\s+/),position=(value,space)=>value?.endsWith('%')?parseFloat(value)*space/100:value==='center'?space/2:value==='right'||value==='bottom'?space:parseFloat(value)||0;
+      const left=position(positions[0],width-dw),top=position(positions[1]||'50%',height-dh),repeat=paint.repeat||'repeat';
+      context.translate(-region.x,-region.y);
+      if(repeat==='no-repeat')context.drawImage(image,left,top,dw,dh);
+      else{const pattern=context.createPattern(image,repeat);if(!pattern)throw Error('unsupported background repeat');pattern.setTransform(new DOMMatrix().translate(left,top).scale(dw/image.naturalWidth,dh/image.naturalHeight));context.fillStyle=pattern;context.fillRect(region.x,region.y,region.width,region.height);}
+    }else context.drawImage(image,region.x,region.y,region.width,region.height,0,0,c.width,c.height);
     const blob=await new Promise(resolve=>c.toBlob(resolve,'image/png'));if(!blob||blob.size>33554432)throw Error('capture too large');
     const bytes=new Uint8Array(await blob.arrayBuffer()),token=uuid();
     if(transfers.size>=6)throw Error('transfer limit');
@@ -87,8 +102,11 @@
   function take(token,offset,count){const transfer=transfers.get(token);if(!transfer||count>65536||offset<0)throw Error('missing transfer');let result='';for(const b of transfer.bytes.subarray(offset,offset+count))result+=String.fromCharCode(b);transfer.at=Date.now();return btoa(result);}
   function begin(id,revision) {
     const r=live(id,revision);if(r.original)return r;
-    const el=r.el,styles={};for(const n of ['background-image','background-size','background-position','background-repeat','background-origin','background-clip','object-position','object-fit','opacity','transition'])styles[n]=css(el,n);
-    r.original={source:sourceOf(r),src:el.getAttribute('src'),srcset:el.getAttribute('srcset'),width:el.naturalWidth||el.width,height:el.naturalHeight||el.height,styles,sources:[]};
+    const el=r.el;
+    if(r.kind==='canvas'&&el.width*el.height>8000000)throw Error('canvas original exceeds reversible pixel limit');
+    const styles={};for(const n of ['background-image','background-size','background-position','background-repeat','background-origin','background-clip','object-position','object-fit','opacity','transition'])styles[n]=css(el,n);
+    r.original={source:sourceOf(r),src:el.getAttribute('src'),srcset:el.getAttribute('srcset'),width:el.naturalWidth||el.width||Math.round(el.getBoundingClientRect().width),height:el.naturalHeight||el.height||Math.round(el.getBoundingClientRect().height),styles,sources:[]};
+    if(r.kind==='background'){const style=getComputedStyle(el);r.original.paint={size:style.backgroundSize,position:style.backgroundPosition,repeat:style.backgroundRepeat};}
     if(el.parentElement?.tagName==='PICTURE')for(const s of el.parentElement.querySelectorAll('source[srcset]'))r.original.sources.push([s,s.getAttribute('srcset')]);
     if(r.kind==='canvas'){const c=document.createElement('canvas');c.width=el.width;c.height=el.height;c.getContext('2d').drawImage(el,0,0);r.original.canvas=c;}
     return r;
@@ -131,7 +149,10 @@
       let target=change.target;
       if(target.tagName==='SOURCE')target=target.parentElement?.querySelector('img')||target;
       const id=ids.get(target),r=id&&records.get(id);
-      if(r&&change.type==='attributes'&&['src','srcset'].includes(change.attributeName)){
+      if(r&&change.type==='attributes'&&change.attributeName==='style'){
+        if(r.original&&Object.entries(r.written||{}).some(([name,value])=>css(r.el,name).join('\0')!==value.join('\0'))){reset(r,false);r.revision++;external=true;}
+        else if(!r.original){r.revision++;external=true;}
+      }else if(r&&change.type==='attributes'&&['src','srcset'].includes(change.attributeName)){
         if(r.original){
           if(change.target.tagName==='SOURCE'){
             const prior=r.original.sources.find(([el])=>el===change.target),now=change.target.getAttribute('srcset');

@@ -160,7 +160,9 @@ tests.product_name = 'ZEUSBrowserIntegrationTests'
 tests.product_reference.path = 'ZEUSBrowserIntegrationTests.xctest'
 tests.add_dependency(app)
 tests.add_dependency(target)
-tests.frameworks_build_phase.add_file_reference(target.product_reference)
+# The test bundle resolves browser symbols from its TEST_HOST. Linking the
+# browser archive again would duplicate its explicitly static ONNX dependency.
+# Keep the build dependency and module search paths without linking a second copy.
 tests.source_build_phase.add_file_reference(group.new_file((browser + '.openminis/Host/NativeBrowserIntegrationTests.swift').to_s))
 tests.source_build_phase.add_file_reference(group.new_file((browser + '.openminis/Host/NativeProjectContractTests.swift').to_s))
 tests.source_build_phase.add_file_reference(group.new_file((browser + '.openminis/Host/NativePersonalizationTests.swift').to_s))

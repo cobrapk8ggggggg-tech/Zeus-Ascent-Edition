@@ -54,6 +54,23 @@ import UIKit
         XCTAssertLessThanOrEqual(layout.height,90);XCTAssertGreaterThan(layout.size,6)
         XCTAssertNil(ComicPixels.color("<script>"));XCTAssertNotNil(ComicPixels.color("#163B72"))
     }
+    func testArabicLetteringChangesActualPixelsInsideTheBalloon()throws{
+        let raster=renderer(CGSize(width:320,height:200)).image{context in
+            UIColor.white.setFill();context.fill(CGRect(x:0,y:0,width:320,height:200))
+            ("HELLO" as NSString).draw(at:CGPoint(x:90,y:40),withAttributes:[.font:UIFont.systemFont(ofSize:32),.foregroundColor:UIColor.black])
+        }
+        let line=ComicLine(text:"HELLO",confidence:1,rect:CGRect(x:88,y:40,width:120,height:40))
+        let speech=ComicSpeech(id:"0",text:"HELLO",lines:[line],rect:CGRect(x:55,y:20,width:210,height:90),vertical:false,balloon:true)
+        let output=try ComicPixels.render(try XCTUnwrap(raster.cgImage),speeches:[speech],translated:["0":"مرحبًا يا صديقي"],target:"ar",fontName:nil,fontScale:1,textColor:"163B72")
+        let pixels=try XCTUnwrap(ComicPixels.rgba(output,width:320,height:200))
+        var blue=0,outside=0
+        for y in 0..<200{for x in 0..<320{let i=(y*320+x)*4
+            if Int(pixels[i+2])>Int(pixels[i])+25 && Int(pixels[i+2])>Int(pixels[i+1])+15{blue+=1;if !speech.rect.contains(CGPoint(x:x,y:y)){outside+=1}}
+        }}
+        XCTAssertGreaterThan(blue,50,"CoreText must draw the selected color into the image")
+        XCTAssertEqual(outside,0,"Arabic lettering must remain inside the original balloon")
+        let attachment=XCTAttachment(image:UIImage(cgImage:output));attachment.name="Arabic lettering - actual pixels";attachment.lifetime = .keepAlways;add(attachment)
+    }
     func testBalloonInteriorProtectsBordersAndProvidesRoomForArabic()throws{
         let image=renderer(CGSize(width:300,height:220)).image{context in
             UIColor.darkGray.setFill();context.fill(CGRect(x:0,y:0,width:300,height:220))
@@ -127,6 +144,23 @@ import UIKit
         let stale = try await view.callAsyncJavaScript("return await zeusComic.apply(id,revision,data,region,mark,generation)",arguments:arguments,in:nil,contentWorld:ComicTranslation.world) as? Bool
         XCTAssertEqual(stale,false)
     }
+    func testBackgroundPanelsKeepOriginalPixelsAfterApplyingOneRegion()async throws{
+        let raster=renderer(CGSize(width:200,height:100)).image{context in
+            UIColor.red.setFill();context.fill(CGRect(x:0,y:0,width:200,height:50));UIColor.blue.setFill();context.fill(CGRect(x:0,y:50,width:200,height:50))
+        }
+        let original=try XCTUnwrap(raster.pngData()).base64EncodedString()
+        let controller=WKUserContentController();controller.addUserScript(WKUserScript(source:ComicTranslation.script,injectionTime:.atDocumentEnd,forMainFrameOnly:false,in:ComicTranslation.world))
+        let config=WKWebViewConfiguration();config.userContentController=controller
+        let view=WKWebView(frame:CGRect(x:0,y:0,width:390,height:700),configuration:config)
+        view.loadHTMLString("<html><body><div style='width:200px;height:100px;background-image:url(data:image/png;base64,\(original));background-size:100% 100%;background-repeat:no-repeat'></div></body></html>",baseURL:URL(string:"https://comic.invalid"))
+        let deadline=Date().addingTimeInterval(15)
+        while Date()<deadline{if (try? await view.callAsyncJavaScript("return !!globalThis.zeusComic",arguments:[:],in:nil,contentWorld:ComicTranslation.world))as? Bool==true{break};try await Task.sleep(for:.milliseconds(100))}
+        let result=try await view.callAsyncJavaScript("const c=zeusComic.scan(false).items[0],g=zeusComic.start(),region={x:0,y:0,width:200,height:50};const transfer=await zeusComic.capture(c.id,c.revision,region),data=zeusComic.take(transfer.token,0,transfer.length);if(!await zeusComic.apply(c.id,c.revision,data,region,'ar',g))throw Error('apply failed');const again=zeusComic.scan(false).items;if(again.length!==1)throw Error('lost background candidate');const next=await zeusComic.capture(c.id,c.revision,{x:0,y:50,width:200,height:50}),bytes=zeusComic.take(next.token,0,next.length);zeusComic.restore();return bytes;",arguments:[:],in:nil,contentWorld:ComicTranslation.world)as? String
+        let bytes=try XCTUnwrap(Data(base64Encoded:try XCTUnwrap(result))),image=try ComicPixels.decode(bytes),pixels=try XCTUnwrap(ComicPixels.rgba(image,width:200,height:50))
+        XCTAssertLessThan(pixels[0],10);XCTAssertGreaterThan(pixels[2],245,"Second window must capture the original blue lower half")
+        let restored=try await view.evaluateJavaScript("document.querySelector('div').style.backgroundImage")as? String
+        XCTAssertTrue(restored?.contains("data:image/png")==true)
+    }
     func testEndToEndImagesDoNotTranslateDOMAndFontChangesReuseOCRAndProvider()async throws{
         let root=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let model=BrowserModel(profiles:ProfileStore(root:root,downloadsRoot:root.appendingPathComponent("Downloads")),useBackgroundDownloads:false)
@@ -161,6 +195,7 @@ import UIKit
         XCTAssertNil(session.error);XCTAssertGreaterThan(session.completed,completeBefore);XCTAssertEqual(session.ocrRuns,ocrBefore)
         let (secondData,_)=try await URLSession.shared.data(from:endpoint),after=try XCTUnwrap(JSONSerialization.jsonObject(with:secondData)as? [[String]])
         XCTAssertEqual(before.count,after.count,"Changing lettering must not spend another translation request")
+        if let snapshot=try? await view.takeSnapshot(configuration:nil){let attachment=XCTAttachment(image:snapshot);attachment.name="Image-only end-to-end - Arabic custom color";attachment.lifetime = .keepAlways;add(attachment)}
         await session.restore()
         let original=try await view.evaluateJavaScript("document.images[0].src")as? String
         XCTAssertTrue(original?.hasPrefix("data:image/png")==true)

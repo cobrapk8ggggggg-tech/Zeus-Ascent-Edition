@@ -37,6 +37,7 @@ struct ComicSettingsSheet:View {
                         Text("تُستخدم حسابات ومفاتيح مزودي ZEUS المحفوظة في هذا البروفايل. الاختيار واللغة هنا مستقلان عن نصوص الصفحات.").font(.footnote)
                     }
                     if prefs.engine.needsKey{if prefs.engine == .papago{TextField("Client ID",text:$clientID).textInputAutocapitalization(.never).autocorrectionDisabled()};SecureField("مفتاح الحساب",text:$key).textInputAutocapitalization(.never).autocorrectionDisabled();Button("حفظ في Keychain"){do{try AISecretVault.save(prefs.engine == .papago ? clientID+"\n"+key:key,profile:model.profile.id,provider:"comic-"+prefs.engine.rawValue);key="";message="حُفظ المفتاح."}catch{message=error.localizedDescription}}}
+                    if translation.target=="ar",[ComicOnlineEngine.papago,.caiyun].contains(prefs.engine){Text("هذا المحرك لا يدعم العربية. استخدم Google أو Microsoft أو مزود ZEUS يدعمها.").font(.footnote)}
                     if prefs.engine == .papago{Text("Client ID في السطر الأول وClient Secret في الثاني.").font(.footnote)}
                 }
             }

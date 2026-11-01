@@ -6,9 +6,9 @@ actor ComicPaddle {
     static let shared=ComicPaddle()
     private let environment: ORTEnv
     private var sessions:[String:ORTSession]=[:]
-    private var order:[String]=[]
+    private var dictionaries:[String:[String]]=[:]
     init(){environment=try! ORTEnv(loggingLevel:.error)}
-    func purge(){sessions.removeAll();order.removeAll()}
+    func purge(){sessions.removeAll();dictionaries.removeAll()}
     private func session(_ name:String)async throws->ORTSession{
         if let s=sessions[name]{return s}
         let file=try await ComicModelStore.shared.file(name,download:false)
@@ -37,8 +37,11 @@ actor ComicPaddle {
     }
     func read(_ image:CGImage,source:String,careful:Bool)async throws->[ComicLine]{
         let detector=try await session("det.onnx"),name=ComicModelStore.recognizer(source),recognizer=try await session(name+".onnx")
-        let dictionaryFile=try await ComicModelStore.shared.file(name+".yml",download:false)
-        let dictionary=try Self.dictionary(String(contentsOf:dictionaryFile,encoding:.utf8))
+        let dictionary:[String]
+        if let saved=dictionaries[name]{dictionary=saved}else{
+            let file=try await ComicModelStore.shared.file(name+".yml",download:false)
+            dictionary=try Self.dictionary(String(contentsOf:file,encoding:.utf8));dictionaries=[name:dictionary]
+        }
         let maxPixels:Double=ProcessInfo.processInfo.physicalMemory<5*1024*1024*1024 ? 700_000:2_000_000
         let factor=min(1,sqrt(maxPixels/Double(image.width*image.height)),4000/Double(max(image.width,image.height)))
         let width=max(32,Int((Double(image.width)*factor/32).rounded())*32),height=max(32,Int((Double(image.height)*factor/32).rounded())*32)

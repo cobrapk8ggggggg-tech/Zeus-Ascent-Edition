@@ -22,3 +22,5 @@ test('removed DOM nodes are dropped from registry',()=>{const s=setup();try{cons
 test('large data URLs cross the probe as a short content identity',()=>{const s=setup('<img src="data:image/png;base64,'+'a'.repeat(100000)+'">');try{const c=s.bridge.scan(false).items[0];assert.ok(c.source.startsWith('data:#'));assert.ok(c.source.length<80);}finally{s.close()}});
 
 test('ordinary HTTP without randomUUID can still create isolated document identity',()=>{const s=setup('<img src="/panel.png">',true);try{assert.match(s.bridge.documentID,/^[a-f0-9]{32}$/);assert.equal(s.bridge.scan(false).items.length,1);}finally{s.close()}});
+
+test('image overlays are not rediscovered as a second background candidate',()=>{const s=setup('<img src="/panel.png" style="background-image:url(/original.png)">');try{assert.equal(s.bridge.scan(false).items.length,1);}finally{s.close()}});

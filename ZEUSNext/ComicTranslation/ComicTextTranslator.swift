@@ -7,6 +7,23 @@ enum ComicOnlineEngine:String,Codable,CaseIterable {
 }
 enum ComicTextTranslator {
     static func translate(_ input:[TranslationSegment],source:String,target:String,preferences:TranslationPreferences,provider:AIProviderConfiguration?,secret:String,local:Bool,engine:ComicOnlineEngine = .existing,engineSecret:String = "",context:[String]=[])async throws->[TranslationSegment]{
+        var batches:[[TranslationSegment]]=[],batch:[TranslationSegment]=[],bytes=0
+        let limit=local ? 1000:12000,countLimit=local ? 4:32
+        for segment in input{
+            guard segment.text.utf8.count <= (local ? 1800:24000)else{throw ComicFailure.message("الحوار أطول من حد المحرك المحدد؛ بقي الأصل.")}
+            if !batch.isEmpty && (bytes+segment.text.utf8.count>limit || batch.count>=countLimit){batches.append(batch);batch=[];bytes=0}
+            batch.append(segment);bytes+=segment.text.utf8.count
+        }
+        if !batch.isEmpty{batches.append(batch)}
+        var output:[TranslationSegment]=[],preceding=context
+        for batch in batches{
+            try Task.checkCancellation()
+            output += try await translateBatch(batch,source:source,target:target,preferences:preferences,provider:provider,secret:secret,local:local,engine:engine,engineSecret:engineSecret,context:preceding.suffix(4).map{String($0.prefix(local ? 80:500))})
+            preceding += batch.map(\.text)
+        }
+        return output
+    }
+    private static func translateBatch(_ input:[TranslationSegment],source:String,target:String,preferences:TranslationPreferences,provider:AIProviderConfiguration?,secret:String,local:Bool,engine:ComicOnlineEngine,engineSecret:String,context:[String])async throws->[TranslationSegment]{
         guard !input.isEmpty else{return []}
         if local{return try await ComicLocalTranslator.shared.translate(input,source:source,target:target,context:context)}
         if engine != .existing {return try await ComicWebEngines.translate(input,source:source,target:target,engine:engine,secret:engineSecret)}
