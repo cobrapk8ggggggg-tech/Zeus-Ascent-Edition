@@ -33,7 +33,7 @@ for spec in "jpeg https://github.com/libjpeg-turbo/libjpeg-turbo.git 3.1.0" "png
   cmake --build "$output/$name" -j 3
  done
 xcrun --sdk "$sdk" clang++ -std=c++17 -arch arm64 -isysroot "$(xcrun --sdk "$sdk" --show-sdk-path)" "$minimum" \
-  -I"$root/.zeus-ci/comic/build/jpeg" -I"$output/jpeg" -I"$root/.zeus-ci/comic/build/png" -I"$output/png" -I"$root/.zeus-ci/comic/build/webp/src" \
+  -I"$root/.zeus-ci/comic/build/jpeg/src" -I"$root/.zeus-ci/comic/build/jpeg" -I"$output/jpeg" -I"$root/.zeus-ci/comic/build/png" -I"$output/png" -I"$root/.zeus-ci/comic/build/webp/src" \
   -c "$root/Native/ComicRuntime/ComicRegionDecoder.cpp" -o "$output/decoder.o"
 python3 - "$output" <<'PY'
 import pathlib,subprocess,sys

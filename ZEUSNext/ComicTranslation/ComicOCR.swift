@@ -35,7 +35,7 @@ actor ComicOCR {
         return ComicReading(lines:lines,speeches:ComicGeometry.group(lines,source:detected),language:detected,runtime:runtime)
     }
     private static func detectScript(_ image:CGImage)async throws->String{
-        let samples=try vision(image,languages:["ko-KR","ja-JP","zh-Hans","en-US"],accurate:false)
+        let samples=try vision(image,languages:["ko-KR","ja-JP","zh-Hans","en-US"],accurate:true)
         let text=samples.map(\.text).joined(separator:" ")
         let recognizer=NLLanguageRecognizer();recognizer.processString(text)
         let scalars=text.unicodeScalars
@@ -61,7 +61,10 @@ actor ComicOCR {
         #endif
     }
     private static func vision(_ image:CGImage,languages:[String],accurate:Bool)throws->[ComicLine]{
-        let request=VNRecognizeTextRequest();request.recognitionLevel=accurate ? .accurate:.fast;request.recognitionLanguages=languages;request.usesLanguageCorrection=false
+        let request=VNRecognizeTextRequest();request.recognitionLevel=accurate ? .accurate:.fast;let aliases=["ko":"ko-KR","ja":"ja-JP","zh":"zh-Hans","en":"en-US","ar":"ar-SA"]
+        let supported=try request.supportedRecognitionLanguages()
+        let requested=languages.map{aliases[$0] ?? $0}.filter{supported.contains($0)}
+        request.recognitionLanguages=requested.isEmpty ? ["en-US"]:requested;request.usesLanguageCorrection=false
         try VNImageRequestHandler(cgImage:image,options:[:]).perform([request])
         return (request.results ?? []).compactMap{r in guard let value=r.topCandidates(1).first else{return nil};let b=r.boundingBox;return ComicLine(text:value.string,confidence:value.confidence,rect:CGRect(x:b.minX*CGFloat(image.width),y:(1-b.maxY)*CGFloat(image.height),width:b.width*CGFloat(image.width),height:b.height*CGFloat(image.height)))}
     }

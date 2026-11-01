@@ -11,12 +11,9 @@ enum ComicWebEngines {
         case .google:
             return try TextTranslationService.parseGoogleBatch(await AIHTTP.object(TextTranslationService.googleBatchRequest(input.map(\.text),target:target),session:session),originals:input)
         case .microsoft:
-            let data=try await AIHTTP.data(AIHTTP.request(URL(string:"https://edge.microsoft.com/translate/auth")!),session:session)
-            let token=String(decoding:data,as:UTF8.self).trimmingCharacters(in:.whitespacesAndNewlines)
-            guard !token.isEmpty,token.count<16384 else{throw ComicFailure.message("تعذّر الحصول على جلسة Microsoft.")}
-            var c=URLComponents(string:"https://api.cognitive.microsofttranslator.com/translate")!;c.queryItems=[URLQueryItem(name:"api-version",value:"3.0"),URLQueryItem(name:"to",value:target)]
-            if source != "auto"{c.queryItems?.append(URLQueryItem(name:"from",value:source))}
-            let rows=try await AIHTTP.object(AIHTTP.request(c.url!,method:"POST",body:input.map{["Text":$0.text]},headers:["Authorization":"Bearer "+token]),session:session)as? [[String:Any]] ?? []
+            var c=URLComponents(string:"https://edge.microsoft.com/translate/translatetext")!
+            c.queryItems=[URLQueryItem(name:"from",value:source == "auto" ? "":source),URLQueryItem(name:"to",value:target),URLQueryItem(name:"isEnterpriseClient",value:"false")]
+            let rows=try await AIHTTP.object(AIHTTP.request(c.url!,method:"POST",body:input.map(\.text),headers:["User-Agent":"Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 ZEUSBrowser/4.0"]),session:session)as? [[String:Any]] ?? []
             output=rows.compactMap{($0["translations"]as? [[String:Any]])?.first?["text"]as? String}
         case .myMemory:
             var values:[String]=[]
