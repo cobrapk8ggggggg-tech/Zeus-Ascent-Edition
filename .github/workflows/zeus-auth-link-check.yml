@@ -63,12 +63,17 @@ jobs:
           browser.package_product_dependencies << ort_product
           ort_build = p.new(Xcodeproj::Project::Object::PBXBuildFile)
           ort_build.product_ref = ort_product; browser.frameworks_build_phase.files << ort_build
+          app.build_configurations.each do |c|
+            c.build_settings['FRAMEWORK_SEARCH_PATHS'] = ['$(inherited)','$(BUILT_PRODUCTS_DIR)']
+            c.build_settings['OTHER_LDFLAGS'] = ['$(inherited)','-framework','onnxruntime']
+          end
           p.save
           scheme = Xcodeproj::XCScheme.new
           scheme.add_build_target(app)
           scheme.save_as(p.path,'Host')
           RUBY
           xcodebuild -project Probe.xcodeproj -scheme Host -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath "$RUNNER_TEMP/AuthLinkProbe" build CODE_SIGNING_ALLOWED=NO 2>&1 | tee link.log
+          file "$RUNNER_TEMP/AuthLinkProbe/Build/Products/Release-iphoneos/onnxruntime.framework/onnxruntime"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

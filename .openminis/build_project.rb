@@ -75,6 +75,13 @@ project.root_object.package_references << ort_package
     config.build_settings['OTHER_LDFLAGS'] = Array(config.build_settings['OTHER_LDFLAGS']) + ['$(inherited)', '-lzeuscomic', '-lz', '-lc++', '-framework', 'Accelerate']
   end
 end
+# SPM archives the Objective-C wrapper into ZEUSBrowser, but its binary
+# XCFramework is not forwarded to a host without a direct package product.
+# Link only that native binary here, never the wrapper product a second time.
+app.build_configurations.each do |config|
+  config.build_settings['FRAMEWORK_SEARCH_PATHS'] = Array(config.build_settings['FRAMEWORK_SEARCH_PATHS']) + ['$(inherited)', '$(BUILT_PRODUCTS_DIR)']
+  config.build_settings['OTHER_LDFLAGS'] = Array(config.build_settings['OTHER_LDFLAGS']) + ['-framework', 'onnxruntime']
+end
 # Strip the actual binaries/dependency graph, not just visible media buttons.
 project.targets.each do |item|
   [item.source_build_phase, item.resources_build_phase, item.frameworks_build_phase, *item.copy_files_build_phases].each do |phase|
