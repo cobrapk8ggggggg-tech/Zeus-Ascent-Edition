@@ -10,12 +10,24 @@ jobs:
   inspect:
     runs-on: ubuntu-latest
     steps:
-      - name: Read the tail of the active device build
+      - name: Read and safely render the active device build tail
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
         run: |
-          set -euo pipefail
-          gh api "repos/$REPO/actions/jobs/124968737259/logs" > live-build.log
-          wc -c live-build.log
-          tail -n 75 live-build.log
+          python3 - <<'PY'
+          import os, urllib.request, urllib.error, urllib.parse
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, headers, newurl): return None
+          url='https://api.github.com/repos/'+os.environ['REPO']+'/actions/jobs/124968737259/logs'
+          req=urllib.request.Request(url,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'User-Agent':'ZEUS-build-review'})
+          try:
+              with urllib.request.build_opener(NoRedirect).open(req) as response: data=response.read()
+          except urllib.error.HTTPError as error:
+              if error.code not in (301,302,303,307,308): raise
+              location=error.headers['Location']
+              assert urllib.parse.urlparse(location).scheme=='https'
+              with urllib.request.urlopen(location) as response: data=response.read()
+          print('Downloaded log bytes:',len(data))
+          for line in data.decode('utf-8',errors='replace').splitlines()[-60:]: print(repr(line))
+          PY
