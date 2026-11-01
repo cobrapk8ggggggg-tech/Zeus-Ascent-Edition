@@ -18,7 +18,15 @@ enum ComicBidi {
             end=NSMaxRange(match.range)
         }
         if end<raw.length{runs.append((raw.substring(from:end),false))}
-        let mirrors:[Character:Character]=["(":")",")":"(","[":"]","]":"[","{":"}","}":"{","<":">",">":"<","«":"»","»":"«"]
-        return runs.reversed().map{value,protected in protected ? value:String(value.reversed().map{mirrors[$0] ?? $0})}.joined()
+        var result=runs.reversed().map{value,protected in protected ? value:String(value.reversed())}.joined()
+        // Reversing OCR character order already reverses bracket positions.
+        // Mirror only a complete pair whose resulting order is inverted; blindly
+        // mirroring every punctuation glyph reverses correctly paired brackets.
+        let brackets:[(Character,Character)]=[("(",")"),("[","]"),("{","}"),("<",">"),("«","»")]
+        for (open,close) in brackets{
+            func balanced(_ value:String)->Bool{var depth=0;for c in value{if c==open{depth+=1};if c==close{depth-=1;if depth<0{return false}}};return depth==0}
+            if !balanced(result){let mirrored=String(result.map{$0==open ? close:$0==close ? open:$0});if balanced(mirrored){result=mirrored}}
+        }
+        return result
     }
 }

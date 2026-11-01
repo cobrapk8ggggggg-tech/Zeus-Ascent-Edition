@@ -91,6 +91,8 @@ import UIKit
         XCTAssertEqual(ComicBidi.logicalFromVisual("ابحرم"),"مرحبا")
         XCTAssertEqual(ComicBidi.logicalFromVisual(")ابحرم( ABC"),"ABC (مرحبا)")
         XCTAssertEqual(ComicBidi.logicalFromVisual("12.5"),"12.5")
+        XCTAssertEqual(ComicBidi.logicalFromVisual("(ابحرم) ABC"),"ABC (مرحبا)")
+        XCTAssertEqual(ComicBidi.logicalFromVisual("]ابحرم[ 12.5"),"12.5 [مرحبا]")
     }
     func testActualLocalOCRReadsRasterText()async throws{
         let image=renderer(CGSize(width:640,height:180)).image{context in
