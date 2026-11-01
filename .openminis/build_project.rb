@@ -56,11 +56,15 @@ ort_package.repositoryURL = 'https://github.com/microsoft/onnxruntime-swift-pack
 ort_package.requirement = { 'kind' => 'exactVersion', 'version' => '1.24.2' }
 project.root_object.package_references << ort_package
 [target, app].each do |item|
-  product = project.new(Xcodeproj::Project::Object::XCSwiftPackageProductDependency)
-  product.package = ort_package; product.product_name = 'onnxruntime'
-  item.package_product_dependencies << product
-  build = project.new(Xcodeproj::Project::Object::PBXBuildFile)
-  build.product_ref = product; item.frameworks_build_phase.files << build
+  # The package contains static Objective-C wrapper objects. Archive them only
+  # into the browser; a second host product duplicates ORT classes at link time.
+  if item == target
+    product = project.new(Xcodeproj::Project::Object::XCSwiftPackageProductDependency)
+    product.package = ort_package; product.product_name = 'onnxruntime'
+    item.package_product_dependencies << product
+    build = project.new(Xcodeproj::Project::Object::PBXBuildFile)
+    build.product_ref = product; item.frameworks_build_phase.files << build
+  end
   item.build_configurations.each do |config|
     config.build_settings['SWIFT_INCLUDE_PATHS'] = ['$(inherited)', (browser + 'Native/ComicRuntime').to_s]
     # Append the comic runtime to the ORIGINAL search paths instead of

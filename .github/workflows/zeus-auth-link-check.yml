@@ -21,7 +21,8 @@ jobs:
           cd probe
           cat > Browser.swift <<'SWIFT'
           import Auth
-          public func authType() -> String { String(reflecting: AuthClient.self) }
+          import OnnxRuntimeBindings
+          public func authType() -> String { String(reflecting: AuthClient.self)+String(reflecting: ORTEnv.self) }
           SWIFT
           cat > Host.swift <<'SWIFT'
           import SwiftUI
@@ -53,6 +54,15 @@ jobs:
           browser.package_product_dependencies << product
           build = p.new(Xcodeproj::Project::Object::PBXBuildFile)
           build.product_ref = product; browser.frameworks_build_phase.files << build
+          ort = p.new(Xcodeproj::Project::Object::XCRemoteSwiftPackageReference)
+          ort.repositoryURL = 'https://github.com/microsoft/onnxruntime-swift-package-manager'
+          ort.requirement = {'kind'=>'exactVersion','version'=>'1.24.2'}
+          p.root_object.package_references << ort
+          ort_product = p.new(Xcodeproj::Project::Object::XCSwiftPackageProductDependency)
+          ort_product.package = ort; ort_product.product_name = 'onnxruntime'
+          browser.package_product_dependencies << ort_product
+          ort_build = p.new(Xcodeproj::Project::Object::PBXBuildFile)
+          ort_build.product_ref = ort_product; browser.frameworks_build_phase.files << ort_build
           p.save
           scheme = Xcodeproj::XCScheme.new
           scheme.add_build_target(app)
