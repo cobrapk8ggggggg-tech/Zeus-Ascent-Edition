@@ -82,7 +82,11 @@ actor ComicOCR {
         else{recognizer=TextRecognizer.textRecognizer(options:TextRecognizerOptions())}
         if fastRecognizers[script]==nil{fastRecognizers.removeAll();fastRecognizers[script]=recognizer}
         let result=try await withCheckedThrowingContinuation{(c:CheckedContinuation<Text,Error>)in recognizer.process(VisionImage(image:UIImage(cgImage:image))){text,error in if let error{c.resume(throwing:error)}else if let text{c.resume(returning:text)}else{c.resume(throwing:ComicFailure.message("لم يُرجع OCR نتيجة."))}}}
-        return result.blocks.flatMap(\.lines).map{ComicLine(text:$0.text,confidence:0.5,rect:$0.frame)}
+        return result.blocks.flatMap(\.lines).map{line in
+            let points=line.cornerPoints.map(\.cgPointValue)
+            let angle=points.count>=2 ? atan2(Double(points[1].y-points[0].y),Double(points[1].x-points[0].x)):0
+            return ComicLine(text:line.text,confidence:0.8,rect:line.frame,angle:angle)
+        }
         #elseif targetEnvironment(simulator)
         return try Self.vision(image,languages:[source == "auto" ? "en-US":source],accurate:true)
         #else
@@ -96,7 +100,7 @@ actor ComicOCR {
         let requested=languages.map{aliases[$0] ?? $0}.filter{supported.contains($0)}
         request.recognitionLanguages=requested.isEmpty ? ["en-US"]:requested;request.usesLanguageCorrection=false
         try VNImageRequestHandler(cgImage:image,options:[:]).perform([request])
-        return (request.results ?? []).compactMap{r in guard let value=r.topCandidates(1).first else{return nil};let b=r.boundingBox;return ComicLine(text:value.string,confidence:value.confidence,rect:CGRect(x:b.minX*CGFloat(image.width),y:(1-b.maxY)*CGFloat(image.height),width:b.width*CGFloat(image.width),height:b.height*CGFloat(image.height)))}
+        return (request.results ?? []).compactMap{r in guard let value=r.topCandidates(1).first else{return nil};let b=r.boundingBox;return ComicLine(text:value.string,confidence:value.confidence,rect:CGRect(x:b.minX*CGFloat(image.width),y:(1-b.maxY)*CGFloat(image.height),width:b.width*CGFloat(image.width),height:b.height*CGFloat(image.height)),angle:atan2(Double((r.topLeft.y-r.topRight.y)*CGFloat(image.height)),Double((r.topRight.x-r.topLeft.x)*CGFloat(image.width))))}
     }
 }
 private extension CGRect {var area:CGFloat {isNull ? 0:max(0,width)*max(0,height)}}

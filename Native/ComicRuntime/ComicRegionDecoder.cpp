@@ -63,3 +63,8 @@ extern "C" unsigned char *zeus_comic_decode_region(const unsigned char *bytes,un
     return nullptr;
 }
 extern "C" void zeus_comic_free_pixels(unsigned char *pixels){std::free(pixels);}
+
+#include "ComicInpaint.h"
+extern "C" void zeus_comic_inpaint(unsigned char *pixels, int width, int height, int left, int top, int right, int bottom) {
+    comic_inpaint(pixels,width,height,left,top,right,bottom);
+}

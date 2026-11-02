@@ -98,16 +98,15 @@ import UIKit
         XCTAssertEqual(outside,0,"Arabic lettering must remain inside the original balloon")
         let attachment=XCTAttachment(image:UIImage(cgImage:output));attachment.name="Arabic lettering - actual pixels";attachment.lifetime = .keepAlways;add(attachment)
     }
-    func testDiagonalTailEstimatesAngleAndRotatedLetteringStaysInsideBounds()throws{
+    func testExplicitBaselineAngleAndRotatedLetteringStaysInsideBounds()throws{
         // A thought tail drifting down-right: three overlapping OCR lines.
-        func line(_ x:CGFloat,_ y:CGFloat)->ComicLine{ComicLine(text:"TAIL",confidence:0.9,rect:CGRect(x:x,y:y,width:110,height:20))}
+        func line(_ x:CGFloat,_ y:CGFloat)->ComicLine{ComicLine(text:"TAIL",confidence:0.9,rect:CGRect(x:x,y:y,width:110,height:20),angle:atan2(48,120))}
         let lines=[line(10,20),line(70,44),line(130,68)]
         let grouped=ComicGeometry.group(lines,source:"en")
         XCTAssertEqual(grouped.count,1,"overlapping diagonal lines form one speech")
-        XCTAssertEqual(grouped.first?.angle ?? 0,atan2(48,120),accuracy:0.02,"slope between first and last line centres is the tail angle")
-        // Bounded estimator: shallow drift and steep diagonals must stay unrotated.
-        XCTAssertEqual(ComicGeometry.estimateAngle([line(0,0),ComicLine(text:"TAIL",confidence:0.9,rect:CGRect(x:200,y:3,width:110,height:20))]),0,"sub-2° drift is noise")
-        XCTAssertEqual(ComicGeometry.estimateAngle([line(0,0),ComicLine(text:"TAIL",confidence:0.9,rect:CGRect(x:40,y:40,width:60,height:20))]),0,"steeper than 35° is a different shape, not a tail")
+        XCTAssertEqual(grouped.first?.angle ?? 0,atan2(48,120),accuracy:0.02,"OCR baselines supply the lettering angle")
+        let paragraph=lines.map{line -> ComicLine in var line=line;line.angle=0;return line}
+        XCTAssertEqual(ComicGeometry.estimateAngle(paragraph),0,"indented paragraph centres must never tilt the translation")
         let speech=ComicSpeech(id:"tail",text:"TAIL\nTAIL\nTAIL",lines:lines,rect:CGRect(x:10,y:20,width:230,height:68),vertical:false,balloon:true,angle:ComicGeometry.estimateAngle(lines))
         let image=renderer(CGSize(width:260,height:160)).image{context in UIColor.white.setFill();context.fill(CGRect(x:0,y:0,width:260,height:160))}.cgImage!
         let drawn=try ComicPixels.render(image,speeches:[speech],translations:[TranslationSegment(id:"tail",text:"ترجمة")],target:"ar",fontName:nil,fontScale:1)
@@ -121,6 +120,41 @@ import UIKit
         XCTAssertGreaterThan(inside,10,"rotated lettering must change pixels inside the speech area")
         XCTAssertEqual(outside,0,"rotated lettering must never paint outside the speech it belongs to")
         let attachment=XCTAttachment(image:UIImage(cgImage:drawn));attachment.name="Rotated tail lettering";attachment.lifetime = .keepAlways;add(attachment)
+    }
+    func testSourceFontCapPreventsOneWordFillingHugeBalloon()throws{
+        let short=try XCTUnwrap(ComicPixels.layout("سجن",rect:CGRect(x:0,y:0,width:450,height:350),target:"ar",fontName:nil,fontScale:1,maximumSize:26))
+        let long=try XCTUnwrap(ComicPixels.layout("عذرًا، لكن هل يمكنكم مساعدتنا؟",rect:CGRect(x:0,y:0,width:450,height:350),target:"ar",fontName:nil,fontScale:1,maximumSize:26))
+        XCTAssertLessThanOrEqual(short.size,26);XCTAssertLessThanOrEqual(long.size,26)
+        XCTAssertEqual(short.size,long.size,accuracy:0.5)
+    }
+    func testOneBalloonOwnsFragmentedAndNestedOCRLinesOnce()throws{
+        let image=renderer(CGSize(width:500,height:400)).image{context in
+            UIColor.black.setFill();context.fill(CGRect(x:0,y:0,width:500,height:400))
+            UIColor.white.setFill();UIBezierPath(ovalIn:CGRect(x:50,y:30,width:400,height:330)).fill()
+        }.cgImage!
+        let lines=[ComicLine(text:"EXCUSE ME",confidence:0.9,rect:CGRect(x:160,y:120,width:180,height:24)),ComicLine(text:"BUT CAN YOU",confidence:0.9,rect:CGRect(x:145,y:155,width:210,height:24)),ComicLine(text:"HELP US?",confidence:0.9,rect:CGRect(x:170,y:190,width:160,height:24)),ComicLine(text:"ME",confidence:0.5,rect:CGRect(x:270,y:120,width:45,height:24))]
+        let speeches=ComicBalloons.speeches(lines,image:image,source:"en")
+        XCTAssertEqual(speeches.count,1);XCTAssertEqual(speeches.first?.lines.count,3)
+        XCTAssertEqual(speeches.first?.angle,0)
+        let translated=try ComicPixels.render(image,speeches:speeches,translations:[TranslationSegment(id:"0",text:"عذرًا، لكن هل يمكنكم مساعدتنا؟")],target:"ar",fontName:nil,fontScale:1)
+        let attachment=XCTAttachment(image:UIImage(cgImage:translated));attachment.name="One balloon one paragraph - source sized Arabic";attachment.lifetime = .keepAlways;add(attachment)
+    }
+    func testCleanupRemovesOutlinedOriginalOnLightAndDarkGradients()throws{
+        for dark in [false,true]{
+            let size=CGSize(width:480,height:300)
+            func raster(text:Bool)->CGImage{renderer(size).image{ctx in
+                for y in 0..<300{let v=CGFloat(y)/1200+(dark ? 0.02:0.7);UIColor(red:v,green:v,blue:min(1,v+0.04),alpha:1).setFill();ctx.fill(CGRect(x:0,y:y,width:480,height:1))}
+                if text{("EXCUSE ME" as NSString).draw(at:CGPoint(x:80,y:45),withAttributes:[.font:UIFont.boldSystemFont(ofSize:30),.foregroundColor:dark ? UIColor.white:UIColor.black,.strokeColor:dark ? UIColor.black:UIColor.white,.strokeWidth:-5])}
+            }.cgImage!}
+            let source=raster(text:true),truth=try XCTUnwrap(ComicPixels.rgba(raster(text:false),width:480,height:300))
+            var pixels=try XCTUnwrap(ComicPixels.rgba(source,width:480,height:300))
+            let line=ComicLine(text:"EXCUSE ME",confidence:1,rect:CGRect(x:80,y:49,width:180,height:30))
+            ComicPixels.clean(&pixels,width:480,height:300,speech:ComicSpeech(id:"0",text:line.text,lines:[line],rect:line.rect,vertical:false))
+            var error=0,total=0,remnants=0
+            for y in 40..<85{for x in 70..<275{let i=(y*480+x)*4;for c in 0..<3{let difference=abs(Int(pixels[i+c])-Int(truth[i+c]));error+=difference;total+=1;if difference>35{remnants+=1}}}}
+            XCTAssertLessThan(Double(error)/Double(total),3,"cleanup must recover the local gradient")
+            XCTAssertLessThan(remnants,15,"source outlines and shadows must disappear before Arabic is drawn")
+        }
     }
     func testOutlineInkAddsOppositeStrokeOverNoisyBackground()throws{
         // Dark striped SFX background: automatic ink is white, so the outline pass
@@ -223,7 +257,7 @@ import UIKit
         let view=WKWebView(frame:CGRect(x:0,y:0,width:390,height:700),configuration:config)
         view.loadHTMLString("<html><body><div style='width:200px;height:100px;background-image:url(data:image/png;base64,\(original));background-size:100% 100%;background-repeat:no-repeat'></div></body></html>",baseURL:URL(string:"https://comic.invalid"))
         let deadline=Date().addingTimeInterval(15)
-        while Date()<deadline{if (try? await view.callAsyncJavaScript("return !!globalThis.zeusComic",arguments:[:],in:nil,contentWorld:ComicTranslation.world))as? Bool==true{break};try await Task.sleep(for:.milliseconds(100))}
+        while Date()<deadline{if (try? await view.callAsyncJavaScript("return !!globalThis.zeusComic && document.images.length>0 && document.images[0].complete",arguments:[:],in:nil,contentWorld:ComicTranslation.world))as? Bool==true{break};try await Task.sleep(for:.milliseconds(100))}
         let result=try await view.callAsyncJavaScript("const c=zeusComic.scan(false).items[0],g=zeusComic.start(),region={x:0,y:0,width:200,height:50};const transfer=await zeusComic.capture(c.id,c.revision,region),data=zeusComic.take(transfer.token,0,transfer.length);if(!await zeusComic.apply(c.id,c.revision,data,region,'ar',g))throw Error('apply failed');const again=zeusComic.scan(false).items;if(again.length!==1)throw Error('lost background candidate');const next=await zeusComic.capture(c.id,c.revision,{x:0,y:50,width:200,height:50}),bytes=zeusComic.take(next.token,0,next.length);zeusComic.restore();return bytes;",arguments:[:],in:nil,contentWorld:ComicTranslation.world)as? String
         let bytes=try XCTUnwrap(Data(base64Encoded:try XCTUnwrap(result))),image=try ComicPixels.decode(bytes),pixels=try XCTUnwrap(ComicPixels.rgba(image,width:200,height:50))
         XCTAssertLessThan(pixels[0],10);XCTAssertGreaterThan(pixels[2],245,"Second window must capture the original blue lower half")

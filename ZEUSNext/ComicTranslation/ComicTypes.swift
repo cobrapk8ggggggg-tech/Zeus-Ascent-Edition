@@ -153,7 +153,7 @@ enum ComicIdentity {
         hash(segments.map{$0.id+"\0"+$0.text}.joined(separator:"\n"))
     }
     static func settings(_ preferences: ComicPreferences, translation: TranslationPreferences, provider: AIProviderConfiguration?) -> String {
-        hash("comic-v2|fallback:\(preferences.allowOnlineFallback ?? false)|\(preferences.mode.rawValue)|\(preferences.source)|\(translation.target)|" + TranslationMemory.namespace(page: "comic://content", preferences: translation, provider: provider))
+        hash("comic-v3|fallback:\(preferences.allowOnlineFallback ?? false)|\(preferences.mode.rawValue)|\(preferences.source)|\(translation.target)|" + TranslationMemory.namespace(page: "comic://content", preferences: translation, provider: provider))
     }
 }
 enum ComicGeometry {
@@ -175,22 +175,40 @@ enum ComicGeometry {
         return regions.filter{r in let(top,bottom)=bounds(r);return bottom>=scroll-(readAhead ? viewport:0)&&top<=scroll+viewport*(readAhead ? 8:1)}.sorted{distance($0)<distance($1)}
     }
     static func estimateAngle(_ lines:[ComicLine])->Double{
-        // Diagonal lettering (thought tails, SFX streaks) is a real Ascent capability.
-        // Axis-aligned OCR boxes still carry the drift of the line cluster: the slope
-        // between the first and last line centres. Only confident, bounded tilt is
-        // adopted — noise must not rotate ordinary bubbles.
-        guard lines.count>=2,!lines.allSatisfy({$0.rect.height>$0.rect.width*1.5}) else{return 0}
-        let ordered=lines.sorted{$0.rect.midX<$1.rect.midX}
-        guard let first=ordered.first,let last=ordered.last else{return 0}
-        let dx=last.rect.midX-first.rect.midX,dy=last.rect.midY-first.rect.midY
-        guard abs(dx)>1 else{return 0}
-        let angle=atan2(dy,dx)
-        let spread=hypot(dx,dy),height=max(first.rect.height,last.rect.height)
-        guard spread>height*1.3,abs(angle)>=2*Double.pi/180,abs(angle)<=35*Double.pi/180 else{return 0}
-        return angle
+        // Baseline orientation comes from the OCR quadrilateral. The drift of
+        // separate line centres describes paragraph alignment, never glyph tilt.
+        let angles=lines.filter { $0.rect.width > $0.rect.height && $0.confidence >= 0.5 }.map(\.angle).sorted()
+        guard !angles.isEmpty else{return 0}
+        let median=angles[angles.count/2]
+        guard abs(median)>=2 * .pi/180,abs(median)<=35 * .pi/180,
+              angles.allSatisfy({abs($0-median)<5 * .pi/180})else{return 0}
+        return median
+    }
+    static func orderedLines(_ lines:[ComicLine],vertical:Bool)->[ComicLine]{
+        if vertical{return lines.sorted{$0.rect.midX>$1.rect.midX}}
+        var rows:[[ComicLine]]=[]
+        for line in lines.sorted(by:{$0.rect.midY<$1.rect.midY}){
+            if let index=rows.firstIndex(where:{row in abs(row[0].rect.midY-line.rect.midY)<min(row[0].rect.height,line.rect.height)*0.5}){rows[index].append(line)}else{rows.append([line])}
+        }
+        return rows.flatMap{$0.sorted{$0.rect.minX<$1.rect.minX}}
+    }
+    static func uniqueLines(_ input:[ComicLine])->[ComicLine]{
+        let candidates=input.filter{line in
+            let letters=line.text.filter{$0.isLetter || $0.isNumber}.count
+            return letters>0 && line.rect.width>2 && line.rect.height>3 && line.confidence>=0.3
+        }.sorted { $0.rect.width * $0.rect.height > $1.rect.width * $1.rect.height }
+        var result:[ComicLine]=[]
+        for line in candidates {
+            let duplicate=result.contains { other in
+                let overlap=line.rect.intersection(other.rect)
+                return !overlap.isNull && overlap.width*overlap.height/(line.rect.width*line.rect.height)>0.75
+            }
+            if !duplicate{result.append(line)}
+        }
+        return result
     }
     static func group(_ input: [ComicLine], source: String) -> [ComicSpeech] {
-        let lines = input.filter { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && $0.rect.width > 0 && $0.rect.height > 0 }
+        let lines = uniqueLines(input)
         var groups: [[ComicLine]] = []
         for line in lines.sorted(by: { $0.rect.minY < $1.rect.minY }) {
             // Select among compatible groups: a nearer adjacent balloon must not
@@ -205,7 +223,11 @@ enum ComicGeometry {
                     let verticalOverlap=min(line.rect.maxY,last.rect.maxY)-max(line.rect.minY,last.rect.minY)
                     return columnGap<max(line.rect.width,last.rect.width)*1.1 && verticalOverlap>min(line.rect.height,last.rect.height)*0.6
                 }
-                return gap >= -min(line.rect.height,last.rect.height)*0.5 && gap<max(line.rect.height,last.rect.height)*1.1 && overlap>min(line.rect.width,last.rect.width)*0.4
+                let rowOverlap=min(line.rect.maxY,last.rect.maxY)-max(line.rect.minY,last.rect.minY)
+                let horizontalGap=max(line.rect.minX-last.rect.maxX,last.rect.minX-line.rect.maxX)
+                let sameRow=rowOverlap>min(line.rect.height,last.rect.height)*0.6 && horizontalGap<max(line.rect.height,last.rect.height)*1.2
+                let nextRow=gap >= -min(line.rect.height,last.rect.height)*0.5 && gap<max(line.rect.height,last.rect.height)*1.2 && overlap>min(line.rect.width,last.rect.width)*0.3
+                return sameRow || nextRow
             }
             if let i=compatible.min(by:{abs(groups[$0].last!.rect.midY-line.rect.midY)<abs(groups[$1].last!.rect.midY-line.rect.midY)}){groups[i].append(line);continue}
             groups.append([line])
@@ -214,8 +236,8 @@ enum ComicGeometry {
         return groups.enumerated().map { index, group in
             let bounds = group.reduce(CGRect.null) { $0.union($1.rect) }
             let vertical = group.allSatisfy { $0.rect.height > $0.rect.width * 1.5 }
-            let ordered = group.sorted { vertical ? $0.rect.midX > $1.rect.midX : $0.rect.minY < $1.rect.minY }
-            return ComicSpeech(id: String(index), text: ordered.map(\.text).joined(separator: vertical ? "" : "\n"), lines: ordered, rect: bounds, vertical: vertical, balloon: false, angle: vertical ? nil:ComicGeometry.estimateAngle(group))
+            let ordered = orderedLines(group,vertical:vertical)
+            return ComicSpeech(id: String(index), text: ordered.map(\.text).joined(separator: vertical ? "" : " "), lines: ordered, rect: bounds, vertical: vertical, balloon: false, angle: vertical ? nil:ComicGeometry.estimateAngle(group))
         }.sorted { a,b in
             if abs(a.rect.minY-b.rect.minY) < min(a.rect.height,b.rect.height)*0.35 { return japanese ? a.rect.midX > b.rect.midX : a.rect.midX < b.rect.midX }
             return a.rect.minY < b.rect.minY

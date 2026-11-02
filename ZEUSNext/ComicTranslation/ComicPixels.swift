@@ -24,40 +24,48 @@ enum ComicPixels {
     }
     static func png(_ image:CGImage)throws->Data{let output=NSMutableData();guard let destination=CGImageDestinationCreateWithData(output,"public.png" as CFString,1,nil)else{throw ComicFailure.message("تعذّر ترميز الصورة.")};CGImageDestinationAddImage(destination,image,nil);guard CGImageDestinationFinalize(destination)else{throw ComicFailure.message("فشل ترميز الصورة.")};return output as Data}
     static func render(_ image:CGImage,speeches:[ComicSpeech],translations:[TranslationSegment],target:String,fontName:String?,fontScale:Double,textColor:String? = nil,ink:ComicInkStyle = .plain,letterSpacing:Double = 0)throws->CGImage{
-        guard let context=context(width:image.width,height:image.height),let pixels=rgba(image,width:image.width,height:image.height)else{throw ComicFailure.message("ذاكرة غير كافية للرسم.")}
-        context.draw(image,in:CGRect(x:0,y:0,width:image.width,height:image.height))
-        let translated=Dictionary(uniqueKeysWithValues:translations.map{($0.id,$0.text)})
-        // CG image coordinates are top-left. CoreGraphics/CoreText are bottom-left.
+        guard let context=context(width:image.width,height:image.height),var pixels=rgba(image,width:image.width,height:image.height)else{throw ComicFailure.message("ذاكرة غير كافية للرسم.")}
+        let original=pixels
+        let translated=Dictionary(translations.map{($0.id,$0.text)},uniquingKeysWith:{$1})
+        var prepared:[(CGRect,Placement,CGColor)]=[]
         for speech in speeches {
             guard let text=translated[speech.id],!text.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty else{continue}
-            let pad=speech.balloon ? 0:max(2,min(speech.rect.width,speech.rect.height)*0.08)
-            let area=speech.rect.insetBy(dx:-pad,dy:-pad).intersection(CGRect(x:0,y:0,width:image.width,height:image.height)).integral
-            guard area.width>3,area.height>3 else{continue}
-            let background=backgroundColor(pixels,width:image.width,height:image.height,rect:area)
-            // Prepare layout before erasing any source text. Failed fit leaves the original.
-            guard let placed=place(text,area:area,imageHeight:image.height,target:target,fontName:fontName,fontScale:fontScale,theta:CGFloat(speech.angle ?? 0),letterSpacing:letterSpacing)else{throw ComicFailure.message("لم يتسع النص للفقاعة؛ بقي الأصل دون مسح.")}
-            // Erase foreground components only inside detected source lines. Uniform
-            // fills are confined to the text masks; balloon borders remain untouched.
-            clean(context,pixels:pixels,width:image.width,height:image.height,speech:speech,background:background)
+            let source=speech.lines.reduce(CGRect.null){$0.union($1.rect)}
+            guard !source.isNull else{continue}
+            let pad=max(3,min(source.width,source.height)*0.12)
+            let area=(speech.balloon ? speech.rect:source.insetBy(dx:-pad,dy:-pad)).intersection(CGRect(x:0,y:0,width:image.width,height:image.height)).integral
+            guard area.width>6,area.height>6 else{continue}
+            let background=backgroundColor(original,width:image.width,height:image.height,rect:area)
+            // Anchor the em size to source glyph height, rather than balloon size.
+            // A one-word translation must never grow to fill an entire balloon.
+            let heights=speech.lines.map{min($0.rect.height,$0.rect.width)}.sorted()
+            let sourceSize=heights[heights.count/2]*1.3
+            guard let placed=place(text,area:area,imageHeight:image.height,target:target,fontName:fontName,fontScale:fontScale,theta:CGFloat(speech.angle ?? 0),letterSpacing:letterSpacing,maximumSize:sourceSize)else{continue}
+            clean(&pixels,width:image.width,height:image.height,speech:speech)
             let automatic=background.0*0.2126+background.1*0.7152+background.2*0.0722>0.5 ? CGColor(gray:0.04,alpha:1):CGColor(gray:0.98,alpha:1)
-            let color=textColor.flatMap(Self.color) ?? automatic
-            letter(context,image:image,area:area,placed:placed,color:color,ink:ink)
+            prepared.append((area,placed,textColor.flatMap(Self.color) ?? automatic))
         }
+        // Finish every source mask before lettering. A later cleanup pass must
+        // never erase an earlier Arabic glyph where source boxes touch.
+        let data=Data(pixels)
+        guard let provider=CGDataProvider(data:data as CFData),let cleaned=CGImage(width:image.width,height:image.height,bitsPerComponent:8,bitsPerPixel:32,bytesPerRow:image.width*4,space:CGColorSpace(name:CGColorSpace.sRGB)!,bitmapInfo:CGBitmapInfo(rawValue:CGImageAlphaInfo.premultipliedLast.rawValue|CGBitmapInfo.byteOrder32Big.rawValue),provider:provider,decode:nil,shouldInterpolate:false,intent:.defaultIntent)else{throw ComicFailure.message("فشل تجهيز الصورة النظيفة.")}
+        context.draw(cleaned,in:CGRect(x:0,y:0,width:image.width,height:image.height))
+        for (area,placed,color) in prepared{letter(context,image:image,area:area,placed:placed,color:color,ink:ink)}
         guard let result=context.makeImage()else{throw ComicFailure.message("فشل رسم النص.")};return result
     }
     struct Placement{var layout:TextLayout;var box:CGRect;var theta:CGFloat}
     // Fit the translation inside the speech area. Non-zero theta (diagonal tails,
     // SFX streaks) shrinks the rectangle until its rotated bounding box stays inside;
     // rotated lettering must never paint outside the speech it belongs to.
-    private static func place(_ text:String,area:CGRect,imageHeight:Int,target:String,fontName:String?,fontScale:Double,theta:CGFloat,letterSpacing:Double)->Placement?{
+    private static func place(_ text:String,area:CGRect,imageHeight:Int,target:String,fontName:String?,fontScale:Double,theta:CGFloat,letterSpacing:Double,maximumSize:CGFloat)->Placement?{
         if theta == 0{
-            guard let value=layout(text,rect:area.insetBy(dx:2,dy:2),target:target,fontName:fontName,fontScale:fontScale,letterSpacing:letterSpacing)else{return nil}
+            guard let value=layout(text,rect:area.insetBy(dx:2,dy:2),target:target,fontName:fontName,fontScale:fontScale,letterSpacing:letterSpacing,maximumSize:maximumSize)else{return nil}
             return Placement(layout:value,box:CGRect(x:-(area.width-4)/2,y:-value.height/2,width:area.width-4,height:value.height),theta:0)
         }
         var low:CGFloat=0.35,high:CGFloat=1,best:Placement?
         for _ in 0..<7{
             let scale=(low+high)/2,width=(area.width-6)*scale,height=(area.height-6)*scale
-            guard width>2,height>2,let value=layout(text,rect:CGRect(x:0,y:0,width:width,height:height),target:target,fontName:fontName,fontScale:fontScale,letterSpacing:letterSpacing)else{high=scale;continue}
+            guard width>2,height>2,let value=layout(text,rect:CGRect(x:0,y:0,width:width,height:height),target:target,fontName:fontName,fontScale:fontScale,letterSpacing:letterSpacing,maximumSize:maximumSize)else{high=scale;continue}
             let measured=CTFramesetterSuggestFrameSizeWithConstraints(CTFramesetterCreateWithAttributedString(value.text),CFRange(),nil,CGSize(width:width,height:CGFloat.greatestFiniteMagnitude),nil)
             let boundsWidth=ceil(measured.width)*abs(cos(theta))+ceil(measured.height)*abs(sin(theta)),boundsHeight=ceil(measured.width)*abs(sin(theta))+ceil(measured.height)*abs(cos(theta))
             if boundsWidth<=area.width-2,boundsHeight<=area.height-2{low=scale;best=Placement(layout:value,box:CGRect(x:-width/2,y:-value.height/2,width:width,height:value.height),theta:theta)}else{high=scale}
@@ -91,24 +99,20 @@ enum ComicPixels {
     }
     static func color(_ hex:String)->CGColor?{let value=hex.replacingOccurrences(of:"#",with:"");guard value.count==6,let n=UInt32(value,radix:16)else{return nil};return CGColor(red:CGFloat((n>>16)&255)/255,green:CGFloat((n>>8)&255)/255,blue:CGFloat(n&255)/255,alpha:1)}
     struct TextLayout{var text:NSAttributedString;var height:CGFloat;var size:CGFloat}
-    static func layout(_ text:String,rect:CGRect,target:String,fontName:String?,fontScale:Double,letterSpacing:Double = 0)->TextLayout?{
+    static func layout(_ text:String,rect:CGRect,target:String,fontName:String?,fontScale:Double,letterSpacing:Double = 0,maximumSize:CGFloat = 96)->TextLayout?{
         guard rect.width>2,rect.height>2 else{return nil}
         let style=NSMutableParagraphStyle();style.alignment = .center;style.baseWritingDirection=TranslationPreferences.rtl(target) ? .rightToLeft:.leftToRight;style.lineBreakMode = .byWordWrapping
         // GeezaPro is iOS's native Arabic face: ArialMT defeats Arabic shaping inside
         // narrow balloons, so Arabic targets fall back to it unless a font is chosen.
         let resolved=fontName ?? (target.hasPrefix("ar") ? "GeezaPro":"ArialMT")
-        var low:CGFloat=6,high=min(96,rect.height),best:TextLayout?
+        var low:CGFloat=4,high=min(96,rect.height,maximumSize*CGFloat(min(1.5,max(0.5,fontScale)))) ,best:TextLayout?
         for _ in 0..<9{let size=(low+high)/2,font=CTFontCreateWithName(resolved as CFString,size,nil)
             let value=NSAttributedString(string:text,attributes:[NSAttributedString.Key(kCTFontAttributeName as String):font,.paragraphStyle:style,.kern:min(4,max(-1,letterSpacing))])
             let setter=CTFramesetterCreateWithAttributedString(value);var fit=CFRange();let measured=CTFramesetterSuggestFrameSizeWithConstraints(setter,CFRange(),nil,CGSize(width:rect.width,height:CGFloat.greatestFiniteMagnitude),&fit)
             if measured.height<=rect.height && measured.width<=rect.width+0.5 && fit.length==value.length{best=TextLayout(text:value,height:ceil(measured.height),size:size);low=size}else{high=size}
         }
         guard let best else{return nil}
-        let chosen=min(best.size,max(6,best.size*CGFloat(min(1.5,max(0.5,fontScale)))*0.8))
-        let font=CTFontCreateWithName(resolved as CFString,chosen,nil)
-        let text=NSAttributedString(string:text,attributes:[NSAttributedString.Key(kCTFontAttributeName as String):font,.paragraphStyle:style,.kern:min(4,max(-1,letterSpacing))])
-        let measured=CTFramesetterSuggestFrameSizeWithConstraints(CTFramesetterCreateWithAttributedString(text),CFRange(),nil,CGSize(width:rect.width,height:CGFloat.greatestFiniteMagnitude),nil)
-        return TextLayout(text:text,height:ceil(measured.height),size:chosen)
+        return best
     }
     private static func backgroundColor(_ pixels:[UInt8],width:Int,height:Int,rect:CGRect)->(CGFloat,CGFloat,CGFloat){
         var bins:[Int:(Int,Int,Int,Int)]=[:]
@@ -118,16 +122,19 @@ enum ComicPixels {
         guard let value=bins.values.max(by:{$0.3<$1.3}),value.3>0 else{return(1,1,1)}
         return(CGFloat(value.0)/CGFloat(value.3*255),CGFloat(value.1)/CGFloat(value.3*255),CGFloat(value.2)/CGFloat(value.3*255))
     }
-    private static func clean(_ context:CGContext,pixels:[UInt8],width:Int,height:Int,speech:ComicSpeech,background:(CGFloat,CGFloat,CGFloat)){
-        let color=CGColor(red:background.0,green:background.1,blue:background.2,alpha:1);context.setFillColor(color)
+    static func clean(_ pixels:inout [UInt8],width:Int,height:Int,speech:ComicSpeech){
+        let bounds=CGRect(x:1,y:1,width:max(0,width-2),height:max(0,height-2))
+        let protected=speech.balloon ? speech.rect:bounds
+        var boxes:[CGRect]=[]
         for line in speech.lines{
-            let protected=speech.balloon ? speech.rect.insetBy(dx:2,dy:2):CGRect(x:0,y:0,width:width,height:height)
-            let box=line.rect.insetBy(dx:-1,dy:-1).integral.intersection(protected).intersection(CGRect(x:0,y:0,width:width,height:height));guard !box.isNull else{continue}
-            for y in Int(box.minY)..<Int(box.maxY){var start:Int?
-                for x in Int(box.minX)..<Int(box.maxX){let i=(y*width+x)*4;let distance=abs(CGFloat(pixels[i])/255-background.0)+abs(CGFloat(pixels[i+1])/255-background.1)+abs(CGFloat(pixels[i+2])/255-background.2)
-                    if distance>0.3{if start==nil{start=x}}else if let begin=start{context.fill(CGRect(x:max(Int(box.minX),begin-1),y:height-y-2,width:x-begin+2,height:3));start=nil}
-                };if let begin=start{context.fill(CGRect(x:begin,y:height-y-2,width:Int(box.maxX)-begin,height:3))}
-            }
+            // Include outlines, antialiasing and shadows outside tight OCR boxes.
+            let pad=max(3,min(line.rect.height,line.rect.width)*0.18)
+            let box=line.rect.insetBy(dx:-pad,dy:-pad).integral.intersection(protected).intersection(bounds)
+            guard !box.isNull,box.width>2,box.height>2 else{continue}
+            if let index=boxes.firstIndex(where:{!$0.intersection(box).isNull}){boxes[index]=boxes[index].union(box)}else{boxes.append(box)}
+        }
+        pixels.withUnsafeMutableBufferPointer{buffer in
+            for box in boxes{zeus_comic_inpaint(buffer.baseAddress,Int32(width),Int32(height),Int32(box.minX),Int32(box.minY),Int32(box.maxX),Int32(box.maxY))}
         }
     }
 }

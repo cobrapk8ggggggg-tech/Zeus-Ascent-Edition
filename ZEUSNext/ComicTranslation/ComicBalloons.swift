@@ -6,15 +6,33 @@ import CoreGraphics
 enum ComicBalloons {
     static func speeches(_ lines:[ComicLine],image:CGImage,source:String)->[ComicSpeech]{
         guard let pixels=ComicPixels.rgba(image,width:image.width,height:image.height)else{return ComicGeometry.group(lines,source:source)}
-        var plates:[(CGRect,[ComicLine])]=[],unplated:[ComicLine]=[]
-        for line in lines{
-            guard let plate=interior(line.rect,pixels:pixels,width:image.width,height:image.height)else{unplated.append(line);continue}
-            if let index=plates.firstIndex(where:{overlap($0.0,plate)>0.7}){plates[index].1.append(line)}else{plates.append((plate,[line]))}
+        let lines=ComicGeometry.uniqueLines(lines)
+        var plates:[CGRect]=[]
+        // Probe paragraphs as well as individual lines: a small line's search
+        // window can end inside a large balloon and miss its enclosure.
+        let probes=ComicGeometry.group(lines,source:source).map(\.rect)+lines.map(\.rect)
+        for probe in probes{
+            guard let plate=interior(probe,pixels:pixels,width:image.width,height:image.height)else{continue}
+            if let index=plates.firstIndex(where:{overlap($0,plate)>0.7}){
+                if plate.width*plate.height>plates[index].width*plates[index].height{plates[index]=plate}
+            }else{plates.append(plate)}
         }
-        var result=plates.map{plate,lines->ComicSpeech in
+        // Give every OCR line exactly one owner, including lines whose own
+        // flood-fill failed. Otherwise the balloon and an orphan line both draw.
+        var owned=[[ComicLine]](repeating:[],count:plates.count),unplated:[ComicLine]=[]
+        for line in lines{
+            let candidates=plates.indices.filter{plates[$0].insetBy(dx:2,dy:2).contains(line.rect)}
+            if let index=candidates.min(by:{plates[$0].width*plates[$0].height<plates[$1].width*plates[$1].height}){owned[index].append(line)}else{unplated.append(line)}
+        }
+        var result=plates.indices.compactMap{index->ComicSpeech? in
+            let lines=owned[index];guard !lines.isEmpty else{return nil}
             let vertical=lines.allSatisfy{$0.rect.height>$0.rect.width*1.5}
-            let ordered=lines.sorted{vertical ? $0.rect.midX>$1.rect.midX:$0.rect.minY<$1.rect.minY}
-            return ComicSpeech(id:"",text:ordered.map(\.text).joined(separator:vertical ? "":"\n"),lines:ordered,rect:safeRectangle(plate,pixels:pixels,width:image.width,height:image.height),vertical:vertical,balloon:true,angle:vertical ? nil:ComicGeometry.estimateAngle(lines))
+            let ordered=ComicGeometry.orderedLines(lines,vertical:vertical)
+            let sourceBounds=lines.reduce(CGRect.null){$0.union($1.rect)}
+            // A conservative inscribed rectangle may exclude a line near a
+            // balloon corner. Always retain that source line in the cleanup area.
+            let area=safeRectangle(plates[index],pixels:pixels,width:image.width,height:image.height).union(sourceBounds.insetBy(dx:-3,dy:-3)).intersection(plates[index].insetBy(dx:2,dy:2))
+            return ComicSpeech(id:"",text:ordered.map(\.text).joined(separator:vertical ? "":" "),lines:ordered,rect:area,vertical:vertical,balloon:true,angle:vertical ? nil:ComicGeometry.estimateAngle(lines))
         }
         result+=ComicGeometry.group(unplated,source:source)
         result.sort{a,b in if abs(a.rect.minY-b.rect.minY)<min(a.rect.height,b.rect.height)*0.35{return source.hasPrefix("ja") ? a.rect.midX>b.rect.midX:a.rect.midX<b.rect.midX};return a.rect.minY<b.rect.minY}
@@ -30,7 +48,7 @@ enum ComicBalloons {
     private static func overlap(_ a:CGRect,_ b:CGRect)->CGFloat{let intersection=a.intersection(b);guard !intersection.isNull else{return 0};return intersection.width*intersection.height/max(1,min(a.width*a.height,b.width*b.height))}
     static func interior(_ text:CGRect,pixels:[UInt8],width:Int,height:Int)->CGRect?{
         guard text.width>2,text.height>2,pixels.count>=width*height*4 else{return nil}
-        let margin=min(600,max(text.width*1.3,text.height*3))
+        let margin=min(600,max(160,max(text.width*1.6,text.height*4)))
         let roi=text.insetBy(dx:-margin,dy:-margin).integral.intersection(CGRect(x:0,y:0,width:width,height:height))
         guard !roi.isNull,roi.width*roi.height<=1_000_000 else{return nil}
         let left=Int(roi.minX),top=Int(roi.minY),rw=Int(roi.width),rh=Int(roi.height)
@@ -41,7 +59,7 @@ enum ComicBalloons {
         let red=background.0/background.3,green=background.1/background.3,blue=background.2/background.3
         func matches(_ index:Int)->Bool{let p=((index/rw+top)*width+index%rw+left)*4;return abs(Int(pixels[p])-red)+abs(Int(pixels[p+1])-green)+abs(Int(pixels[p+2])-blue)<75}
         var seen=[UInt8](repeating:0,count:rw*rh),best:CGRect?
-        let maximum=min(150_000,max(4096,Int(text.width*text.height*40)))
+        let maximum=min(800_000,max(16384,Int(text.width*text.height*80)))
         for seed in seeds where seed>=0&&seed<seen.count&&seen[seed]==0&&matches(seed){
             var queue=[seed],head=0,minX=seed%rw,maxX=minX,minY=seed/rw,maxY=minY,touches=false
             seen[seed]=1

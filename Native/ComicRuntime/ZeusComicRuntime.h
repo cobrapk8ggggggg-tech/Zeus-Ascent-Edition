@@ -4,6 +4,7 @@
 extern "C" {
 #endif
 unsigned char *zeus_comic_decode_region(const unsigned char *bytes, unsigned long size, int x, int y, int width, int height);
+void zeus_comic_inpaint(unsigned char *pixels, int width, int height, int left, int top, int right, int bottom);
 void zeus_comic_free_pixels(unsigned char *pixels);
 void *zeus_comic_load(const char *path, int context, int threads);
 char *zeus_comic_generate(void *handle, const char *prompt, int maximum_tokens, int (*cancelled)(void *), void *context);
