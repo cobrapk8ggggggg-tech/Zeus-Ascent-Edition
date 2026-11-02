@@ -8,6 +8,12 @@ import UIKit
 #endif
 
 @MainActor final class NativeComicTranslationTests:XCTestCase{
+    func testGroupedReadingMenuIncludesBothTranslationModes() {
+        XCTAssertTrue(BrowserActionGroup.reading.actions.contains(.translate))
+        XCTAssertTrue(BrowserActionGroup.reading.actions.contains(.translateImages))
+        XCTAssertNotEqual(BrowserAction.translate.identifier, BrowserAction.translateImages.identifier)
+        XCTAssertEqual(SettingsCategory.imageTranslation.title, "ترجمة الصور والمانهوا")
+    }
     private func renderer(_ size:CGSize)->UIGraphicsImageRenderer{let format=UIGraphicsImageRendererFormat();format.scale=1;return UIGraphicsImageRenderer(size:size,format:format)}
     func testContextWindowCacheSeparatesOwnedSpeechSubsets() {
         let first=[TranslationSegment(id:"upper",text:"HELLO")]

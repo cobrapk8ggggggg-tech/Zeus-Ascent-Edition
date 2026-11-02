@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 
 struct ComicSettingsSheet:View {
     @ObservedObject var model:BrowserModel
+    var embedded=false
     @Environment(\.dismiss)private var dismiss
     @State private var importingFont=false
     @State private var importingModel=false
@@ -16,7 +17,14 @@ struct ComicSettingsSheet:View {
     private var prefs:ComicPreferences{model.data.settings.comicTranslation ?? ComicPreferences()}
     private var translation:TranslationPreferences{prefs.resolvedTranslation(model.data.settings)}
     var body:some View{
-        NavigationStack{Form{
+        Group { if embedded { settingsForm } else { NavigationStack { settingsForm } } }
+        .onAppear{customColor=prefs.textColor ?? ""}
+        .onChange(of:prefs.engine){_,_ in key="";clientID=""}
+        .fileImporter(isPresented:$importingFont,allowedContentTypes:[.data]){result in do{let url=try result.get();let name=try ComicFonts.importFont(url);var p=prefs;p.fontName=name;save(p)}catch{message=error.localizedDescription}}
+        .fileImporter(isPresented:$importingModel,allowedContentTypes:[.data]){result in Task{do{try await ComicLocalTranslator.shared.importModel(result.get());message="استُورد النموذج المحلي."}catch{message=error.localizedDescription}}}
+    }
+    private var settingsForm:some View{
+        Form{
             Section("ترجمة صور المواقع"){
                 Button("ترجمة الصور الآن",systemImage:"character.viewfinder"){model.current?.comicTranslation?.start();dismiss()}.accessibilityIdentifier("startImageTranslation")
                 Toggle("ترجمة الصور تلقائيًا",isOn:binding(\.automatic))
@@ -61,11 +69,7 @@ struct ComicSettingsSheet:View {
                 Button("مسح حفظ صور هذا البروفايل",role:.destructive){let id=model.profile.id;Task{do{try await ComicMemory.shared.clear(profile:id);message="مُسحت النتائج المحفوظة."}catch{message=error.localizedDescription}}}
                 if let message{Text(message).font(.footnote)}
             }
-        }.navigationTitle("ترجمة الصور والمانهوا").toolbar{ToolbarItem(placement:.confirmationAction){Button("تم"){dismiss()}}}}
-        .onAppear{customColor=prefs.textColor ?? ""}
-        .onChange(of:prefs.engine){_,_ in key="";clientID=""}
-        .fileImporter(isPresented:$importingFont,allowedContentTypes:[.data]){result in do{let url=try result.get();let name=try ComicFonts.importFont(url);var p=prefs;p.fontName=name;save(p)}catch{message=error.localizedDescription}}
-        .fileImporter(isPresented:$importingModel,allowedContentTypes:[.data]){result in Task{do{try await ComicLocalTranslator.shared.importModel(result.get());message="استُورد النموذج المحلي."}catch{message=error.localizedDescription}}}
+        }.navigationTitle("ترجمة الصور والمانهوا").toolbar{if !embedded{ToolbarItem(placement:.confirmationAction){Button("تم"){dismiss()}}}}
     }
     private func save(_ value:ComicPreferences){model.data.settings.comicTranslation=value;model.persist();if let session=model.current?.comicTranslation,session.active{session.pause();redraw?.cancel();redraw=Task{do{try await Task.sleep(for:.milliseconds(250));try Task.checkCancellation();if session.active{session.start()}}catch{}}}}
     private func binding<T>(_ path:WritableKeyPath<ComicPreferences,T>)->Binding<T>{Binding(get:{prefs[keyPath:path]},set:{var p=prefs;p[keyPath:path]=$0;save(p)})}

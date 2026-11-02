@@ -277,6 +277,11 @@ struct BrowserRoot: View {
     @ViewBuilder private func actionButton(_ action: BrowserAction) -> some View {
         if action == .tools {
             Menu {
+                Section("الترجمة") {
+                    Button(BrowserAction.translate.title, systemImage: BrowserAction.translate.symbol) { perform(.translate) }.accessibilityIdentifier("menu-translateButton")
+                    Button(BrowserAction.translateImages.title, systemImage: BrowserAction.translateImages.symbol) { perform(.translateImages) }.accessibilityIdentifier("menu-translateImagesButton")
+                    Button("إعدادات ترجمة الصور", systemImage: "slider.horizontal.3") { imageTranslationSettings = true }.accessibilityIdentifier("menu-imageTranslationSettings")
+                }
                 ForEach(BrowserActionGroup.allCases) { group in
                     Menu { ForEach(group.actions) { item in Button(item.title, systemImage: item.symbol) { perform(item) }.accessibilityIdentifier("menu-" + item.identifier) } } label: { Label(group.title, systemImage: group.symbol) }.accessibilityIdentifier("group-" + group.rawValue)
                 }
