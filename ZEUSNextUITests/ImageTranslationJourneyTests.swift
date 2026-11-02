@@ -38,9 +38,14 @@ final class ImageTranslationJourneyTests: XCTestCase {
         let hierarchy=XCTAttachment(string:app.debugDescription)
         hierarchy.name="Image translation main settings accessibility";hierarchy.lifetime = .keepAlways;add(hierarchy)
         XCTAssertTrue(automatic.waitForExistence(timeout:5));XCTAssertTrue(automatic.isHittable)
-        if automatic.value as? String != "1" {automatic.tap()}
-        XCTAssertEqual(automatic.value as? String,"1")
-        automatic.tap();XCTAssertEqual(automatic.value as? String,"0")
+        // iOS 26 exposes both a full-width Switch row and its UISwitch child.
+        // Tapping the row's center hits blank space, not the RTL thumb.
+        let thumb=automatic.switches.firstMatch
+        let control=thumb.exists ? thumb:automatic
+        XCTAssertTrue(control.isHittable)
+        if control.value as? String != "1" {control.tap()}
+        XCTAssertEqual(control.value as? String,"1")
+        control.tap();XCTAssertEqual(control.value as? String,"0")
         capture("image-translation-main-settings-category")
     }
 
