@@ -31,7 +31,7 @@ actor ComicModelStore {
         }
         loading[name]=task
         defer{loading[name]=nil}
-        return try await task.value
+        return try await withTaskCancellationHandler(operation:{try await task.value},onCancel:{task.cancel()})
     }
     static func valid(_ url:URL,artifact:ComicModelArtifact)throws->Bool{
         guard try url.resourceValues(forKeys:[.fileSizeKey]).fileSize==Int(artifact.bytes)else{return false}
@@ -39,9 +39,21 @@ actor ComicModelStore {
         while let data=try stream.read(upToCount:1_048_576),!data.isEmpty{hash.update(data:data)}
         return hash.finalize().map{String(format:"%02x",$0)}.joined()==artifact.sha256
     }
-    func prepare(source:String)async throws{
+    func isPrepared(source:String) -> Bool {
         let name=Self.recognizer(source)
-        for file in ["det.onnx",name+".onnx",name+".yml"]{_ = try await self.file(file,download:true)}
+        return ["det.onnx",name+".onnx",name+".yml"].allSatisfy { file in
+            guard let artifact=Self.catalog.first(where:{$0.name==file}) else{return false}
+            return (try? Self.valid(Self.root.appendingPathComponent(file),artifact:artifact)) == true
+        }
+    }
+    func prepare(source:String,onProgress:(@Sendable (Int,Int) async -> Void)? = nil)async throws{
+        let name=Self.recognizer(source),files=["det.onnx",name+".onnx",name+".yml"]
+        for (index,file) in files.enumerated(){
+            try Task.checkCancellation()
+            await onProgress?(index,files.count)
+            _ = try await self.file(file,download:true)
+        }
+        await onProgress?(files.count,files.count)
     }
     static func recognizer(_ language:String)->String { if language.hasPrefix("ko"){return "korean"};if language.hasPrefix("ja")||language.hasPrefix("zh"){return "han"};if ["ar","fa","ur"].contains(where:language.hasPrefix){return "arabic"};if ["ru","uk","bg","sr"].contains(where:language.hasPrefix){return "cyrillic"};if language.hasPrefix("el"){return "greek"};if ["hi","mr","ne"].contains(where:language.hasPrefix){return "devanagari"};if language.hasPrefix("th"){return "thai"};if language.hasPrefix("ta"){return "tamil"};if language.hasPrefix("te"){return "telugu"};return "latin" }
     func removeAll()throws{try? FileManager.default.removeItem(at:Self.root)}

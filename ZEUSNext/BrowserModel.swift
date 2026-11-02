@@ -217,7 +217,7 @@ struct WebDialog: Identifiable {
     }
     func selectTab(_ tab: BrowserTab) {
         guard tabs.contains(where: { $0.id == tab.id }) else { return }
-        current?.comicTranslation?.pause()
+        current?.comicTranslation?.suspend()
         snapshotCurrent(); if twinFocused && twinTabID != nil && tab.id != selectedTabID { twinTabID = tab.id } else if tab.id == twinTabID { twinFocused = true } else { selectedTabID = tab.id; twinFocused = false }; tab.lastUsed = Date(); address = tab.isHome ? "" : tab.url; persist()
         Task { await ensureCurrentLoaded() }
     }
@@ -276,7 +276,7 @@ struct WebDialog: Identifiable {
         var changed = profile; changed.locked = locked; profiles.update(changed)
     }
     func backgrounded() {
-        for tab in tabs { tab.comicTranslation?.pause() }
+        for tab in tabs { tab.comicTranslation?.suspend() }
         BrowserPresentation.cancel()
         leftAt = Date()
         cleanOnExit(profile)
@@ -352,7 +352,7 @@ struct WebDialog: Identifiable {
         leftAt = nil
     }
     func logout() {
-        for tab in tabs { tab.comicTranslation?.pause() }
+        for tab in tabs { tab.comicTranslation?.suspend() }
         BrowserPresentation.cancel()
         dialog?.complete(nil); dialog = nil
         transitionEpoch = UUID()

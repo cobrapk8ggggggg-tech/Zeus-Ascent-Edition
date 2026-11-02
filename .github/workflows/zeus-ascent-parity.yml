@@ -1,7 +1,7 @@
 name: ZEUS-Ascent parity — tests, simulator and gap report
 on:
   push:
-    branches: [fix/image-translation-entry-20261102, fix/unsigned-ipa-20261101, main, edition/ascent-parity-20261101]
+    branches: [fix/comic-translation-reliability,fix/image-translation-entry-20261102, fix/unsigned-ipa-20261101, main, edition/ascent-parity-20261101]
     paths: ['ZEUSNext/**', 'ZEUSNextUITests/**', 'Native/ComicRuntime/**', '.zeus-ci/**', '.openminis/Host/NativeComicTranslationTests.swift', 'docs/comic-translation/**', '.github/workflows/zeus-ascent-parity.yml']
   workflow_dispatch:
 permissions:
@@ -19,6 +19,7 @@ jobs:
       - run: npm ci --prefix .zeus-ci/comic
       - run: node --test .zeus-ci/comic/bridge.test.mjs
       - run: python3 .zeus-ci/comic/compare_test.py
+      - run: python3 .zeus-ci/comic/evidence_test.py
       - run: python3 .zeus-ci/comic/parity_selftest.py
   decoder:
     runs-on: ubuntu-latest
@@ -29,6 +30,7 @@ jobs:
       - run: g++ -std=c++17 -shared -fPIC Native/ComicRuntime/ComicRegionDecoder.cpp -o /tmp/libcomicdecoder.so $(pkg-config --cflags --libs libjpeg libpng libwebp)
       - run: python3 .zeus-ci/comic/decoder.test.py /tmp/libcomicdecoder.so
   ios:
+    needs: [bridge, decoder]
     runs-on: macos-15
     timeout-minutes: 65
     steps:
@@ -96,7 +98,7 @@ jobs:
             xcrun xcresulttool get test-results summary --path results/comic.xcresult > results/summary.json
           fi
       - name: Prove the pipeline end to end inside WebKit and ONNX
-        run: python3 .zeus-ci/comic/sim_probe.py results/simulator.log results/evidence.json
+        run: python3 .zeus-ci/comic/sim_probe.py results/simulator.log results/evidence.json --bridge-passed --decoder-passed
       - name: Generate the Ascent parity report from this run's evidence
         run: |
           python3 .zeus-ci/comic/parity_report.py docs/comic-translation/ascent-parity.json results/evidence.json results/parity.json results/PARITY-CI.ar.md

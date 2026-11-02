@@ -8,6 +8,20 @@ import UIKit
 #endif
 
 @MainActor final class NativeComicTranslationTests:XCTestCase{
+    func testReferrerPoliciesAndRenderInvalidation() throws {
+        let page=URL(string:"https://reader.example/chapter?part=1#text")!,cdn=URL(string:"https://cdn.example/panel.webp")!
+        XCTAssertNil(ComicImageFetch.referrer(page:page,destination:cdn,policy:"no-referrer"))
+        XCTAssertEqual(ComicImageFetch.referrer(page:page,destination:cdn,policy:nil),"https://reader.example/")
+        XCTAssertEqual(ComicImageFetch.referrer(page:page,destination:page,policy:nil),"https://reader.example/chapter?part=1")
+        XCTAssertNil(ComicImageFetch.referrer(page:page,destination:URL(string:"http://cdn.example/panel.png")!,policy:nil))
+        XCTAssertNil(ComicImageFetch.referrer(page:page,destination:URL(string:"https://reader.example:8443/panel.png")!,policy:"same-origin"))
+        var p=ComicPreferences();let original=p.renderIdentity;p.inkStyle = .outline
+        XCTAssertNotEqual(original,p.renderIdentity)
+        let ink=p.renderIdentity;p.letterSpacing=2;XCTAssertNotEqual(ink,p.renderIdentity)
+        XCTAssertEqual(ComicLetterCase.sentence.apply("HELLO! NEXT."),"Hello! Next.")
+        let legacy=try JSONDecoder().decode(ComicPreferences.self,from:JSONEncoder().encode(ComicPreferences()))
+        XCTAssertEqual(legacy.letterCase,.original)
+    }
     func testGroupedReadingMenuIncludesBothTranslationModes() {
         XCTAssertTrue(BrowserActionGroup.reading.actions.contains(.translate))
         XCTAssertTrue(BrowserActionGroup.reading.actions.contains(.translateImages))
@@ -216,7 +230,9 @@ import UIKit
         let restored=try await view.evaluateJavaScript("document.querySelector('div').style.backgroundImage")as? String
         XCTAssertTrue(restored?.contains("data:image/png")==true)
     }
-    func testEndToEndImagesDoNotTranslateDOMAndFontChangesReuseOCRAndProvider()async throws{
+    func testEndToEndImagesDoNotTranslateDOMAndFontChangesReuseOCRAndProvider()async throws { try await runImagePipeline(crossOrigin:false) }
+    func testCrossOriginNoReferrerImagesTranslateThroughNativeFetch()async throws { try await runImagePipeline(crossOrigin:true) }
+    private func runImagePipeline(crossOrigin:Bool)async throws{
         let root=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let model=BrowserModel(profiles:ProfileStore(root:root,downloadsRoot:root.appendingPathComponent("Downloads")),useBackgroundDownloads:false)
         model.data.settings.shieldsEnabled=false
@@ -230,9 +246,16 @@ import UIKit
         defer{tab.dispose();window.isHidden=true;try? FileManager.default.removeItem(at:root)}
         let source=renderer(CGSize(width:640,height:240)).image{context in UIColor.white.setFill();context.fill(CGRect(x:0,y:0,width:640,height:240));("HELLO WORLD" as NSString).draw(at:CGPoint(x:100,y:80),withAttributes:[.font:UIFont.systemFont(ofSize:48),.foregroundColor:UIColor.black])}
         let encoded=try XCTUnwrap(source.pngData()).base64EncodedString()
-        view.loadHTMLString("<html><body><p id='text'>Original page text stays unchanged.</p><img id='comic' style='width:100%;height:auto' src='data:image/png;base64,\(encoded)'></body></html>",baseURL:URL(string:tab.url))
+        var imageURL=URLComponents(string:"http://127.0.0.1:8766/comic-no-referrer.png")!
+        imageURL.queryItems=[URLQueryItem(name:"image",value:encoded)]
+        let sourceURL=crossOrigin ? imageURL.url!.absoluteString : "data:image/png;base64,"+encoded
+        view.loadHTMLString("<html><body><p id='text'>Original page text stays unchanged.</p><img id='comic' referrerpolicy='no-referrer' style='width:100%;height:auto' src='\(sourceURL)'></body></html>",baseURL:URL(string:tab.url))
         var deadline=Date().addingTimeInterval(20)
         while Date()<deadline{if (try? await view.callAsyncJavaScript("return !!globalThis.zeusComic && document.images[0]?.complete",arguments:[:],in:nil,contentWorld:ComicTranslation.world))as? Bool==true{break};try await Task.sleep(for:.milliseconds(100))}
+        if crossOrigin {
+            let tainted=try await view.evaluateJavaScript("(()=>{try{const c=document.createElement('canvas');c.width=640;c.height=240;c.getContext('2d').drawImage(document.images[0],0,0);c.toDataURL();return false}catch(e){return e.name==='SecurityError'}})()")as? Bool
+            XCTAssertEqual(tainted,true,"Fixture must exercise native fallback after canvas is tainted")
+        }
         session.start();deadline=Date().addingTimeInterval(35)
         while Date()<deadline && (session.running||session.completed==0) && session.error==nil{try await Task.sleep(for:.milliseconds(100))}
         XCTAssertNil(session.error);XCTAssertGreaterThan(session.completed,0)
@@ -246,14 +269,22 @@ import UIKit
         XCTAssertFalse(before.isEmpty);let ocrBefore=session.ocrRuns,completeBefore=session.completed
         preferences.fontScale=0.65;preferences.textColor="163B72";model.data.settings.comicTranslation=preferences
         session.pause();session.start();deadline=Date().addingTimeInterval(25)
-        while Date()<deadline && (session.running||session.completed==completeBefore) && session.error==nil{try await Task.sleep(for:.milliseconds(100))}
-        XCTAssertNil(session.error);XCTAssertGreaterThan(session.completed,completeBefore);XCTAssertEqual(session.ocrRuns,ocrBefore)
+        while Date()<deadline && session.running && session.error==nil{try await Task.sleep(for:.milliseconds(100))}
+        XCTAssertNil(session.error);XCTAssertEqual(session.completed,completeBefore);XCTAssertEqual(session.ocrRuns,ocrBefore)
         let (secondData,_)=try await URLSession.shared.data(from:endpoint),after=try XCTUnwrap(JSONSerialization.jsonObject(with:secondData)as? [[String]])
         XCTAssertEqual(before.count,after.count,"Changing lettering must not spend another translation request")
         if let snapshot=try? await view.takeSnapshot(configuration:nil){let attachment=XCTAttachment(image:snapshot);attachment.name="Image-only end-to-end - Arabic custom color";attachment.lifetime = .keepAlways;add(attachment)}
+        await session.toggleOriginal()
+        XCTAssertTrue(session.showingOriginal)
+        let visibleOriginal=try await view.evaluateJavaScript("document.images[0].src")as? String
+        XCTAssertEqual(visibleOriginal,sourceURL)
+        await session.toggleOriginal()
+        deadline=Date().addingTimeInterval(25)
+        while session.running && Date()<deadline {try await Task.sleep(for:.milliseconds(100))}
+        XCTAssertFalse(session.showingOriginal);XCTAssertEqual(session.ocrRuns,ocrBefore)
         await session.restore()
         let original=try await view.evaluateJavaScript("document.images[0].src")as? String
-        XCTAssertTrue(original?.hasPrefix("data:image/png")==true)
+        XCTAssertEqual(original,sourceURL)
         try await ComicMemory.shared.clear(profile:model.profile.id)
     }
     func testOCRAndTranslationCachesAreSeparateAndProfileScoped()async throws{

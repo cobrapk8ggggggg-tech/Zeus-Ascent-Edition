@@ -30,6 +30,7 @@ def main(checklist_path, evidence_path, out_json, out_md):
     passed = set(evidence.get("passed_tests", []))
     rows = []
     met = unproven = missing = 0.0
+    measurable = 0
     documented = []
     for feature in checklist["features"]:
         status = feature["zeus_status"]
@@ -41,7 +42,10 @@ def main(checklist_path, evidence_path, out_json, out_md):
             documented.append(feature["name"])
             rows.append((feature, "موثق في المصدر دون اختبار آلي في CI", "—"))
             continue
+        measurable += 1
         proven = tests in passed
+        if feature["id"] == "ocr_paddle": proven = "testActualPinnedPaddleModelReadsRasterText" in evidence.get("core_passed",[])
+        if feature["id"] == "fetch": proven = "testCrossOriginNoReferrerImagesTranslateThroughNativeFetch" in evidence.get("core_passed",[])
         if weight is None:
             state = "خارج النطاق (قارئ مستقل — تطبيق منفصل لاحقاً)"
             rows.append((feature, state, "—"))
@@ -56,11 +60,14 @@ def main(checklist_path, evidence_path, out_json, out_md):
             rows.append((feature, state, "0"))
         if status in ("missing",):
             missing += 1
-    total = met + unproven
+    total = measurable
     score = (met / total * 100) if total else 0.0
     out = {
         "ascent_version": checklist["ascent_version"],
         "score_percent": round(score, 1),
+        "coverage_percent": round(score, 1),
+        "quality_equivalence_proven": False,
+        "physical_device": evidence.get("physical_device") is True,
         "proven_weight": round(met, 2),
         "unproven_weight": round(unproven, 2),
         "missing_features": [f["name"] for f in checklist["features"] if f["zeus_status"] == "missing"],
@@ -71,10 +78,10 @@ def main(checklist_path, evidence_path, out_json, out_md):
     }
     Path(out_json).write_text(json.dumps(out, ensure_ascii=False, indent=1))
     lines = [
-        "# تقرير التكافؤ مع Ascent — هذا التشغيل",
+        "# تقرير تغطية التحقق — هذا التشغيل",
         "",
         f"- النسخة المرجعية: Ascent {checklist['ascent_version']} (تحليل REA موثق).",
-        f"- **درجة التكافؤ المثبتة: {score:.1f}%** من الوزن الكلي القابل للقياس.",
+        f"- **تغطية التحقق: {score:.1f}%** من القدرات المدرجة القابلة للاختبار؛ ليست قياسًا لتكافؤ الجودة.",
         f"- مثبت في هذا التشغيل: {met:.2f} · غير مثبت (لم يُشغّل اختباره هنا): {unproven:.2f}",
         "",
         "| القدرة | الحالة في هذا التشغيل | الوزن |",
@@ -94,7 +101,7 @@ def main(checklist_path, evidence_path, out_json, out_md):
               "> الأداة لا تخترع نتائج: كل بند «مثبت» مرتبط باختبار أخضر في هذا التشغيل نفسه،",
               "> والبنود غير المقاسة تبقى معلنة كغير مثبتة. القياس الصوتي الحقيقي (CER على عينات فعلية) يبقى معيار القبول النهائي وفق compare.py."]
     Path(out_md).write_text("\n".join(lines))
-    print(f"parity score: {score:.1f}% (proven {met:.2f} / {total:.2f})")
+    print(f"verification coverage: {score:.1f}% (proven {met:.2f} / {total:.2f})")
 
 
 if __name__ == "__main__":

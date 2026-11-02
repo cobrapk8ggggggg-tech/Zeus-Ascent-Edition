@@ -24,3 +24,38 @@ test('large data URLs cross the probe as a short content identity',()=>{const s=
 test('ordinary HTTP without randomUUID can still create isolated document identity',()=>{const s=setup('<img src="/panel.png">',true);try{assert.match(s.bridge.documentID,/^[a-f0-9]{32}$/);assert.equal(s.bridge.scan(false).items.length,1);}finally{s.close()}});
 
 test('image overlays are not rediscovered as a second background candidate',()=>{const s=setup('<img src="/panel.png" style="background-image:url(/original.png)">');try{assert.equal(s.bridge.scan(false).items.length,1);}finally{s.close()}});
+
+test('image referrer policy overrides document policy and survives scanning',()=>{
+ const s=setup('<meta name="referrer" content="origin"><img referrerpolicy="no-referrer" src="https://cdn.example/panel.webp"><img src="/other.png">');
+ try{const c=s.bridge.scan(false).items;assert.equal(c[0].referrerPolicy,'no-referrer');assert.equal(c[1].referrerPolicy,'origin');}finally{s.close()}
+});
+test('native lazy load completion wakes translation without scrolling',async()=>{
+ const s=setup('<img data-pending="yes" src="/late.png">');
+ try{const notifications=[];s.w.webkit={messageHandlers:{zeusComic:{postMessage:v=>notifications.push(v.kind)}}};s.bridge.start();assert.equal(s.bridge.scan(false).items[0].pending,true);
+ s.w.document.images[0].dataset.pending='no';s.w.document.images[0].dispatchEvent(new s.w.Event('load'));await new Promise(r=>setTimeout(r,0));
+ assert.ok(notifications.includes('loaded'));assert.equal(s.bridge.scan(false).items[0].pending,false);
+ }finally{s.close()}
+});
+function fakeDecoder(s){s.w.Image=class {async decode(){}};}
+test('original toggle retains translated source and marks without reprocessing',async()=>{
+ const s=setup('<img referrerpolicy="no-referrer" src="/panel.png" style="opacity:.8">');
+ try{fakeDecoder(s);const c=s.bridge.scan(false).items[0],g=s.bridge.start();assert.equal(await s.bridge.apply(c.id,c.revision,'YQ==',{x:0,y:0,width:200,height:400},'ar',g),true);
+ s.bridge.mark(c.id,c.revision,'ar');const translated=s.w.document.images[0].src;
+ s.bridge.setOriginal(true);assert.equal(s.w.document.images[0].src,'https://reader.example/panel.png');assert.equal(s.bridge.has(c.id,c.revision,'ar'),true);
+ assert.equal(await s.bridge.apply(c.id,c.revision,'YQ==',{x:0,y:0,width:200,height:400},'ar',g),false);
+ s.bridge.setOriginal(false);assert.equal(s.w.document.images[0].src,translated);assert.equal(s.bridge.scan(false).items[0].source,c.source);
+ s.bridge.restore();assert.equal(s.w.document.images[0].src,c.source);assert.equal(s.w.document.images[0].style.opacity,'0.8');
+ }finally{s.close()}
+});
+test('partial lettering uses the fetched backing image instead of refetching its URL',async()=>{
+ const s=setup('<img referrerpolicy="no-referrer" src="https://cdn.example/panel.webp">');
+ try{fakeDecoder(s);const c=s.bridge.scan(false).items[0],g=s.bridge.start();s.bridge.outputStart('original',1);s.bridge.outputPart('original',0,'YQ==');s.bridge.outputOriginal('original',c.id,c.revision);
+ assert.equal(s.bridge.hasBacking(c.id,c.revision),true);assert.equal(await s.bridge.apply(c.id,c.revision,'YQ==',{x:0,y:0,width:200,height:200},'ar',g),true);
+ assert.ok(!s.w.document.images[0].style.backgroundImage.includes('cdn.example'));s.bridge.restore();assert.equal(s.w.document.images[0].style.backgroundImage,'');assert.equal(s.bridge.hasBacking(c.id,c.revision),false);
+ }finally{s.close()}
+});
+test('a recycled image while viewing original is never overwritten by old lettering',async()=>{
+ const s=setup();try{fakeDecoder(s);const c=s.bridge.scan(false).items[0];await s.bridge.apply(c.id,c.revision,'YQ==',{x:0,y:0,width:200,height:400},'ar',s.bridge.start());s.bridge.setOriginal(true);
+ s.w.document.images[0].src='/next.png';await new Promise(r=>setTimeout(r,0));s.bridge.setOriginal(false);assert.ok(s.w.document.images[0].src.endsWith('/next.png'));
+ }finally{s.close()}
+});

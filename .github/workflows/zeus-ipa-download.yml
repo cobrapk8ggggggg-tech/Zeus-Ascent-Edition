@@ -2,8 +2,8 @@ name: ZEUS integrated IPA - build and publish (no tests)
 run-name: IPA from ${{ github.ref_name }} (${{ github.sha }})
 on:
   push:
-    branches: [fix/image-translation-entry-20261102, fix/unsigned-ipa-20261101, main, edition/ascent-parity-20261101, feature/zeus-manhwa-translation-20261101, build/zeus-unsigned-ipa-repair-20261023, feature/zeus-project-agent-20261023, feature/zeus-direct-integrations-20261023, feature/zeus-ipad-layout-studio-20261025, feature/zeus-cloud-account-20261026, feature/zeus-android-lab-20261030]
-    paths: [.github/workflows/zeus-ipa-download.yml, .openminis/**, ZEUSNext/**]
+    branches: [fix/comic-translation-reliability,fix/image-translation-entry-20261102, fix/unsigned-ipa-20261101, main, edition/ascent-parity-20261101, feature/zeus-manhwa-translation-20261101, build/zeus-unsigned-ipa-repair-20261023, feature/zeus-project-agent-20261023, feature/zeus-direct-integrations-20261023, feature/zeus-ipad-layout-studio-20261025, feature/zeus-cloud-account-20261026, feature/zeus-android-lab-20261030]
+    paths: [.github/workflows/zeus-ipa-download.yml, .openminis/**, ZEUSNext/**, Native/ComicRuntime/**, .zeus-ci/**]
   workflow_dispatch:
     inputs:
       source_ref:
@@ -44,6 +44,7 @@ jobs:
           test "$(uname -m)" = arm64
           mkdir -p results
           git -C browser rev-parse HEAD > results/browser-commit.txt
+          git -C browser rev-parse --abbrev-ref HEAD > results/browser-ref.txt
           git -C upstream rev-parse HEAD > results/openminis-commit.txt
           python3 browser/.openminis/prepare_reference.py upstream --sdk iphoneos --manifest results/original-source.json
           brew install ninja llvm lld libarchive pkg-config meson
@@ -139,6 +140,7 @@ jobs:
             results/*.ipa
             results/*.sha256
             results/*commit.txt
+            results/browser-ref.txt
             results/native-adapters.json
             results/ipa-zip-check.txt
             results/ipa-size-audit.json

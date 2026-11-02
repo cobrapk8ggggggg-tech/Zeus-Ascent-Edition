@@ -8,6 +8,65 @@ enum ComicReadingMode: String, Codable, CaseIterable { case fastest, balanced, c
 enum ComicInkStyle: String, Codable, CaseIterable { case plain, outline, shadow
     var title: String { switch self { case .plain: return "عادي"; case .outline: return "محدّد (حواف بارزة)"; case .shadow: return "مظلّل" } }
 }
+enum ComicLetterCase: String, Codable, CaseIterable {
+    case original, upper, lower, sentence
+    var title: String { switch self { case .original: return "كما في الأصل"; case .upper: return "أحرف كبيرة"; case .lower: return "أحرف صغيرة"; case .sentence: return "بداية الجملة" } }
+    func apply(_ text: String) -> String {
+        switch self {
+        case .original: return text
+        case .upper: return text.uppercased()
+        case .lower: return text.lowercased()
+        case .sentence:
+            var beginning = true
+            return text.lowercased().map { character in
+                let value = beginning ? String(character).uppercased() : String(character)
+                if character.isLetter { beginning = false }
+                if ".!?؟。".contains(character) { beginning = true }
+                return value
+            }.joined()
+        }
+    }
+}
+enum ComicSessionPhase: String {
+    case idle, waiting, fetching, recognizing, downloading, translating, rendering, displaying, paused, completed, partial, failed
+    var title: String {
+        switch self {
+        case .idle: return "ترجمة الصور"
+        case .waiting: return "بانتظار الصور"
+        case .fetching: return "جلب الصورة"
+        case .recognizing: return "قراءة الفقاعات"
+        case .downloading: return "تجهيز نموذج القراءة"
+        case .translating: return "ترجمة الحوار"
+        case .rendering: return "رسم الترجمة"
+        case .displaying: return "عرض الترجمة"
+        case .paused: return "الترجمة متوقفة"
+        case .completed: return "الصور المتاحة جاهزة"
+        case .partial: return "اكتملت بعض الصور"
+        case .failed: return "تعذّرت ترجمة الصور"
+        }
+    }
+}
+struct ComicDiagnostic: Identifiable {
+    let id = UUID()
+    let phase: ComicSessionPhase
+    let domain: String
+    let code: Int
+    let status: Int?
+    let retryable: Bool
+    var detail: String { "\(phase.title) · \(domain) \(code)" + (status.map { " · HTTP \($0)" } ?? "") }
+    static func capture(_ error: Error, phase: ComicSessionPhase) -> ComicDiagnostic {
+        if let failure = error as? ComicHTTPFailure {
+            return ComicDiagnostic(phase: phase, domain: "HTTP", code: failure.status, status: failure.status, retryable: failure.status == 429 || failure.status >= 500)
+        }
+        let value = error as NSError
+        let retryable = value.domain == NSURLErrorDomain && [NSURLErrorTimedOut, NSURLErrorNetworkConnectionLost, NSURLErrorNotConnectedToInternet, NSURLErrorCannotConnectToHost].contains(value.code)
+        return ComicDiagnostic(phase: phase, domain: value.domain, code: value.code, status: nil, retryable: retryable)
+    }
+}
+struct ComicHTTPFailure: LocalizedError {
+    let status: Int
+    var errorDescription: String? { status == 403 ? "رفض خادم الصور الطلب. يمكنك إعادة المحاولة بعد التحقق من تحميل الصورة في الصفحة." : "تعذّر جلب الصورة من الخادم (\(status))." }
+}
 struct ComicPreferences: Codable, Equatable {
     static let sourceLanguages=TranslationPreferences.languages+[("el","Ελληνικά"),("hi","हिन्दी"),("th","ไทย"),("ta","தமிழ்"),("te","తెలుగు"),("uk","Українська")]
     var mode: ComicReadingMode = .fastest
@@ -20,6 +79,11 @@ struct ComicPreferences: Codable, Equatable {
     var fontScale: Double = 1
     var textColor: String?
     var inkStyleRaw: String?
+    var allowOnlineFallback: Bool?
+    var letterCaseRaw: String?
+    var letterSpacing: Double?
+    var letterCase: ComicLetterCase { ComicLetterCase(rawValue: letterCaseRaw ?? "") ?? .original }
+    var renderIdentity: String { "render-v4|\(fontName ?? "default")|\(fontScale)|\(textColor ?? "auto")|\(inkStyle.rawValue)|\(letterCase.rawValue)|\(letterSpacing ?? 0)" }
     var inkStyle: ComicInkStyle { get { ComicInkStyle(rawValue: inkStyleRaw ?? "") ?? .plain } set { inkStyleRaw = newValue.rawValue } }
     var engine: ComicOnlineEngine = .existing
     var translation: TranslationPreferences?
@@ -41,6 +105,7 @@ struct ComicCandidate: Codable, Identifiable {
     var h: Double
     var pending: Bool
     var revision: String
+    var referrerPolicy: String?
 }
 struct ComicEnvelope: Codable {
     var document: String
@@ -88,7 +153,7 @@ enum ComicIdentity {
         hash(segments.map{$0.id+"\0"+$0.text}.joined(separator:"\n"))
     }
     static func settings(_ preferences: ComicPreferences, translation: TranslationPreferences, provider: AIProviderConfiguration?) -> String {
-        hash("comic-v1|\(preferences.mode.rawValue)|\(preferences.source)|\(translation.target)|" + TranslationMemory.namespace(page: "comic://content", preferences: translation, provider: provider))
+        hash("comic-v2|fallback:\(preferences.allowOnlineFallback ?? false)|\(preferences.mode.rawValue)|\(preferences.source)|\(translation.target)|" + TranslationMemory.namespace(page: "comic://content", preferences: translation, provider: provider))
     }
 }
 enum ComicGeometry {

@@ -23,7 +23,7 @@ enum ComicPixels {
         let image=try decode(data);guard image.width==region.width,expectedHeight==nil||image.height==expectedHeight,let crop=image.cropping(to:region.rect)else{throw ComicFailure.message("تعذّر فك المنطقة المطلوبة.")};return crop
     }
     static func png(_ image:CGImage)throws->Data{let output=NSMutableData();guard let destination=CGImageDestinationCreateWithData(output,"public.png" as CFString,1,nil)else{throw ComicFailure.message("تعذّر ترميز الصورة.")};CGImageDestinationAddImage(destination,image,nil);guard CGImageDestinationFinalize(destination)else{throw ComicFailure.message("فشل ترميز الصورة.")};return output as Data}
-    static func render(_ image:CGImage,speeches:[ComicSpeech],translations:[TranslationSegment],target:String,fontName:String?,fontScale:Double,textColor:String? = nil,ink:ComicInkStyle = .plain)throws->CGImage{
+    static func render(_ image:CGImage,speeches:[ComicSpeech],translations:[TranslationSegment],target:String,fontName:String?,fontScale:Double,textColor:String? = nil,ink:ComicInkStyle = .plain,letterSpacing:Double = 0)throws->CGImage{
         guard let context=context(width:image.width,height:image.height),let pixels=rgba(image,width:image.width,height:image.height)else{throw ComicFailure.message("ذاكرة غير كافية للرسم.")}
         context.draw(image,in:CGRect(x:0,y:0,width:image.width,height:image.height))
         let translated=Dictionary(uniqueKeysWithValues:translations.map{($0.id,$0.text)})
@@ -35,7 +35,7 @@ enum ComicPixels {
             guard area.width>3,area.height>3 else{continue}
             let background=backgroundColor(pixels,width:image.width,height:image.height,rect:area)
             // Prepare layout before erasing any source text. Failed fit leaves the original.
-            guard let placed=place(text,area:area,imageHeight:image.height,target:target,fontName:fontName,fontScale:fontScale,theta:CGFloat(speech.angle ?? 0))else{throw ComicFailure.message("لم يتسع النص للفقاعة؛ بقي الأصل دون مسح.")}
+            guard let placed=place(text,area:area,imageHeight:image.height,target:target,fontName:fontName,fontScale:fontScale,theta:CGFloat(speech.angle ?? 0),letterSpacing:letterSpacing)else{throw ComicFailure.message("لم يتسع النص للفقاعة؛ بقي الأصل دون مسح.")}
             // Erase foreground components only inside detected source lines. Uniform
             // fills are confined to the text masks; balloon borders remain untouched.
             clean(context,pixels:pixels,width:image.width,height:image.height,speech:speech,background:background)
@@ -49,15 +49,15 @@ enum ComicPixels {
     // Fit the translation inside the speech area. Non-zero theta (diagonal tails,
     // SFX streaks) shrinks the rectangle until its rotated bounding box stays inside;
     // rotated lettering must never paint outside the speech it belongs to.
-    private static func place(_ text:String,area:CGRect,imageHeight:Int,target:String,fontName:String?,fontScale:Double,theta:CGFloat)->Placement?{
+    private static func place(_ text:String,area:CGRect,imageHeight:Int,target:String,fontName:String?,fontScale:Double,theta:CGFloat,letterSpacing:Double)->Placement?{
         if theta == 0{
-            guard let value=layout(text,rect:area.insetBy(dx:2,dy:2),target:target,fontName:fontName,fontScale:fontScale)else{return nil}
+            guard let value=layout(text,rect:area.insetBy(dx:2,dy:2),target:target,fontName:fontName,fontScale:fontScale,letterSpacing:letterSpacing)else{return nil}
             return Placement(layout:value,box:CGRect(x:-(area.width-4)/2,y:-value.height/2,width:area.width-4,height:value.height),theta:0)
         }
         var low:CGFloat=0.35,high:CGFloat=1,best:Placement?
         for _ in 0..<7{
             let scale=(low+high)/2,width=(area.width-6)*scale,height=(area.height-6)*scale
-            guard width>2,height>2,let value=layout(text,rect:CGRect(x:0,y:0,width:width,height:height),target:target,fontName:fontName,fontScale:fontScale)else{high=scale;continue}
+            guard width>2,height>2,let value=layout(text,rect:CGRect(x:0,y:0,width:width,height:height),target:target,fontName:fontName,fontScale:fontScale,letterSpacing:letterSpacing)else{high=scale;continue}
             let measured=CTFramesetterSuggestFrameSizeWithConstraints(CTFramesetterCreateWithAttributedString(value.text),CFRange(),nil,CGSize(width:width,height:CGFloat.greatestFiniteMagnitude),nil)
             let boundsWidth=ceil(measured.width)*abs(cos(theta))+ceil(measured.height)*abs(sin(theta)),boundsHeight=ceil(measured.width)*abs(sin(theta))+ceil(measured.height)*abs(cos(theta))
             if boundsWidth<=area.width-2,boundsHeight<=area.height-2{low=scale;best=Placement(layout:value,box:CGRect(x:-width/2,y:-value.height/2,width:width,height:value.height),theta:theta)}else{high=scale}
@@ -91,7 +91,7 @@ enum ComicPixels {
     }
     static func color(_ hex:String)->CGColor?{let value=hex.replacingOccurrences(of:"#",with:"");guard value.count==6,let n=UInt32(value,radix:16)else{return nil};return CGColor(red:CGFloat((n>>16)&255)/255,green:CGFloat((n>>8)&255)/255,blue:CGFloat(n&255)/255,alpha:1)}
     struct TextLayout{var text:NSAttributedString;var height:CGFloat;var size:CGFloat}
-    static func layout(_ text:String,rect:CGRect,target:String,fontName:String?,fontScale:Double)->TextLayout?{
+    static func layout(_ text:String,rect:CGRect,target:String,fontName:String?,fontScale:Double,letterSpacing:Double = 0)->TextLayout?{
         guard rect.width>2,rect.height>2 else{return nil}
         let style=NSMutableParagraphStyle();style.alignment = .center;style.baseWritingDirection=TranslationPreferences.rtl(target) ? .rightToLeft:.leftToRight;style.lineBreakMode = .byWordWrapping
         // GeezaPro is iOS's native Arabic face: ArialMT defeats Arabic shaping inside
@@ -99,14 +99,14 @@ enum ComicPixels {
         let resolved=fontName ?? (target.hasPrefix("ar") ? "GeezaPro":"ArialMT")
         var low:CGFloat=6,high=min(96,rect.height),best:TextLayout?
         for _ in 0..<9{let size=(low+high)/2,font=CTFontCreateWithName(resolved as CFString,size,nil)
-            let value=NSAttributedString(string:text,attributes:[NSAttributedString.Key(kCTFontAttributeName as String):font,.paragraphStyle:style])
+            let value=NSAttributedString(string:text,attributes:[NSAttributedString.Key(kCTFontAttributeName as String):font,.paragraphStyle:style,.kern:min(4,max(-1,letterSpacing))])
             let setter=CTFramesetterCreateWithAttributedString(value);var fit=CFRange();let measured=CTFramesetterSuggestFrameSizeWithConstraints(setter,CFRange(),nil,CGSize(width:rect.width,height:CGFloat.greatestFiniteMagnitude),&fit)
             if measured.height<=rect.height && measured.width<=rect.width+0.5 && fit.length==value.length{best=TextLayout(text:value,height:ceil(measured.height),size:size);low=size}else{high=size}
         }
         guard let best else{return nil}
         let chosen=min(best.size,max(6,best.size*CGFloat(min(1.5,max(0.5,fontScale)))*0.8))
         let font=CTFontCreateWithName(resolved as CFString,chosen,nil)
-        let text=NSAttributedString(string:text,attributes:[NSAttributedString.Key(kCTFontAttributeName as String):font,.paragraphStyle:style])
+        let text=NSAttributedString(string:text,attributes:[NSAttributedString.Key(kCTFontAttributeName as String):font,.paragraphStyle:style,.kern:min(4,max(-1,letterSpacing))])
         let measured=CTFramesetterSuggestFrameSizeWithConstraints(CTFramesetterCreateWithAttributedString(text),CFRange(),nil,CGSize(width:rect.width,height:CGFloat.greatestFiniteMagnitude),nil)
         return TextLayout(text:text,height:ceil(measured.height),size:chosen)
     }

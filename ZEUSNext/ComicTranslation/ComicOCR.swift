@@ -21,7 +21,7 @@ actor ComicOCR {
         fastRecognizers.removeAll()
         #endif
     }
-    func read(_ image:CGImage,source:String,mode:ComicReadingMode)async throws->ComicReading{
+    func read(_ image:CGImage,source:String,mode:ComicReadingMode,onPreparing:(@Sendable (Bool) async -> Void)? = nil)async throws->ComicReading{
         try Task.checkCancellation()
         let detected=source == "auto" ? try await Self.detectScript(image) : source
         let fastSupported=ComicModelStore.recognizer(detected)=="latin" || ["ja","zh","ko"].contains(where:detected.hasPrefix)
@@ -33,6 +33,12 @@ actor ComicOCR {
         var runtime="MLKit"
         #endif
         if mode != .fastest || !fastSupported {
+            if !(await ComicModelStore.shared.isPrepared(source:detected)) {
+                await onPreparing?(true)
+                try await ComicModelStore.shared.prepare(source:detected)
+                try Task.checkCancellation()
+                await onPreparing?(false)
+            }
             let accurate=try await ComicPaddle.shared.read(image,source:detected,careful:mode == .careful)
             runtime=fastSupported ? "MLKit+Paddle/ONNX":"Paddle/ONNX"
             if mode == .careful{lines=accurate}else{
