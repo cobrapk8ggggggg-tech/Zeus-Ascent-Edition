@@ -20,6 +20,7 @@ jobs:
       - run: node --test .zeus-ci/comic/bridge.test.mjs
       - run: python3 .zeus-ci/comic/compare_test.py
       - run: python3 .zeus-ci/comic/evidence_test.py
+      - run: python3 .zeus-ci/comic/boot_simulator_test.py
   decoder:
     runs-on: ubuntu-latest
     steps:
@@ -71,12 +72,10 @@ jobs:
           assert choices
           with open(os.environ['GITHUB_ENV'],'a') as f:f.write('COMIC_SIMULATOR='+choices[0]['udid']+'\n')
           PY
-      - name: Boot selected simulator before tests
+      - name: Boot selected simulator with bounded failover
         if: matrix.sdk == 'iphonesimulator'
-        timeout-minutes: 6
-        run: |
-          xcrun simctl boot "$COMIC_SIMULATOR" || true
-          xcrun simctl bootstatus "$COMIC_SIMULATOR" -b
+        timeout-minutes: 15
+        run: python3 .zeus-ci/comic/boot_simulator.py "$COMIC_SIMULATOR"
       - name: Start deterministic provider fixture
         if: matrix.sdk == 'iphonesimulator'
         run: |

@@ -50,6 +50,8 @@
     r.written={};
     for(const u of r.urls)URL.revokeObjectURL(u);
     r.urls.clear();r.parts.clear();r.original=null;r.captureSource=null;r.backingURL=null;r.presentation=null;r.mark=null;r.renderMark=null;r.canvasMark=null;
+    // Restoring our own attributes is not a new source revision.
+    observer.takeRecords();
   }
   function fingerprint(el) { try { const c=document.createElement('canvas');c.width=c.height=16;c.getContext('2d').drawImage(el,0,0,16,16);return Array.from(c.getContext('2d').getImageData(0,0,16,16).data).join(','); }catch{return '';} }
   function shortSource(source,id,revision){if(!source.startsWith('data:')||source.length<=512)return source;let hash=2166136261;for(const start of [0,Math.max(0,(source.length>>1)-128),Math.max(0,source.length-256)])for(let i=start;i<Math.min(source.length,start+256);i++){hash^=source.charCodeAt(i);hash=Math.imul(hash,16777619);}return 'data:#'+source.length+'.'+(hash>>>0).toString(36);}

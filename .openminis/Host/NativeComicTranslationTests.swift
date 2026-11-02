@@ -271,7 +271,9 @@ import UIKit
         preferences.fontScale=0.65;preferences.textColor="163B72";model.data.settings.comicTranslation=preferences
         session.pause();session.start();deadline=Date().addingTimeInterval(25)
         while Date()<deadline && session.running && session.error==nil{try await Task.sleep(for:.milliseconds(100))}
-        XCTAssertNil(session.error);XCTAssertEqual(session.completed,completeBefore);XCTAssertEqual(session.ocrRuns,ocrBefore)
+        XCTAssertNil(session.error)
+        XCTAssertEqual(session.completed,completeBefore,"Changing lettering must not count the same source as another image")
+        XCTAssertEqual(session.ocrRuns,ocrBefore,"Changing lettering must reuse the original OCR result")
         let (secondData,_)=try await URLSession.shared.data(from:endpoint),after=try XCTUnwrap(JSONSerialization.jsonObject(with:secondData)as? [[String]])
         XCTAssertEqual(before.count,after.count,"Changing lettering must not spend another translation request")
         if let snapshot=try? await view.takeSnapshot(configuration:nil){let attachment=XCTAttachment(image:snapshot);attachment.name="Image-only end-to-end - Arabic custom color";attachment.lifetime = .keepAlways;add(attachment)}

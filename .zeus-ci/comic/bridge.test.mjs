@@ -71,3 +71,8 @@ test('an original toggle belonging to a previous document session is rejected',a
  assert.equal(s.bridge.setOriginal(true,'current'),true);assert.equal(s.bridge.setOriginal(false,'current'),true);assert.equal(s.w.document.images[0].src,translated);
  }finally{s.close()}
 });
+test('changing lettering settings preserves the source revision and image identity',async()=>{
+ const s=setup();try{fakeDecoder(s);const c=s.bridge.scan(false).items[0];const g=s.bridge.resume('first','session');await s.bridge.apply(c.id,c.revision,'YQ==',{x:0,y:0,width:200,height:400},'first',g);s.bridge.mark(c.id,c.revision,'first');
+ await new Promise(r=>setTimeout(r,0));s.bridge.resume('second','session');await new Promise(r=>setTimeout(r,0));const fresh=s.bridge.scan(false).items[0];assert.equal(fresh.id,c.id);assert.equal(fresh.revision,c.revision);assert.equal(fresh.source,c.source);
+ }finally{s.close()}
+});

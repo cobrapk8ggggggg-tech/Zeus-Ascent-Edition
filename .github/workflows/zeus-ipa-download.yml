@@ -7,12 +7,15 @@ on:
   workflow_dispatch:
     inputs:
       source_ref:
-        description: Browser source branch, tag or commit to package
+        description: Optional source override; leave empty to build the selected workflow branch
         required: false
-        default: main
+        default: ''
         type: string
 permissions:
   contents: read
+concurrency:
+  group: zeus-ipa-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   ipa:
     runs-on: macos-15

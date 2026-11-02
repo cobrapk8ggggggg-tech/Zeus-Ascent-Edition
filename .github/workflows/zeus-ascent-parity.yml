@@ -20,6 +20,7 @@ jobs:
       - run: node --test .zeus-ci/comic/bridge.test.mjs
       - run: python3 .zeus-ci/comic/compare_test.py
       - run: python3 .zeus-ci/comic/evidence_test.py
+      - run: python3 .zeus-ci/comic/boot_simulator_test.py
       - run: python3 .zeus-ci/comic/parity_selftest.py
   decoder:
     runs-on: ubuntu-latest
@@ -57,23 +58,9 @@ jobs:
           assert choices
           with open(os.environ['GITHUB_ENV'],'a') as f:f.write('COMIC_SIMULATORS='+' '.join(choices[:3])+'\n')
           PY
-      - name: Boot the selected simulator with retries
-        timeout-minutes: 12
-        run: |
-          booted=""
-          for udid in $COMIC_SIMULATORS; do
-            for attempt in 1 2; do
-              xcrun simctl boot "$udid" 2>/dev/null || true
-              if xcrun simctl bootstatus "$udid" -b; then booted="$udid"; break; fi
-              echo "boot attempt $attempt failed for $udid; erasing and retrying"
-              xcrun simctl shutdown "$udid" 2>/dev/null || true
-              xcrun simctl erase "$udid" 2>/dev/null || true
-              sleep 10
-            done
-            [ -n "$booted" ] && break
-          done
-          [ -n "$booted" ] || { echo "no iOS-26 iPhone simulator could boot"; exit 1; }
-          echo "COMIC_SIMULATOR=$booted" >> "$GITHUB_ENV"
+      - name: Boot an available simulator with bounded failover
+        timeout-minutes: 15
+        run: python3 .zeus-ci/comic/boot_simulator.py $COMIC_SIMULATORS
       - name: Start deterministic provider fixture
         run: |
           python3 .zeus-ci/fixture_server.py > results/fixture.log 2>&1 &
@@ -96,6 +83,7 @@ jobs:
           git rev-parse HEAD > results/source-commit.txt
           if [ -f results/comic.xcresult/Info.plist ]; then
             xcrun xcresulttool get test-results summary --path results/comic.xcresult > results/summary.json
+            xcrun xcresulttool export attachments --path results/comic.xcresult --output-path results/screenshots || true
           fi
       - name: Prove the pipeline end to end inside WebKit and ONNX
         run: python3 .zeus-ci/comic/sim_probe.py results/simulator.log results/evidence.json --bridge-passed --decoder-passed
