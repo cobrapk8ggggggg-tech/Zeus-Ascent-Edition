@@ -158,8 +158,9 @@
   }
   // Switching the visual representation keeps OCR, lettering and object URLs alive.
   // Restore never overwrites an element the reader has recycled for another panel.
-  function setOriginal(show) {
-    if(show===showingOriginal)return;
+  function setOriginal(show,ticket) {
+    if(ticket!=null&&ticket!==sessionTicket)return false;
+    if(show===showingOriginal)return true;
     showingOriginal=show;
     for(const r of records.values()) {
       const el=r.el,o=r.original;
@@ -195,7 +196,7 @@
         r.guard?.observe(el,{attributes:true,attributeFilter:['src','srcset']});
       }
     }
-    observer.takeRecords();
+    observer.takeRecords();return true;
   }
   function restore(){setOriginal(false);generation++;active=false;for(const r of records.values())reset(r);transfers.clear();}
   function start(){active=true;return generation;}

@@ -34,17 +34,37 @@ jobs:
       - uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: '26.3'
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Verify image bridge and evidence provenance before packaging
+        run: |
+          set -euo pipefail
+          mkdir -p results
+          npm ci --prefix browser/.zeus-ci/comic
+          node --test browser/.zeus-ci/comic/bridge.test.mjs 2>&1 | tee results/verification.log
+          python3 browser/.zeus-ci/comic/evidence_test.py 2>&1 | tee -a results/verification.log
+          python3 browser/.zeus-ci/comic/compare_test.py 2>&1 | tee -a results/verification.log
       - uses: actions/setup-go@v5
         with:
           go-version: '1.25.0'
           cache-dependency-path: upstream/deps/rclone-mobile/go.sum
       - name: Prepare device build and record exact source revisions
+        env:
+          ZEUS_SOURCE_REF: ${{ inputs.source_ref || github.ref_name }}
         run: |
           set -euo pipefail
           test "$(uname -m)" = arm64
           mkdir -p results
           git -C browser rev-parse HEAD > results/browser-commit.txt
-          git -C browser rev-parse --abbrev-ref HEAD > results/browser-ref.txt
+          printf '%s\n' "$ZEUS_SOURCE_REF" > results/browser-ref.txt
+          python3 - <<'PY'
+          import json,os,subprocess
+          from pathlib import Path
+          value={"source_commit":subprocess.check_output(['git','-C','browser','rev-parse','HEAD'],text=True).strip(),"source_ref":os.environ['ZEUS_SOURCE_REF'],"bridge_verified":True,"evidence_checks_verified":True,"physical_device_quality_measured":False}
+          text=json.dumps(value,indent=2)+'\n'
+          Path('browser/ZEUSNext/Resources/comic-build.json').write_text(text)
+          Path('results/comic-build.json').write_text(text)
+          PY
           git -C upstream rev-parse HEAD > results/openminis-commit.txt
           python3 browser/.openminis/prepare_reference.py upstream --sdk iphoneos --manifest results/original-source.json
           brew install ninja llvm lld libarchive pkg-config meson
@@ -141,6 +161,8 @@ jobs:
             results/*.sha256
             results/*commit.txt
             results/browser-ref.txt
+            results/comic-build.json
+            results/verification.log
             results/native-adapters.json
             results/ipa-zip-check.txt
             results/ipa-size-audit.json

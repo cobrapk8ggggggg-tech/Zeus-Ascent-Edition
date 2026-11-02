@@ -36,6 +36,7 @@ import CoreGraphics
     @Published var storageNotice:String?
     private var work:Task<Void,Never>?
     private var epoch=UUID()
+    private var lastRenderTicket: String?
     private var frames:[String:WKFrameInfo]=[:]
     private var documents:[String:ComicEnvelope]=[:]
     private var done=Set<String>()
@@ -91,20 +92,24 @@ import CoreGraphics
         if let issue=configurationIssue {error=issue;phase = .failed;return}
         schedule()
     }
-    func navigationStarted(){pause();active=false;showingOriginal=false;phase = .idle;appliedRegions.removeAll();diagnostics.removeAll();contextNotice=nil;completed=0;ocrRuns=0;done.removeAll();failed.removeAll();frames.removeAll();documents.removeAll();readings.removeAll();textResults.removeAll();speechTexts.removeAll();fetched.removeAll();fetchedOrder.removeAll();resolvedScripts.removeAll();error=nil}
-    func pause(){resumeWhenVisible=false;paused=true;phase = .paused;retries.values.forEach{$0.cancel()};retries.removeAll();let previousTicket=epoch.uuidString;epoch=UUID();work?.cancel();work=nil;running=false;pending=false;Task{_ = try? await call("globalThis.zeusComic?.pause(ticket)",args:["ticket":previousTicket],frame:nil)};for frame in frames.values{Task{_ = try? await call("globalThis.zeusComic?.pause(ticket)",args:["ticket":previousTicket],frame:frame)}}}
+    func navigationStarted(){pause();active=false;showingOriginal=false;lastRenderTicket=nil;phase = .idle;appliedRegions.removeAll();diagnostics.removeAll();contextNotice=nil;completed=0;ocrRuns=0;done.removeAll();failed.removeAll();frames.removeAll();documents.removeAll();readings.removeAll();textResults.removeAll();speechTexts.removeAll();fetched.removeAll();fetchedOrder.removeAll();resolvedScripts.removeAll();error=nil}
+    func pause(){resumeWhenVisible=false;paused=true;phase = .paused;retries.values.forEach{$0.cancel()};retries.removeAll();let previousTicket=lastRenderTicket ?? epoch.uuidString;epoch=UUID();work?.cancel();work=nil;running=false;pending=false;Task{_ = try? await call("globalThis.zeusComic?.pause(ticket)",args:["ticket":previousTicket],frame:nil)};for frame in frames.values{Task{_ = try? await call("globalThis.zeusComic?.pause(ticket)",args:["ticket":previousTicket],frame:frame)}}}
     func suspend(){let resume = active && !paused;pause();resumeWhenVisible=resume}
     func becameVisible(){if resumeWhenVisible || (!paused && (active||preferences.automatic)){resumeWhenVisible=false;start()}}
     func restore()async{pause();showingOriginal=false;active=false;phase = .idle;appliedRegions.removeAll();for frame in frames.values{_ = try? await call("globalThis.zeusComic?.restore()",frame:frame)};_ = try? await call("globalThis.zeusComic?.restore()",frame:nil);done.removeAll();failed.removeAll();completed=0;error=nil}
     func toggleOriginal() async {
         guard active else { return }
         let show = !showingOriginal
+        let sourceTicket=lastRenderTicket
         pause()
         let ticket = epoch
         do {
-            _ = try await call("zeusComic.setOriginal(show)", args: ["show": show], frame: nil)
-            for frame in frames.values where !frame.isMainFrame {
-                _ = try await call("zeusComic.setOriginal(show)", args: ["show": show], frame: frame)
+            let arguments:[String:Any]=["show":show,"ticket":(sourceTicket.map{$0 as Any} ?? NSNull())]
+            let changed=try await call("return zeusComic.setOriginal(show,ticket)",args:arguments,frame:nil)as? Bool
+            guard changed == true else{throw CancellationError()}
+            for (document,frame) in frames where !frame.isMainFrame {
+                do { _ = try await call("return zeusComic.setOriginal(show,ticket)",args:arguments,frame:frame) }
+                catch { frames[document]=nil;contextNotice="تعذّر تبديل عرض أحد الإطارات غير المتاحة." }
             }
             try valid(ticket)
             showingOriginal = show
@@ -120,7 +125,7 @@ import CoreGraphics
             error = diagnostic.code == NSURLErrorNoPermissionsToReadFile ? "تعذّرت قراءة بيانات الصورة. أعد المحاولة؛ تفاصيل المرحلة متاحة أدناه." : "تعذّر الاتصال بمصدر الصورة أو خدمة الترجمة. تحقق من الاتصال وأعد المحاولة."
         } else { error = "تعذّرت معالجة إحدى الصور. بقي الأصل متاحًا؛ يمكنك إعادة المحاولة أو تغيير وضع القراءة." }
     }
-    private func schedule(){if running{pending=true;return};guard active && !paused else{return};let ticket=epoch;running=true;pendingImages=false;sawImages=false;sweepFailure=false;phase = .waiting
+    private func schedule(){guard active && !paused else{return};if let issue=configurationIssue {error=issue;phase = .failed;return};if running{pending=true;return};guard active && !paused else{return};let ticket=epoch;running=true;pendingImages=false;sawImages=false;sweepFailure=false;phase = .waiting
         work=Task{[weak self]in guard let self else{return};defer{if epoch==ticket{running=false;work=nil
                 if failed.isEmpty && !sweepFailure { error=nil }
                 phase = (!failed.isEmpty || sweepFailure) ? (completed > 0 ? .partial : .failed) : (pendingImages || !sawImages ? .waiting : .completed)
@@ -143,6 +148,7 @@ import CoreGraphics
         let translationMark=ComicIdentity.settings(prefs,translation:translation,provider:provider)+"|"+prefs.engine.rawValue+"|local:\(prefs.localModel)|"+ComicLocalTranslator.modelIdentity
         let mark=translationMark+"|"+prefs.renderIdentity
         let persistent=translation.keepsTranslations && !model.profile.isPrivate
+        lastRenderTicket=ticket.uuidString
         let generation=try await call("return zeusComic.resume(mark,ticket)",args:["mark":mark,"ticket":ticket.uuidString],frame:frame)as? Int ?? 0
         let value=try await call("return zeusComic.scan(wake)",args:["wake":prefs.readAhead],frame:frame)
         let data=try JSONSerialization.data(withJSONObject:value),envelope=try JSONDecoder().decode(ComicEnvelope.self,from:data)

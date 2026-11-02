@@ -65,3 +65,9 @@ test('a delayed pause from an old session cannot cancel a newer render',async()=
  s.bridge.pause('new');assert.equal(await s.bridge.apply(c.id,c.revision,'YQ==',{x:0,y:0,width:200,height:400},'ar',current),false);
  }finally{s.close()}
 });
+test('an original toggle belonging to a previous document session is rejected',async()=>{
+ const s=setup();try{fakeDecoder(s);const c=s.bridge.scan(false).items[0];const generation=s.bridge.resume('ar','current');await s.bridge.apply(c.id,c.revision,'YQ==',{x:0,y:0,width:200,height:400},'ar',generation);const translated=s.w.document.images[0].src;
+ assert.equal(s.bridge.setOriginal(true,'old'),false);assert.equal(s.w.document.images[0].src,translated);
+ assert.equal(s.bridge.setOriginal(true,'current'),true);assert.equal(s.bridge.setOriginal(false,'current'),true);assert.equal(s.w.document.images[0].src,translated);
+ }finally{s.close()}
+});
