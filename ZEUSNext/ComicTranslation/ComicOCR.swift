@@ -23,9 +23,21 @@ actor ComicOCR {
     }
     func read(_ image:CGImage,source:String,mode:ComicReadingMode,onPreparing:(@Sendable (Bool) async -> Void)? = nil)async throws->ComicReading{
         try Task.checkCancellation()
-        let detected=source == "auto" ? try await Self.detectScript(image) : source
-        let fastSupported=ComicModelStore.recognizer(detected)=="latin" || ["ja","zh","ko"].contains(where:detected.hasPrefix)
-        let fast=fastSupported ? try await self.fast(image,source:detected):[]
+        var detected=source == "auto" ? try await Self.detectScript(image) : source
+        var fastSupported=ComicModelStore.recognizer(detected)=="latin" || ["ja","zh","ko"].contains(where:detected.hasPrefix)
+        var fast=fastSupported ? try await self.fast(image,source:detected):[]
+        // An empty first hypothesis is not evidence that the panel has no text.
+        // Probe the other bundled scripts before downloading a recognizer or
+        // caching an empty reading. Explicit user language always wins.
+        if source == "auto",fast.isEmpty {
+            for alternative in ["en","ko","ja","zh"] where alternative != detected {
+                try Task.checkCancellation()
+                let candidate=try await self.fast(image,source:alternative)
+                if candidate.map(\.text).joined().filter({$0.isLetter}).count>=3 {
+                    fast=candidate;detected=alternative;fastSupported=true;break
+                }
+            }
+        }
         var lines=fast
         #if targetEnvironment(simulator)
         var runtime="Apple Vision (simulator only; ML Kit has no arm64 simulator slice)"
@@ -54,9 +66,9 @@ actor ComicOCR {
         let text=samples.map(\.text).joined(separator:" ")
         let recognizer=NLLanguageRecognizer();recognizer.processString(text)
         let scalars=text.unicodeScalars
-        if scalars.contains(where:{(0xAC00...0xD7AF).contains($0.value)}){return "ko"}
-        if scalars.contains(where:{(0x3040...0x30FF).contains($0.value)}){return "ja"}
-        if scalars.filter({(0x4E00...0x9FFF).contains($0.value)}).count>=2{return "zh"}
+        if scalars.filter({(0xAC00...0xD7AF).contains($0.value)}).count>=2{return "ko"}
+        if scalars.filter({(0x3040...0x30FF).contains($0.value)}).count>=2{return "ja"}
+        if scalars.filter({(0x4E00...0x9FFF).contains($0.value)}).count>=2{return recognizer.dominantLanguage == .japanese ? "ja":"zh"}
         return recognizer.dominantLanguage?.rawValue ?? "en"
     }
     private func fast(_ image:CGImage,source:String)async throws->[ComicLine]{

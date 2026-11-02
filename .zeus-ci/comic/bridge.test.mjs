@@ -59,3 +59,9 @@ test('a recycled image while viewing original is never overwritten by old letter
  s.w.document.images[0].src='/next.png';await new Promise(r=>setTimeout(r,0));s.bridge.setOriginal(false);assert.ok(s.w.document.images[0].src.endsWith('/next.png'));
  }finally{s.close()}
 });
+test('a delayed pause from an old session cannot cancel a newer render',async()=>{
+ const s=setup();try{fakeDecoder(s);const c=s.bridge.scan(false).items[0];const old=s.bridge.resume('ar','old');const current=s.bridge.resume('ar','new');
+ assert.notEqual(old,current);s.bridge.pause('old');assert.equal(await s.bridge.apply(c.id,c.revision,'YQ==',{x:0,y:0,width:200,height:400},'ar',current),true);
+ s.bridge.pause('new');assert.equal(await s.bridge.apply(c.id,c.revision,'YQ==',{x:0,y:0,width:200,height:400},'ar',current),false);
+ }finally{s.close()}
+});

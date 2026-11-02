@@ -20,7 +20,7 @@
   function policyOf(r) {
     const valid=new Set(['no-referrer','no-referrer-when-downgrade','origin','origin-when-cross-origin','same-origin','strict-origin','strict-origin-when-cross-origin','unsafe-url']);
     const policies=[r.original?.referrerPolicy,r.el.referrerPolicy,r.el.getAttribute('referrerpolicy'),document.referrerPolicy,document.querySelector('meta[name="referrer" i]')?.content];
-    return policies.map(v=>(v||'').trim().toLowerCase()).find(v=>valid.has(v))||'strict-origin-when-cross-origin';
+    return policies.map(v=>(v||'').trim().toLowerCase()).find(v=>valid.has(v))||null;
   }
   function sourceOf(r) { return r.original?.source || (r.kind==='canvas' ? 'canvas:'+r.id : r.kind==='background' ? absolute((/url\(["']?(.*?)["']?\)/.exec(r.el.style.backgroundImage)||[])[1]||'') : r.el.currentSrc || r.el.src || ''); }
   function release(r) {
@@ -166,6 +166,9 @@
       if(!o||!el.isConnected)continue;
       if(show) {
         release(r);r.guard?.disconnect();
+        for(const name of ['opacity','transition']){
+          if(r.written?.[name]&&css(el,name).join('\0')===r.written[name].join('\0')){putCSS(el,name,o.styles[name]);delete r.written[name];}
+        }
         const styles={};for(const name of Object.keys(o.styles))styles[name]=css(el,name);
         r.presentation={src:el.getAttribute('src'),srcset:el.getAttribute('srcset'),styles,
           sources:o.sources.map(([node])=>[node,node.getAttribute('srcset')])};

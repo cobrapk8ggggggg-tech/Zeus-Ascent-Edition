@@ -31,6 +31,21 @@ final class ImageTranslationJourneyTests: XCTestCase {
         capture("image-translation-main-settings-category")
     }
 
+    func testAppearanceShowsRendererPreviewAndFontControls() {
+        let app=launch("dualBars")
+        openTools(app,layout:"dualBars")
+        app.buttons["menu-imageTranslationSettings"].tap()
+        let appearance=app.segmentedControls.buttons["المظهر"]
+        XCTAssertTrue(appearance.waitForExistence(timeout:10));appearance.tap()
+        app.swipeUp()
+        let preview=app.descendants(matching:.any).matching(identifier:"comicLetteringPreview").firstMatch
+        XCTAssertTrue(preview.waitForExistence(timeout:10))
+        capture("image-translation-lettering-preview")
+        app.swipeUp()
+        XCTAssertTrue(app.sliders["حجم خط الصور"].waitForExistence(timeout:5))
+        capture("image-translation-typography-controls")
+    }
+
     private func startFromMenu(_ layout: String) {
         let app = launch(layout)
         let search = app.textFields["homeSearchField"]

@@ -18,6 +18,7 @@ import LocalAuthentication
     var filterTask: Task<Void, Never>?
     var translation: PageTranslation?
     var comicTranslation: ComicTranslation?
+    var comicDocumentPolicies: [String:String] = [:]
     var lastUsed = Date()
     var pinned = false
     var groupID: UUID?

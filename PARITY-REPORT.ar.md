@@ -1,5 +1,8 @@
 # تقرير استلام ZEUS وإصلاحه وتحسينه — فرع Ascent
 
+> تحديث 2026-11-02: النسب التاريخية أدناه لا تثبت تكافؤ جودة الترجمة. أصلح هذا الفرع توليد الأدلة، وأعاد تسمية المقياس إلى تغطية التحقق. التشخيص الحالي والحدود في [سجل الاعتمادية](docs/comic-translation/RELIABILITY-20261102.ar.md).
+
+
 > المستودع الجديد: **cobrapk8ggggggg-tech/Zeus-Browser-Ascent** — مكمل لفرع `feature/zeus-manhwa-translation-20261101` في Zeus-Browser، بعد قراءته كاملاً (15 commit، 14 ملف Swift، جسر JS، C++ decoder، 10 workflows، وسجل 25 تشغيل CI).
 
 ## 1) ما وجدناه: ما بناه المستخدم (ممتاز)

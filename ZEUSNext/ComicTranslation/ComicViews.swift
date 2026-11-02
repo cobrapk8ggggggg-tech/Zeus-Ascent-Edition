@@ -171,7 +171,7 @@ struct ComicSettingsSheet: View {
     private var storageSettings: some View {
         Group {
             Section("حزم قراءة الصور") {
-                Text(prefs.source == "auto" ? "تُكتشف لغة الصورة وتُجهّز حزمتها تلقائيًا عند القراءة. للتجهيز المسبق اختر لغة المصدر في قسم القراءة." : "اللغة المحددة: \(prefs.source)")
+                Text(prefs.source == "auto" ? "تُكتشف لغة الصورة وتُجهّز حزمتها تلقائيًا عند القراءة. للتجهيز المسبق اختر لغة المصدر في قسم القراءة." : "اللغة المحددة: \(ComicPreferences.sourceLanguages.first(where:{$0.0==prefs.source})?.1 ?? prefs.source)")
                     .font(.callout).foregroundStyle(.secondary)
                 if downloading {
                     ProgressView(value:downloadProgress).accessibilityLabel("تجهيز ملفات نموذج القراءة")
@@ -201,7 +201,7 @@ struct ComicSettingsSheet: View {
                 })
                 message="حزمة القراءة جاهزة."
             } catch is CancellationError { message="أُلغي التنزيل؛ يمكنك استكمال تجهيز الحزمة لاحقًا." }
-              catch { message=error.localizedDescription }
+              catch { message=Task.isCancelled ? "أُلغي تجهيز الحزمة.":error.localizedDescription }
         }
     }
     private func save(_ value:ComicPreferences) {
@@ -226,8 +226,9 @@ private struct ComicLetteringPreview: View {
         Group {
             if let image { Image(uiImage:image).resizable().scaledToFit() }
             else { RoundedRectangle(cornerRadius:24).fill(.secondary.opacity(0.1)).overlay { if failed { Text("تعذّر رسم المعاينة").font(.caption) } else { ProgressView() } } }
-        }.frame(minHeight:150,maxHeight:220).clipShape(RoundedRectangle(cornerRadius:20))
-            .accessibilityLabel("معاينة خط الترجمة داخل فقاعة")
+        }.overlay(alignment:.bottom) { if failed { Text("تعذّر تحديث المعاينة بالإعداد الحالي").font(.caption).padding(8).background(.regularMaterial,in:Capsule()) } }
+        .frame(minHeight:150,maxHeight:220).clipShape(RoundedRectangle(cornerRadius:20))
+            .accessibilityElement(children:.ignore).accessibilityLabel("معاينة خط الترجمة داخل فقاعة").accessibilityIdentifier("comicLetteringPreview")
             .task(id:preferences.renderIdentity+target) { await render() }
     }
     @MainActor private func render() async {

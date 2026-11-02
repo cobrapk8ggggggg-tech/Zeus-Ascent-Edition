@@ -248,6 +248,7 @@ import UIKit
         let encoded=try XCTUnwrap(source.pngData()).base64EncodedString()
         var imageURL=URLComponents(string:"http://127.0.0.1:8766/comic-no-referrer.png")!
         imageURL.queryItems=[URLQueryItem(name:"image",value:encoded)]
+        imageURL.percentEncodedQuery=imageURL.percentEncodedQuery?.replacingOccurrences(of:"+",with:"%2B")
         let sourceURL=crossOrigin ? imageURL.url!.absoluteString : "data:image/png;base64,"+encoded
         view.loadHTMLString("<html><body><p id='text'>Original page text stays unchanged.</p><img id='comic' referrerpolicy='no-referrer' style='width:100%;height:auto' src='\(sourceURL)'></body></html>",baseURL:URL(string:tab.url))
         var deadline=Date().addingTimeInterval(20)

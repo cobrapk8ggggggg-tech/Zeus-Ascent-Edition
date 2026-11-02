@@ -121,7 +121,8 @@ enum ComicPixels {
     private static func clean(_ context:CGContext,pixels:[UInt8],width:Int,height:Int,speech:ComicSpeech,background:(CGFloat,CGFloat,CGFloat)){
         let color=CGColor(red:background.0,green:background.1,blue:background.2,alpha:1);context.setFillColor(color)
         for line in speech.lines{
-            let box=line.rect.insetBy(dx:-1,dy:-1).integral.intersection(CGRect(x:0,y:0,width:width,height:height));guard !box.isNull else{continue}
+            let protected=speech.balloon ? speech.rect.insetBy(dx:2,dy:2):CGRect(x:0,y:0,width:width,height:height)
+            let box=line.rect.insetBy(dx:-1,dy:-1).integral.intersection(protected).intersection(CGRect(x:0,y:0,width:width,height:height));guard !box.isNull else{continue}
             for y in Int(box.minY)..<Int(box.maxY){var start:Int?
                 for x in Int(box.minX)..<Int(box.maxX){let i=(y*width+x)*4;let distance=abs(CGFloat(pixels[i])/255-background.0)+abs(CGFloat(pixels[i+1])/255-background.1)+abs(CGFloat(pixels[i+2])/255-background.2)
                     if distance>0.3{if start==nil{start=x}}else if let begin=start{context.fill(CGRect(x:max(Int(box.minX),begin-1),y:height-y-2,width:x-begin+2,height:3));start=nil}
