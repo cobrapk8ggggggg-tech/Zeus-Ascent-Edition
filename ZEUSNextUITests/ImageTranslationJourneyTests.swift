@@ -27,7 +27,20 @@ final class ImageTranslationJourneyTests: XCTestCase {
         }
         XCTAssertTrue(category.waitForExistence(timeout: 5)); category.tap()
         XCTAssertTrue(app.buttons["startImageTranslation"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.switches["ترجمة الصور تلقائيًا"].exists)
+        // SwiftUI may expose the switch with its state appended to its label,
+        // and Form realizes offscreen rows lazily. Find the named control after
+        // navigation settles, then prove that it actually changes the setting.
+        let automatic=app.switches.matching(NSPredicate(format:"label CONTAINS %@","ترجمة الصور")).firstMatch
+        for _ in 0..<6 {
+            if automatic.waitForExistence(timeout:2) && automatic.isHittable {break}
+            app.swipeUp()
+        }
+        let hierarchy=XCTAttachment(string:app.debugDescription)
+        hierarchy.name="Image translation main settings accessibility";hierarchy.lifetime = .keepAlways;add(hierarchy)
+        XCTAssertTrue(automatic.waitForExistence(timeout:5));XCTAssertTrue(automatic.isHittable)
+        if automatic.value as? String != "1" {automatic.tap()}
+        XCTAssertEqual(automatic.value as? String,"1")
+        automatic.tap();XCTAssertEqual(automatic.value as? String,"0")
         capture("image-translation-main-settings-category")
     }
 
