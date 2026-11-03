@@ -160,16 +160,26 @@ import CoreGraphics
         let ordered=envelope.items.filter{!$0.pending&&$0.width>0&&$0.height>0}.sorted{a,b in
             let d1=max(0,a.y-envelope.scroll-envelope.viewport,envelope.scroll-a.y-a.h),d2=max(0,b.y-envelope.scroll-envelope.viewport,envelope.scroll-b.y-b.h);return d1<d2
         }
-        // Bounded sweep; rescan geometry before the next window after a scroll.
-        for candidate in ordered.prefix(prefs.readAhead ? 16:4){
+        // Bound new work, not the DOM prefix: already-completed images (including
+        // fixed decorations) must never starve another visible chapter panel.
+        var startedImages=0
+        for candidate in ordered{
             try valid(ticket)
             let allRegions=ComicGeometry.regions(width:candidate.width,height:candidate.height,maximumPixels:7_000_000)
-            let regions=ComicGeometry.prioritized(allRegions,candidate:candidate,scroll:envelope.scroll,viewport:envelope.viewport,readAhead:prefs.readAhead)
+            let regions=ComicGeometry.prioritized(allRegions,candidate:candidate,scroll:envelope.scroll,viewport:envelope.viewport,readAhead:prefs.readAhead).filter{region in
+                let job="\(document)|\(candidate.id)|\(candidate.revision)|\(region.y)|\(mark)"
+                return !done.contains(job) && !failed.contains(job)
+            }
             if allRegions.isEmpty{failed.insert(candidate.id);continue}
+            if regions.isEmpty{continue}
+            if try await call("return zeusComic.has(id,revision,mark)",args:["id":candidate.id,"revision":candidate.revision,"mark":mark],frame:frame)as? Bool==true{
+                for region in regions{done.insert("\(document)|\(candidate.id)|\(candidate.revision)|\(region.y)|\(mark)")}
+                continue
+            }
+            if startedImages >= (prefs.readAhead ? 16:4){pending=true;break}
+            startedImages+=1
             for region in regions{
                 let job="\(document)|\(candidate.id)|\(candidate.revision)|\(region.y)|\(mark)"
-                if done.contains(job)||failed.contains(job){continue}
-                if try await call("return zeusComic.has(id,revision,mark)",args:["id":candidate.id,"revision":candidate.revision,"mark":mark],frame:frame)as? Bool==true{done.insert(job);continue}
                 do{
                     phase = .fetching
                     if !prefs.showUntranslated{_ = try await call("zeusComic.hold(id,revision)",args:["id":candidate.id,"revision":candidate.revision],frame:frame)}

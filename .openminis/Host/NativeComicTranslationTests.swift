@@ -698,12 +698,14 @@ import UIKit
     }
     func testEndToEndImagesDoNotTranslateDOMAndFontChangesReuseOCRAndProvider()async throws { try await runImagePipeline(crossOrigin:false) }
     func testCrossOriginNoReferrerImagesTranslateThroughNativeFetch()async throws { try await runImagePipeline(crossOrigin:true) }
-    private func runImagePipeline(crossOrigin:Bool)async throws{
+    func testCompletedImagesCannotStarveOtherVisiblePanels()async throws { try await runImagePipeline(crossOrigin:false,panelCount:6) }
+    private func runImagePipeline(crossOrigin:Bool,panelCount:Int=1)async throws{
         let root=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let model=BrowserModel(profiles:ProfileStore(root:root,downloadsRoot:root.appendingPathComponent("Downloads")),useBackgroundDownloads:false)
         model.data.settings.shieldsEnabled=false
         var provider=AIProviderConfiguration();provider.baseURL="http://127.0.0.1:8765/v1";provider.model="comic-"+UUID().uuidString;model.data.settings.aiProviders=[provider]
         var preferences=ComicPreferences();preferences.source="en";preferences.showUntranslated=true
+        if panelCount>1{preferences.readAhead=false}
         var translation=TranslationPreferences();translation.engine = .ai;translation.providerID=provider.id;preferences.translation=translation;model.data.settings.comicTranslation=preferences
         let tab=try XCTUnwrap(model.current);tab.url="http://127.0.0.1:8765/comic-end-to-end"
         let prepared=await model.prepare(tab),view=try XCTUnwrap(prepared),session=try XCTUnwrap(tab.comicTranslation)
@@ -716,16 +718,25 @@ import UIKit
         imageURL.queryItems=[URLQueryItem(name:"image",value:encoded)]
         imageURL.percentEncodedQuery=imageURL.percentEncodedQuery?.replacingOccurrences(of:"+",with:"%2B")
         let sourceURL=crossOrigin ? imageURL.url!.absoluteString : "data:image/png;base64,"+encoded
-        view.loadHTMLString("<html><body><p id='text'>Original page text stays unchanged.</p><img id='comic' referrerpolicy='no-referrer' style='width:100%;height:auto' src='\(sourceURL)'></body></html>",baseURL:URL(string:tab.url))
+        // Overlapping fixed artwork and a later panel are all viewport-near,
+        // exactly as in the reported reader's promotional overlay. Finishing
+        // the first four must make room for the remaining visible images.
+        let images=(0..<panelCount).map{index in
+            let style=panelCount>1 ? "position:absolute;width:240px;height:90px;left:0;top:\(60+index*12)px":"width:100%;height:auto"
+            return "<img referrerpolicy='no-referrer' style='\(style)' src='\(sourceURL)'>"
+        }.joined()
+        view.loadHTMLString("<html><body><p id='text'>Original page text stays unchanged.</p>\(images)</body></html>",baseURL:URL(string:tab.url))
         var deadline=Date().addingTimeInterval(20)
-        while Date()<deadline{if (try? await view.callAsyncJavaScript("return !!globalThis.zeusComic && document.images[0]?.complete",arguments:[:],in:nil,contentWorld:ComicTranslation.world))as? Bool==true{break};try await Task.sleep(for:.milliseconds(100))}
+        while Date()<deadline{if (try? await view.callAsyncJavaScript("return !!globalThis.zeusComic && [...document.images].every(i=>i.complete)",arguments:[:],in:nil,contentWorld:ComicTranslation.world))as? Bool==true{break};try await Task.sleep(for:.milliseconds(100))}
         if crossOrigin {
             let tainted=try await view.evaluateJavaScript("(()=>{try{const c=document.createElement('canvas');c.width=640;c.height=240;c.getContext('2d').drawImage(document.images[0],0,0);c.toDataURL();return false}catch(e){return e.name==='SecurityError'}})()")as? Bool
             XCTAssertEqual(tainted,true,"Fixture must exercise native fallback after canvas is tainted")
         }
         session.start();deadline=Date().addingTimeInterval(35)
-        while Date()<deadline && (session.running||session.completed==0) && session.error==nil{try await Task.sleep(for:.milliseconds(100))}
-        XCTAssertNil(session.error);XCTAssertGreaterThan(session.completed,0)
+        while Date()<deadline && (session.running||session.completed<panelCount) && session.error==nil{try await Task.sleep(for:.milliseconds(100))}
+        XCTAssertNil(session.error);XCTAssertEqual(session.completed,panelCount)
+        let paintedCount=try await view.evaluateJavaScript("[...document.images].filter(i=>i.src.startsWith('blob:')).length")as? Int
+        XCTAssertEqual(paintedCount,panelCount,"Completed DOM images must not consume the next work budget")
         let unchanged=try await view.evaluateJavaScript("document.querySelector('#text').textContent")as? String
         XCTAssertEqual(unchanged,"Original page text stays unchanged.")
         let sourceBefore=try await view.evaluateJavaScript("document.images[0].src")as? String
