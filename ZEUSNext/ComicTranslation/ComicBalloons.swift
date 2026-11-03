@@ -51,7 +51,6 @@ enum ComicBalloons {
     private static func overlap(_ a:CGRect,_ b:CGRect)->CGFloat{let intersection=a.intersection(b);guard !intersection.isNull else{return 0};return intersection.width*intersection.height/max(1,min(a.width*a.height,b.width*b.height))}
     private struct Plate{var rect:CGRect;var mask:[UInt8];var width:Int;var height:Int;var color:[UInt8];var uniform:Bool}
     private static func flatCleanup(_ plate:Plate,lines:[ComicLine],lobe:CGRect,pixels:[UInt8],width:Int,height:Int)->ComicFlatCleanup?{
-        guard plate.uniform else{return nil}
         let x=Int(plate.rect.minX)-1,y=Int(plate.rect.minY)-1
         let area=lobe.offsetBy(dx:-CGFloat(x),dy:-CGFloat(y)).integral
         let boxes:[Int32]=lines.flatMap{line in
@@ -68,6 +67,7 @@ enum ComicBalloons {
                 return zeus_comic_mask_coverage(p.baseAddress,m.baseAddress,Int32(plate.width),Int32(plate.height),Int32(r.minX),Int32(r.minY),Int32(r.maxX),Int32(r.maxY))>=0.95
             }}}
         }
+        if !plate.uniform && !complete{return nil}
         var runs:[Int]=[]
         if complete{for yy in 0..<plate.height{
             var xx=0
@@ -78,7 +78,7 @@ enum ComicBalloons {
                 runs += [start+x,yy+y,xx-start]
             }
         }}
-        return ComicFlatCleanup(color:plate.color,runs:runs,complete:complete)
+        return ComicFlatCleanup(color:plate.color,uniform:plate.uniform,runs:runs,complete:complete)
     }
     // A line may contain words from both connected balloons. Only split that
     // line when its measured word boxes acquire different shape owners.

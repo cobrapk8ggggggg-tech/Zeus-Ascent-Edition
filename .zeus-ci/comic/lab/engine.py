@@ -34,7 +34,19 @@ class Engine:
         x=flat['origin'][0]-origin[0];y=flat['origin'][1]-origin[1];mh,mw=flat['mask'].shape
         l=max(0,x);t=max(0,y);r=min(w,x+mw);b=min(h,y+mh)
         if r>l and b>t:mask[t:b,l:r]=flat['mask'][t-y:b-y,l-x:r-x]
-        result[mask>0]=flat['color'];return result,mask,True
+        if flat['uniform']:result[mask>0]=flat['color'];return result,mask,True
+        boxes=[[a-origin[0],c-origin[1],d-origin[0],f-origin[1]]for a,c,d,f in flat['boxes']]
+        if not self.simple_background(rgb,mask,boxes):return result,mask,False
+        source=np.ascontiguousarray(cv2.cvtColor(rgb,cv2.COLOR_RGB2RGBA));target=source.copy();merged=[]
+        for a,c,d,f in boxes:
+            pad=max(3,min(d-a,f-c)*.18);box=[max(1,int(a-pad)),max(1,int(c-pad)),min(w-1,int(np.ceil(d+pad))),min(h-1,int(np.ceil(f+pad)))]
+            while True:
+                overlaps=[q for q in merged if min(q[2],box[2])>max(q[0],box[0]) and min(q[3],box[3])>max(q[1],box[1])]
+                if not overlaps:break
+                for q in overlaps:merged.remove(q);box=[min(q[0],box[0]),min(q[1],box[1]),max(q[2],box[2]),max(q[3],box[3])]
+            merged.append(box)
+        for box in merged:self.lib.clean_mask(source,target,mask,w,h,*box)
+        return target[:,:,:3],mask,True
     def ink_style(self,rgb,boxes):
         u8=np.ctypeslib.ndpointer(dtype=np.uint8,flags='C_CONTIGUOUS');i32=np.ctypeslib.ndpointer(dtype=np.int32,flags='C_CONTIGUOUS');f32=np.ctypeslib.ndpointer(dtype=np.float32,flags='C_CONTIGUOUS')
         self.lib.ink_style.argtypes=[u8,ctypes.c_int,ctypes.c_int,i32,ctypes.c_int,f32];self.lib.ink_style.restype=ctypes.c_float

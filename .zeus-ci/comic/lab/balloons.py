@@ -52,14 +52,14 @@ def paragraphs(rgb,lines,include_layout=False,engine=None,include_cleanup=False)
   for p,g in lobes:
    if not g:continue
    flat=None
-   if engine is not None and colors[tuple(original_plate)][1]:
+   if engine is not None:
     xx,yy,rr,bb=original_plate;origin=[xx-1,yy-1];paper=shapes[tuple(original_plate)];boxes=[]
     for line in g:
      a,c,d,f=line['box'];pad=max(8,min(d-a,f-c)*.3);boxes.append([int(np.floor(a-pad-xx+1)),int(np.floor(c-pad-yy+1)),int(np.ceil(d+pad-xx+1)),int(np.ceil(f+pad-yy+1))])
     mask,complete=engine.flat_balloon_mask(paper,boxes,[p[0]-xx+1,p[1]-yy+1,p[2]-xx+1,p[3]-yy+1])
     tight=[[l['box'][0]-xx+1,l['box'][1]-yy+1,l['box'][2]-xx+1,l['box'][3]-yy+1]for l in g]
     if complete:complete=engine.safe_to_letter(np.ascontiguousarray(rgb[yy-1:bb+1,xx-1:rr+1]),mask,tight)
-    flat=dict(mask=mask,complete=complete,color=colors[tuple(original_plate)][0],origin=origin)
+    if complete or colors[tuple(original_plate)][1]:flat=dict(mask=mask,complete=complete,color=colors[tuple(original_plate)][0],uniform=colors[tuple(original_plate)][1],origin=origin,boxes=[l['box']for l in g])
 
    x,y,r,b=p;dx=(r-x)*.15;dy=(b-y)*.15
    area=[max(x+2,min(x+dx,min(l['box'][0]-3 for l in g))),max(y+2,min(y+dy,min(l['box'][1]-3 for l in g))),min(r-2,max(r-dx,max(l['box'][2]+3 for l in g))),min(b-2,max(b-dy,max(l['box'][3]+3 for l in g)))]

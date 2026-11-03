@@ -329,7 +329,10 @@ import UIKit
         }.cgImage!}
         let source=raster(text:true),clean=raster(text:false),line=ComicLine(text:"HELLO",confidence:1,rect:CGRect(x:38,y:50,width:180,height:58),glyphHeight:40)
         let speech=ComicSpeech(id:"0",text:"HELLO",lines:[line],rect:CGRect(x:30,y:30,width:270,height:100),vertical:false,balloon:false)
+        let sourceAttachment=XCTAttachment(image:UIImage(cgImage:source));sourceAttachment.name="Native UIKit outlined source used for appearance inference";sourceAttachment.lifetime = .keepAlways;add(sourceAttachment)
         let style=try XCTUnwrap(ComicPixels.appearance(source,speech:speech))
+        let fillRGB=try XCTUnwrap(style.fill.converted(to:CGColorSpace(name:CGColorSpace.sRGB)!,intent:.defaultIntent,options:nil)?.components)
+        XCTAssertLessThan(fillRGB[0],0.15,"Black source ink must remain black, independently of the larger white outline")
         XCTAssertNotNil(style.stroke);XCTAssertGreaterThan(style.strokePercent,2)
         let colored=try ComicPixels.render(clean,speeches:[speech],translations:[TranslationSegment(id:"0",text:"مرحبا")],target:"ar",fontName:nil,fontScale:1,precleanedIDs:["0"],styleSource:source)
         let plain=try ComicPixels.render(clean,speeches:[speech],translations:[TranslationSegment(id:"0",text:"مرحبا")],target:"ar",fontName:nil,fontScale:1,textColor:"000000",ink:.plain,precleanedIDs:["0"])
@@ -482,11 +485,24 @@ import UIKit
         XCTAssertEqual(decoded.settings.translation?.target,"fr");XCTAssertEqual(decoded.settings.comicTranslation?.translation?.target,"ar")
         XCTAssertEqual(ComicPreferences().mode,.balanced)
     }
+    func testGoogleImageBatchRetriesOnlyMissingRowsAndKeepsSuccessfulDialogues()async throws{
+        let config=URLSessionConfiguration.ephemeral;config.protocolClasses=[ComicGoogleStub.self]
+        let session=URLSession(configuration:config);defer{session.invalidateAndCancel()}
+        let input=[TranslationSegment(id:"a",text:"HELLO"),TranslationSegment(id:"b",text:"SFX"),TranslationSegment(id:"c",text:"GOODBYE")]
+        ComicGoogleStub.reset([["مرحبا",NSNull(),"وداعا"],["صوت"]])
+        let complete=try await ComicWebEngines.translate(input,source:"en",target:"ar",engine:.google,secret:"",session:session)
+        XCTAssertEqual(complete.map(\.id),["a","b","c"]);XCTAssertEqual(complete.map(\.text),["مرحبا","صوت","وداعا"])
+        XCTAssertEqual(ComicGoogleStub.requests().count,2)
+        XCTAssertEqual(ComicGoogleStub.requests().last?.httpBody.flatMap{String(data:$0,encoding:.utf8)},"q=SFX","Only the failed source must be retried")
+        ComicGoogleStub.reset([["مرحبا",NSNull(),"وداعا"],[NSNull()]])
+        do{_ = try await ComicWebEngines.translate(input,source:"en",target:"ar",engine:.google,secret:"",session:session);XCTFail("An untranslated SFX must remain explicit")}
+        catch let partial as ComicPartialTranslation{XCTAssertEqual(partial.translated.map(\.id),["a","c"]);XCTAssertEqual(partial.failedIDs,["b"])}
+    }
     func testVioletFastestOCRAndFlatBalloonsDoNotNeedRestoration()async throws{
         let(data,_)=try await URLSession.shared.data(from:URL(string:"http://127.0.0.1:8765/comic-violet/image/001.jpeg")!)
         let image=try ComicPixels.decode(data),began=Date()
         let reading=try await ComicOCR.shared.read(image,source:"auto",mode:.fastest)
-        let flat=reading.speeches.filter{$0.flatCleanup?.complete==true}
+        let flat=reading.speeches.filter{$0.flatCleanup?.complete==true && $0.flatCleanup?.uniform==true}
         XCTAssertGreaterThanOrEqual(flat.count,4,"The exact reported chapter must discover and clean ordinary dialogues without LaMa")
         XCTAssertTrue(reading.speeches.contains{$0.text.localizedCaseInsensitiveContains("PARDON")},"The first dialogue must be recognized in the original language")
         let restoration=try await ComicRestoration.shared.restore(image,speeches:flat,requiredHeadroom:0)
@@ -628,4 +644,26 @@ import UIKit
         let found=await ComicMemory.shared.data(profile:first,layer:.reading,key:"same"),other=await ComicMemory.shared.data(profile:second,layer:.reading,key:"same"),translation=await ComicMemory.shared.data(profile:first,layer:.translation,key:"same")
         XCTAssertEqual(found,bytes);XCTAssertNil(other);XCTAssertNil(translation);try await ComicMemory.shared.clear(profile:first)
     }
+}
+
+private final class ComicGoogleStub:URLProtocol{
+    private static let guardLock=NSLock()
+    private static var replies:[Data]=[]
+    private static var sent:[URLRequest]=[]
+    static func reset(_ values:[[Any]]){guardLock.lock();defer{guardLock.unlock()};replies=values.map{try! JSONSerialization.data(withJSONObject:$0)};sent=[]}
+    static func requests()->[URLRequest]{guardLock.lock();defer{guardLock.unlock()};return sent}
+    override class func canInit(with request:URLRequest)->Bool{request.url?.host=="translate.googleapis.com"}
+    override class func canonicalRequest(for request:URLRequest)->URLRequest{request}
+    override func startLoading(){
+        var captured=request
+        if captured.httpBody==nil,let stream=request.httpBodyStream{
+            stream.open();defer{stream.close()};var body=Data(),buffer=[UInt8](repeating:0,count:4096)
+            while body.count<65536{let n=stream.read(&buffer,maxLength:buffer.count);if n<=0{break};body.append(contentsOf:buffer.prefix(n))}
+            captured.httpBody=body
+        }
+        Self.guardLock.lock();Self.sent.append(captured);let data=Self.replies.isEmpty ? Data("[]".utf8):Self.replies.removeFirst();Self.guardLock.unlock()
+        let response=HTTPURLResponse(url:request.url!,statusCode:200,httpVersion:"HTTP/1.1",headerFields:["Content-Type":"application/json"] )!
+        client?.urlProtocol(self,didReceive:response,cacheStoragePolicy:.notAllowed);client?.urlProtocol(self,didLoad:data);client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading(){}
 }

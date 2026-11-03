@@ -358,7 +358,8 @@ static inline float comic_ink_style(const unsigned char *rgba,int w,int h,const 
     int fill=palette[0],stroke=-1;float best=0,strokePercent=0;
     auto energy=[&](int k){return double(hist[k])*delta(k,bg)*delta(k,bg);};
     for(int k:palette)if(energy(k)>energy(fill))fill=k;
-    for(int a:palette)for(int b:palette)if(a!=b&&delta(a,b)>=160&&hist[b]<hist[a]*4){
+    int sampled=0;for(int k=0;k<512;k++)sampled+=hist[k];
+    for(int a:palette)for(int b:palette)if(a!=b&&delta(a,b)>=160&&hist[b]<sampled*.7f){
         // A colour lying inside the fill-to-paper antialias ramp is not a
         // separate outline. Its apparent band changes with JPEG/raster sampling.
         float dot=0,length=0;for(int c=0;c<3;c++){float u=center(bg,c)-center(a,c),v=center(b,c)-center(a,c);dot+=u*v;length+=u*u;}
@@ -372,8 +373,8 @@ static inline float comic_ink_style(const unsigned char *rgba,int w,int h,const 
             return winner;
         };
         for(int y=1;y<h-1;y++)for(int x=1;x<w-1;x++){int p=y*w+x;if(!roi[p])continue;int k=key(p);if(k!=a&&k!=b)continue;
-            bool core=true;
-            for(int d:{-1,1,-w,w}){int q=classify(p+d);if(q==k)continue;core=false;
+            int same=0;
+            for(int d:{-1,1,-w,w}){int q=classify(p+d);if(q==k){same++;continue;}
                 // Cross the thin antialias ramp to the next solid ink. Classing
                 // its middle grey as background would lose half every boundary.
                 for(int step=2;step<=3&&q!=a&&q!=b;step++){
@@ -384,7 +385,7 @@ static inline float comic_ink_style(const unsigned char *rgba,int w,int h,const 
                 if(k==a){if(q==b)ab++;else if(q!=a)otherA++;}
                 else if(q!=a&&q!=b)otherB++;
             }
-            if(k==a&&core)cores++;
+            if(k==a&&same>=2)cores++;
         }
         float enclosure=float(ab)/std::max(1,ab+otherA),outer=float(otherB)/std::max(1,ab+otherB);
         float thickness=float(hist[b])/std::max(1,ab);
@@ -430,12 +431,34 @@ static inline float comic_ink_style(const unsigned char *rgba,int w,int h,const 
 // glyph-shaped holes. Fill those holes only after every one has an OCR owner;
 // the exterior and balloon border can never enter this mask.
 static inline bool comic_flat_balloon_mask(const unsigned char *paper,unsigned char *mask,int w,int h,int left,int top,int right,int bottom,const int *boxes,int count){
-    if(!paper||!mask||!boxes||w<3||h<3||int64_t(w)*h>1000000||count<1)return false;
+    if(!paper||!mask||!boxes||w<3||h<3||int64_t(w)*h>1000000||count<1||count>2000)return false;
     left=std::clamp(left,1,w-1);right=std::clamp(right,1,w-1);top=std::clamp(top,1,h-1);bottom=std::clamp(bottom,1,h-1);
     std::vector<unsigned char> outside(w*h,0),holes(w*h,0);std::vector<int> queue;
     auto enqueue=[&](int p){if(!paper[p]&&!outside[p]){outside[p]=1;queue.push_back(p);}};
     for(int x=0;x<w;x++){enqueue(x);enqueue((h-1)*w+x);}for(int y=1;y<h-1;y++){enqueue(y*w);enqueue(y*w+w-1);}
     for(size_t i=0;i<queue.size();i++){int p=queue[i],x=p%w,y=p/w;if(x)enqueue(p-1);if(x+1<w)enqueue(p+1);if(y)enqueue(p-w);if(y+1<h)enqueue(p+w);}
+    // White letter outlines can touch a balloon through a one-pixel bridge.
+    // Retain shape cores supported by this dialogue, excluding those attached
+    // ornaments while keeping every missing line inside the actual balloon.
+    std::vector<int> d(w*h,0);std::vector<int> glyphs;
+    for(int i=0;i<count;i++)glyphs.push_back(std::min(boxes[i*4+2]-boxes[i*4],boxes[i*4+3]-boxes[i*4+1]));
+    std::sort(glyphs.begin(),glyphs.end());int radius=std::clamp(glyphs[count/2]/5,3,12);
+    for(int p=0;p<w*h;p++)d[p]=outside[p]?0:w+h;
+    for(int y=0;y<h;y++)for(int x=0;x<w;x++){int p=y*w+x;if(d[p])d[p]=std::min({d[p],x?d[p-1]+1:1,y?d[p-w]+1:1});}
+    for(int y=h-1;y>=0;y--)for(int x=w-1;x>=0;x--){int p=y*w+x;if(d[p])d[p]=std::min({d[p],x+1<w?d[p+1]+1:1,y+1<h?d[p+w]+1:1});}
+    std::vector<int> labels(w*h,0);int components=0;
+    for(int p=0;p<w*h;p++)if(d[p]>=radius&&!labels[p]){
+        components++;queue.assign(1,p);labels[p]=components;
+        for(size_t k=0;k<queue.size();k++){int q=queue[k],x=q%w,y=q/w;auto visit=[&](int r){if(d[r]>=radius&&!labels[r]){labels[r]=components;queue.push_back(r);}};if(x)visit(q-1);if(x+1<w)visit(q+1);if(y)visit(q-w);if(y+1<h)visit(q+w);}
+    }
+    std::vector<unsigned char> keep(components+1,0);bool supported=false;
+    for(int i=0;i<count;i++){int x=std::clamp((boxes[i*4]+boxes[i*4+2])/2,0,w-1),y=std::clamp((boxes[i*4+1]+boxes[i*4+3])/2,0,h-1),c=labels[y*w+x];if(c){keep[c]=1;supported=true;}}
+    if(supported){
+        for(int p=0;p<w*h;p++)d[p]=labels[p]&&keep[labels[p]]?0:w+h;
+        for(int y=0;y<h;y++)for(int x=0;x<w;x++){int p=y*w+x;d[p]=std::min({d[p],x?d[p-1]+1:w+h,y?d[p-w]+1:w+h});}
+        for(int y=h-1;y>=0;y--)for(int x=w-1;x>=0;x--){int p=y*w+x;d[p]=std::min({d[p],x+1<w?d[p+1]+1:w+h,y+1<h?d[p+w]+1:w+h});}
+        for(int p=0;p<w*h;p++)if(d[p]>=radius)outside[p]=1;
+    }
     int ink=0;for(int y=top;y<bottom;y++)for(int x=left;x<right;x++)if(!paper[y*w+x]&&!outside[y*w+x]){holes[y*w+x]=255;ink++;}
     if(ink<4||!comic_mask_owned(holes.data(),w,h,left,top,right,bottom,boxes,count))return false;
     for(int y=top;y<bottom;y++)for(int x=left;x<right;x++)if(holes[y*w+x])for(int dy=-1;dy<=1;dy++)for(int dx=-1;dx<=1;dx++){

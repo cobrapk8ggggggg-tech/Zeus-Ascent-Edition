@@ -76,6 +76,9 @@ jobs:
         if: matrix.sdk == 'iphonesimulator'
         timeout-minutes: 15
         run: python3 .zeus-ci/comic/boot_simulator.py "$COMIC_SIMULATOR"
+      - name: Download the exact Violet chapter pixels
+        if: matrix.sdk == 'iphonesimulator'
+        run: python3 .zeus-ci/comic/prepare_violet.py
       - name: Start deterministic provider fixture
         if: matrix.sdk == 'iphonesimulator'
         run: |
@@ -102,6 +105,7 @@ jobs:
           git rev-parse HEAD > results/source-commit.txt
           if [ -f results/comic.xcresult/Info.plist ]; then
             xcrun xcresulttool get test-results summary --path results/comic.xcresult > results/summary.json
+            xcrun xcresulttool export attachments --path results/comic.xcresult --output-path results/screenshots
           fi
       - uses: actions/upload-artifact@v4
         if: always()

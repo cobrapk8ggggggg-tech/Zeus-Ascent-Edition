@@ -73,7 +73,7 @@ final class ImageTranslationJourneyTests: XCTestCase {
         let ready=NSPredicate{_,_ in
             guard translated.exists else{return false}
             let values=translated.label.components(separatedBy:"·").last ?? ""
-            return values.range(of:"[1-9١-٩][0-9٠-٩]*",options:.regularExpression) != nil
+            let digits=values.compactMap{$0.wholeNumberValue};return digits.reduce(0){$0*10+$1}>=4
         }
         expectation(for:ready,evaluatedWith:nil);waitForExpectations(timeout:85)
         let hierarchy=XCTAttachment(string:app.debugDescription);hierarchy.name="Violet actual app - fastest, auto language, restoration off";hierarchy.lifetime = .keepAlways;add(hierarchy)

@@ -194,7 +194,7 @@ import CoreGraphics
                     let window=try await Task.detached{try ComicWindow.join(center,before:before,after:after)}.value
                     let image=window.image,offset=window.offset
                     let imageHash=try await Task.detached{ComicIdentity.hash(try ComicPixels.png(image))}.value
-                    let readingKey=imageHash+"|ocr-v14|\(prefs.source)|\(prefs.mode.rawValue)|vote:\(region.coreTop+offset):\(region.coreBottom-region.coreTop)"
+                    let readingKey=imageHash+"|ocr-v15|\(prefs.source)|\(prefs.mode.rawValue)|vote:\(region.coreTop+offset):\(region.coreBottom-region.coreTop)"
                     phase = .recognizing
                     let reading:ComicReading
                     if let saved=readings[readingKey]{reading=saved}
@@ -222,18 +222,39 @@ import CoreGraphics
                     else if persistent,let stored=await ComicMemory.shared.data(profile:owner,layer:.translation,key:translationKey),let saved=try? JSONDecoder().decode([TranslationSegment].self,from:stored){translated=saved}
                     else{translated=try await translateSpeeches(segments,reading:reading,namespace:translationMark+"|"+ComicIdentity.hash(envelope.url),profile:owner,persistent:persistent,preferences:prefs,translation:translation,provider:provider,ticket:ticket)
                         try valid(ticket)
-                        if persistent{do{try await ComicMemory.shared.save(JSONEncoder().encode(translated),profile:owner,layer:.translation,key:translationKey)}catch{storageNotice="تعذّر حفظ الترجمة على الجهاز."}}
+                        if persistent && translated.count==segments.count{do{try await ComicMemory.shared.save(JSONEncoder().encode(translated),profile:owner,layer:.translation,key:translationKey)}catch{storageNotice="تعذّر حفظ الترجمة على الجهاز."}}
                     }
-                    if textResults.count>=64{textResults.removeAll()};textResults[translationKey]=translated
+                    if translated.count==segments.count{if textResults.count>=64{textResults.removeAll()};textResults[translationKey]=translated}
                     try valid(ticket);phase = .rendering
                     let renderedKey=translationKey+"|"+prefs.renderIdentity
                     let rendered:Data
-                    var renderingPartial=false
+                    var renderingPartial=translated.count != segments.count
                     if persistent,let stored=await ComicMemory.shared.data(profile:owner,layer:.rendered,key:renderedKey){rendered=stored;countTexts(job,detected:counted.count,translated:counted.count)}
                     else{
                         let lettering=translated.map{TranslationSegment(id:$0.id,text:prefs.letterCase.apply($0.text))}
                         let eligible=await Task.detached{ComicPixels.restorableSpeeches(core,translations:lettering,width:image.width,height:image.height,target:translation.target,fontName:prefs.fontName,fontScale:prefs.fontScale,letterSpacing:prefs.letterSpacing ?? 0)}.value
                         try valid(ticket)
+                        // Paint ready flat/light dialogues before waiting for any
+                        // complex artwork. One slow SFX must not hide the page.
+                        if prefs.restorationEnabled ?? true{
+                            let ready=await Task.detached{()->Int in
+                                guard let pixels=ComicPixels.rgba(image,width:image.width,height:image.height)else{return 0}
+                                return eligible.filter{ComicPixels.canClean(pixels,width:image.width,height:image.height,speech:$0)}.count
+                            }.value
+                            if ready>0 && ready<eligible.count{
+                                let preview=try await Task.detached{()->(Data,[String]) in
+                                    let report=try ComicPixels.renderReport(image,speeches:core,translations:lettering,target:translation.target,fontName:prefs.fontName,fontScale:prefs.fontScale,textColor:prefs.textColor,ink:prefs.inkStyle,letterSpacing:prefs.letterSpacing ?? 0,requireCleanSource:true)
+                                    let area=CGRect(x:0,y:region.coreTop+offset,width:region.width,height:region.coreBottom-region.coreTop)
+                                    guard let crop=report.image.cropping(to:area)else{throw ComicFailure.message("تعذّر تجهيز النصوص الجاهزة.")};return(try ComicPixels.png(crop),report.unresolved)
+                                }.value
+                                try valid(ticket)
+                                let area=["x":0,"y":region.y+region.coreTop,"width":region.width,"height":region.coreBottom-region.coreTop]
+                                if try await apply(preview.0,candidate:candidate,region:area,mark:mark,generation:generation,frame:frame,ticket:ticket){
+                                    countTexts(job,detected:counted.count,translated:counted.filter{source in translated.contains{$0.id==source.id} && !preview.1.contains(source.id)}.count)
+                                    appliedRegions.insert("\(document)|\(candidate.id)|\(candidate.revision)|\(region.y)");completed=appliedRegions.count
+                                }
+                            }
+                        }
                         let restored:ComicRestoration.Result
                         if prefs.restorationEnabled ?? true{
                             restored=try await ComicRestoration.shared.restore(image,speeches:eligible,onPreparing:{ [weak self] preparing in
@@ -247,7 +268,7 @@ import CoreGraphics
                         let rect=CGRect(x:0,y:region.coreTop+offset,width:region.width,height:region.coreBottom-region.coreTop)
                         guard let crop=drawing.image.cropping(to:rect)else{throw ComicFailure.message("تعذّر قص منطقة الرسم.")};return (try ComicPixels.png(crop),drawing.unresolved)}.value
                         rendered=result.0
-                        countTexts(job,detected:counted.count,translated:counted.filter{!result.1.contains($0.id)}.count)
+                        countTexts(job,detected:counted.count,translated:counted.filter{source in translated.contains{$0.id==source.id} && !result.1.contains(source.id)}.count)
                         if !result.1.isEmpty{renderingPartial=true;sweepFailure=true;contextNotice="احتُفظ ببعض النصوص الأصلية لعدم اكتمال تنظيفها أو ملاءمة خطها."}
                         try valid(ticket)
                         if persistent && !renderingPartial{do{try await ComicMemory.shared.save(rendered,profile:owner,layer:.rendered,key:renderedKey)}catch{storageNotice="تعذّر حفظ الصورة المترجمة؛ النص المحفوظ يظل متاحًا."}}
@@ -256,7 +277,8 @@ import CoreGraphics
                     let outputRegion:[String:Int]=["x":0,"y":region.y+region.coreTop,"width":region.width,"height":region.coreBottom-region.coreTop]
                     let applied=try await apply(rendered,candidate:candidate,region:outputRegion,mark:mark,generation:generation,frame:frame,ticket:ticket)
                     guard applied else{throw ComicFailure.message("لم يسمح الموقع بعرض الصورة المترجمة؛ بقي الأصل متاحًا.")}
-                    done.insert(job);appliedRegions.insert("\(document)|\(candidate.id)|\(candidate.revision)|\(region.y)");completed=appliedRegions.count
+                    if renderingPartial{failed.insert(job)}else{done.insert(job)}
+                    appliedRegions.insert("\(document)|\(candidate.id)|\(candidate.revision)|\(region.y)");completed=appliedRegions.count
                 }catch is CancellationError{throw CancellationError()}catch{try valid(ticket);failed.insert(job);self.record(error,at:phase)
                     let diagnostic=ComicDiagnostic.capture(error,phase:phase),attempt=retryCounts[job,default:0]
                     if diagnostic.retryable && attempt<2 {
@@ -281,7 +303,7 @@ import CoreGraphics
     private func translateSpeeches(_ segments:[TranslationSegment],reading:ComicReading,namespace:String,profile:UUID,persistent:Bool,preferences:ComicPreferences,translation:TranslationPreferences,provider:AIProviderConfiguration?,ticket:UUID)async throws->[TranslationSegment]{
         let namespace=namespace+"|"+reading.language
         func key(_ text:String)->String{ComicIdentity.hash(namespace+"\0"+text)}
-        var values:[String:String]=[:]
+        var values:[String:String]=[:],failedTexts=Set<String>()
         for segment in segments{if let value=speechTexts[key(segment.text)]{values[segment.text]=value}}
         if persistent{let saved=await ComicMemory.shared.lookupText(segments,namespace:namespace,profile:profile);values.merge(saved){_,saved in saved}}
         try valid(ticket)
@@ -294,24 +316,39 @@ import CoreGraphics
             do {
                 response=try await ComicTextTranslator.translate(missing,source:reading.language,target:translation.target,preferences:translation,provider:provider,secret:AISecretVault.read(profile:profile,provider:translation.secretKey(provider:provider)),local:preferences.localModel,engine:preferences.engine,engineSecret:AISecretVault.read(profile:profile,provider:"comic-"+preferences.engine.rawValue),context:preceding,following:following)
             } catch is CancellationError { throw CancellationError() }
-              catch {
+              catch let partial as ComicPartialTranslation {
+                response=partial.translated
+                let originals=Dictionary(uniqueKeysWithValues:missing.map{($0.id,$0.text)})
+                failedTexts.formUnion(partial.failedIDs.compactMap{originals[$0]})
+                contextNotice=partial.localizedDescription;sweepFailure=true
+              } catch {
                 try valid(ticket)
                 guard preferences.allowOnlineFallback == true,!preferences.localModel,preferences.engine != .google else{throw error}
                 contextNotice="استُخدم Google بعد تعذّر المحرك المختار، وفق إعداد الرجوع الذي فعّلته."
-                response=try await ComicWebEngines.translate(missing,source:reading.language,target:translation.target,engine:.google,secret:"")
+                do{response=try await ComicWebEngines.translate(missing,source:reading.language,target:translation.target,engine:.google,secret:"")}
+                catch let partial as ComicPartialTranslation{
+                    response=partial.translated
+                    let originals=Dictionary(uniqueKeysWithValues:missing.map{($0.id,$0.text)})
+                    failedTexts.formUnion(partial.failedIDs.compactMap{originals[$0]})
+                    contextNotice=partial.localizedDescription;sweepFailure=true
+                }
             }
             try valid(ticket)
             let originals=Dictionary(uniqueKeysWithValues:missing.map{($0.id,$0.text)})
             var fresh:[String:String]=[:]
             for item in response{if let original=originals[item.id]{fresh[original]=item.text}}
-            guard fresh.count==missing.count else{throw ComicFailure.message("رد الترجمة لا يطابق الفقاعات.")}
+            guard fresh.count+failedTexts.count==missing.count else{throw ComicFailure.message("رد الترجمة لا يطابق الفقاعات.")}
             values.merge(fresh){_,new in new}
             if persistent,!(await ComicMemory.shared.saveText(fresh,namespace:namespace,profile:profile)){storageNotice="تعذّر حفظ بعض النصوص؛ قد تحتاج مساحة إضافية."}
         }
         try valid(ticket)
         if speechTexts.count>=8000{speechTexts.removeAll()}
         for (text,value)in values{speechTexts[key(text)]=value}
-        return try segments.map{segment in guard let value=values[segment.text]else{throw ComicFailure.message("ترجمة ناقصة.")};return TranslationSegment(id:segment.id,text:value)}
+        return try segments.compactMap{segment -> TranslationSegment? in
+            if let value=values[segment.text]{return TranslationSegment(id:segment.id,text:value)}
+            if failedTexts.contains(segment.text){return nil}
+            throw ComicFailure.message("ترجمة ناقصة.")
+        }
     }
     private func capture(_ candidate:ComicCandidate,region:ComicRegion,frame:WKFrameInfo?,ticket:UUID)async throws->Data{
         do{
