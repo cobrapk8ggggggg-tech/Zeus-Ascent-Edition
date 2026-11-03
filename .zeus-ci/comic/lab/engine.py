@@ -13,7 +13,7 @@ class Engine:
             subprocess.run(['g++','-O2','-std=c++17','-shared','-fPIC',str(HERE/'native.cpp'),'-o',str(temporary)],check=True)
             os.replace(temporary,library)
         self.lib=ctypes.CDLL(str(library));p=np.ctypeslib.ndpointer(dtype=np.uint8,flags='C_CONTIGUOUS')
-        self.lib.clean.argtypes=[p]+[ctypes.c_int]*6;self.lib.text_mask.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.clean_source.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.coverage.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.coverage.restype=ctypes.c_float;self.lib.refine.argtypes=[p,p,p]+[ctypes.c_int]*6;self.lib.refine_ocr.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.clean_mask.argtypes=[p,p,p]+[ctypes.c_int]*6;self.lib.simple_background.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.neural_valid.argtypes=[p,p,p]+[ctypes.c_int]*6
+        self.lib.clean.argtypes=[p]+[ctypes.c_int]*6;self.lib.text_mask.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.clean_source.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.coverage.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.coverage.restype=ctypes.c_float;self.lib.refine.argtypes=[p,p,p]+[ctypes.c_int]*6;self.lib.refine_ocr.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.clean_mask.argtypes=[p,p,p]+[ctypes.c_int]*6;self.lib.simple_background.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.neural_valid.argtypes=[p,p,p]+[ctypes.c_int]*6;self.lib.mask_owned.argtypes=[p]+[ctypes.c_int]*6+[np.ctypeslib.ndpointer(dtype=np.int32,flags='C_CONTIGUOUS'),ctypes.c_int]
     def session(self,name):
         if name not in self.sessions:
             # Match the app's memory discipline: only one restoration graph,
@@ -86,17 +86,31 @@ class Engine:
         image=cv2.copyMakeBorder(cv2.resize(rgb,(cw,ch)),0,1024-ch,0,1024-cw,cv2.BORDER_CONSTANT,value=(0,0,0))
         session=self.session('ctd.onnx');output=session.run(['seg'],{session.get_inputs()[0].name:image.astype(np.float32).transpose(2,0,1)[None]/255})[0][0,0]
         return ((cv2.resize(output[:ch,:cw],(w,h)))>.3).astype(np.uint8)*255
-    def restore_neural(self,rgb,boxes):
-        h,w=rgb.shape[:2];x=max(0,min(b[0]for b in boxes)-48);y=max(0,min(b[1]for b in boxes)-48);r=min(w,max(b[2]for b in boxes)+48);b=min(h,max(b[3]for b in boxes)+48)
+    def restore_neural(self,rgb,boxes,balloon=None):
+        h,w=rgb.shape[:2];bounds=balloon if balloon is not None else[min(q[0]for q in boxes),min(q[1]for q in boxes),max(q[2]for q in boxes),max(q[3]for q in boxes)]
+        x=max(0,int(bounds[0])-48);y=max(0,int(bounds[1])-48);r=min(w,int(bounds[2])+48);b=min(h,int(bounds[3])+48)
         crop=np.ascontiguousarray(rgb[y:b,x:r]);local=[[a-x,c-y,d-x,e-y]for a,c,d,e in boxes]
-        hint=self.hints(crop);mask=self.refine(crop,hint,local)
+        hint=self.hints(crop)
+        owned=None if balloon is None else[balloon[0]-x,balloon[1]-y,balloon[2]-x,balloon[3]-y]
+        if not self.owns_text(crop,local,owned,hint):return rgb.copy(),np.zeros((h,w),np.uint8),False
+        mask=self.refine(crop,hint,local)
         rgba=np.ascontiguousarray(cv2.cvtColor(crop,cv2.COLOR_RGB2RGBA))
         if not all(self.lib.neural_valid(rgba,hint,mask,crop.shape[1],crop.shape[0],*map(int,box))for box in local):return rgb.copy(),np.zeros((h,w),np.uint8),False
         restored=self.lama(crop,mask);result=rgb.copy();result[y:b,x:r]=restored
         whole_mask=np.zeros((h,w),np.uint8);whole_mask[y:b,x:r]=mask
         return result,whole_mask,True
-    def can_letter_light(self,rgb,mask,boxes):
-        return self.safe_to_letter(rgb,mask,boxes) and self.simple_background(rgb,mask,boxes)
+    def owns_text(self,rgb,boxes,balloon=None,evidence=None):
+        if balloon is None:return True
+        rgba=np.ascontiguousarray(cv2.cvtColor(rgb,cv2.COLOR_RGB2RGBA));h,w=rgb.shape[:2]
+        area=[max(1,int(balloon[0])),max(1,int(balloon[1])),min(w-1,int(balloon[2])),min(h-1,int(balloon[3]))]
+        if evidence is None:
+            evidence=np.zeros((h,w),np.uint8);self.lib.text_mask(rgba,evidence,w,h,*area)
+        owned=[]
+        for x,y,r,b in boxes:
+            pad=max(8,min(r-x,b-y)*.3);owned.append([int(np.floor(x-pad)),int(np.floor(y-pad)),int(np.ceil(r+pad)),int(np.ceil(b+pad))])
+        return bool(self.lib.mask_owned(evidence,w,h,*area,np.ascontiguousarray(owned,dtype=np.int32).reshape(-1),len(boxes)))
+    def can_letter_light(self,rgb,mask,boxes,balloon=None):
+        return self.safe_to_letter(rgb,mask,boxes) and self.simple_background(rgb,mask,boxes) and self.owns_text(rgb,boxes,balloon)
     def safe_to_letter(self,rgb,mask,boxes):
         rgba=np.ascontiguousarray(cv2.cvtColor(rgb,cv2.COLOR_RGB2RGBA));h,w=mask.shape
         return all(self.lib.coverage(rgba,mask,w,h,*map(int,box))>=.95 for box in boxes)

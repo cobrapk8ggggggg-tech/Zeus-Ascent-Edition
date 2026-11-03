@@ -168,6 +168,25 @@ import UIKit
         let drawn=try ComicPixels.render(restored.image,speeches:[speech],translations:[TranslationSegment(id:"cover",text:fixture.translation)],target:"ar",fontName:nil,fontScale:1,requireCleanSource:true,precleanedIDs:restored.restored)
         for (name,output)in [("Neural original artwork",image),("Neural cleaned artwork",restored.image),("Neural Arabic artwork",drawn)]{let attachment=XCTAttachment(image:UIImage(cgImage:output));attachment.name=name;attachment.lifetime = .keepAlways;add(attachment)}
     }
+    func testMissingSourceLineIsNeverErasedOrOverpainted()async throws{
+        let image=renderer(CGSize(width:400,height:240)).image{context in
+            UIColor.white.setFill();context.fill(CGRect(x:0,y:0,width:400,height:240))
+            let attributes:[NSAttributedString.Key:Any]=[.font:UIFont.systemFont(ofSize:30),.foregroundColor:UIColor.black]
+            ("HELLO" as NSString).draw(at:CGPoint(x:80,y:35),withAttributes:attributes)
+            ("OTHER LINE" as NSString).draw(at:CGPoint(x:30,y:140),withAttributes:attributes)
+        }.cgImage!
+        let known=ComicLine(text:"HELLO",confidence:1,rect:CGRect(x:78,y:35,width:130,height:45),glyphHeight:30)
+        let missing=ComicLine(text:"OTHER LINE",confidence:1,rect:CGRect(x:28,y:140,width:250,height:45),glyphHeight:30)
+        let speech=ComicSpeech(id:"0",text:"HELLO",lines:[known],rect:CGRect(x:10,y:10,width:380,height:220),vertical:false,balloon:true)
+        let original=try XCTUnwrap(ComicPixels.rgba(image,width:400,height:240))
+        XCTAssertFalse(ComicPixels.canClean(original,width:400,height:240,speech:speech))
+        var complete=speech;complete.lines=[known,missing]
+        XCTAssertTrue(ComicPixels.canClean(original,width:400,height:240,speech:complete),"a fully owned balloon must still translate")
+        XCTAssertThrowsError(try ComicPixels.render(image,speeches:[speech],translations:[TranslationSegment(id:"0",text:"ترجمة")],target:"ar",fontName:nil,fontScale:1,requireCleanSource:true))
+        let restored=try await ComicRestoration.shared.restore(image,speeches:[speech],requiredHeadroom:0)
+        XCTAssertTrue(restored.restored.isEmpty)
+        XCTAssertEqual(original,ComicPixels.rgba(restored.image,width:400,height:240),"neural restoration cannot bypass missing source ownership")
+    }
     func testIncompleteCleanupDoesNotPaintOverOriginal()throws{
         let image=renderer(CGSize(width:200,height:100)).image{context in
             UIColor.white.setFill();context.fill(CGRect(x:0,y:0,width:200,height:100))
@@ -300,6 +319,16 @@ import UIKit
         XCTAssertEqual(ComicBidi.logicalFromVisual("12.5"),"12.5")
         XCTAssertEqual(ComicBidi.logicalFromVisual("(ابحرم) ABC"),"ABC (مرحبا)")
         XCTAssertEqual(ComicBidi.logicalFromVisual("]ابحرم[ 12.5"),"12.5 [مرحبا]")
+    }
+    func testStrongerPartialOCRCannotDropTheBeginningOfACompleteLine(){
+        let whole=ComicLine(text:"YOU HAVE BECOME",confidence:0.8,rect:CGRect(x:20,y:40,width:220,height:35))
+        let partial=ComicLine(text:"BECOME",confidence:0.99,rect:CGRect(x:85,y:40,width:155,height:35))
+        let merged=ComicOCR.merge([whole],accurate:[partial])
+        XCTAssertEqual(merged.count,1);XCTAssertEqual(merged[0].text,"YOU HAVE BECOME");XCTAssertEqual(merged[0].rect,whole.rect)
+        let corrected=ComicLine(text:"YOU HAVE BECOME",confidence:0.99,rect:CGRect(x:24,y:42,width:214,height:31))
+        let complete=ComicOCR.merge([whole],accurate:[corrected])
+        XCTAssertEqual(complete[0].confidence,corrected.confidence)
+        XCTAssertTrue(complete[0].rect.contains(whole.rect),"cleanup must retain the complete source span")
     }
     func testAutomaticArabicScriptUsesTheArabicRecognizer()async throws{
         let image=renderer(CGSize(width:700,height:220)).image{context in

@@ -133,13 +133,15 @@ actor ComicRestoration {
         var result = original, ids = Set<String>()
         for speech in candidates {
             try Task.checkCancellation()
-            let bounds = speech.lines.reduce(CGRect.null) { $0.union($1.rect) }.insetBy(dx: -48, dy: -48).integral.intersection(CGRect(x:0,y:0,width:image.width,height:image.height))
+            let sourceBounds=speech.balloon ? speech.rect:speech.lines.reduce(CGRect.null) { $0.union($1.rect) }
+            let bounds = sourceBounds.insetBy(dx: -48, dy: -48).integral.intersection(CGRect(x:0,y:0,width:image.width,height:image.height))
             guard bounds.width * bounds.height <= 1_000_000, let crop = image.cropping(to: bounds), let pixels = ComicPixels.rgba(crop,width:crop.width,height:crop.height) else { continue }
             var local = speech
             local.rect = speech.rect.offsetBy(dx: -bounds.minX, dy: -bounds.minY)
             local.lines = speech.lines.map { line in var line=line;line.rect=line.rect.offsetBy(dx:-bounds.minX,dy:-bounds.minY);return line }
             let neural = try await hints(pixels, width: crop.width, height: crop.height)
             try Task.checkCancellation()
+            guard ComicPixels.ownsText(pixels,width:crop.width,height:crop.height,speech:local,evidence:neural)else{continue}
             var mask = [UInt8](repeating:0,count:crop.width*crop.height)
             pixels.withUnsafeBufferPointer { p in neural.withUnsafeBufferPointer { hints in mask.withUnsafeMutableBufferPointer { m in
                 for line in local.lines {

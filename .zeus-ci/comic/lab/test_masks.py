@@ -32,6 +32,12 @@ class Masks(unittest.TestCase):
    output,mask=self.engine.clean(source,[box])
    self.assertLess(int(np.abs(output.astype(int)-clean.astype(int)).max()),4)
    self.assertTrue(self.engine.safe_to_letter(source,mask,[box]))
+ def test_missing_balloon_line_must_not_be_overpainted(self):
+  image=Image.new('RGB',(400,240),'white');draw=ImageDraw.Draw(image);font=ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',30)
+  draw.text((80,35),'HELLO',font=font,fill='black');draw.text((30,140),'OTHER LINE',font=font,fill='black')
+  rgb=np.asarray(image);known=draw.textbbox((80,35),'HELLO',font=font);missing=draw.textbbox((30,140),'OTHER LINE',font=font);area=[10,10,390,230]
+  self.assertFalse(self.engine.owns_text(rgb,[known],area),'unrecognized source line must block the entire balloon')
+  self.assertTrue(self.engine.owns_text(rgb,[known,missing],area),'a fully recognized balloon must remain usable')
  def test_empty_mask_is_identity(self):
   image=np.full((100,240,3),180,np.uint8);output,mask=self.engine.clean(image,[[30,30,190,60]])
   self.assertTrue(np.array_equal(image,output));self.assertEqual(int(mask.sum()),0)

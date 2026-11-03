@@ -61,11 +61,7 @@ actor ComicOCR {
             #else
             runtime=fastSupported ? "MLKit+Paddle/ONNX":"Paddle/ONNX"
             #endif
-            if mode == .careful{lines=accurate}else{
-                for line in accurate where !lines.contains(where:{$0.rect.intersection(line.rect).area/min(max(1,$0.rect.area),max(1,line.rect.area))>0.5}){lines.append(line)}
-                // A low-confidence fast line is replaced only by a stronger overlapping reading.
-                lines=lines.map{line in accurate.filter{$0.rect.intersection(line.rect).area/max(1,line.rect.area)>0.5&&$0.confidence>line.confidence}.max(by:{$0.confidence<$1.confidence}) ?? line}
-            }
+            lines=mode == .careful ? accurate:Self.merge(fast,accurate:accurate)
         }
         // Keep script-consistent readings from the same local Vision
         // probe. Covers mixed-language panels without poisoning the whole page's
@@ -83,6 +79,17 @@ actor ComicOCR {
             }
         }
         return ComicReading(lines:lines,speeches:ComicBalloons.speeches(lines,image:image,source:detected),language:detected,runtime:runtime)
+    }
+    // A stronger partial word cannot replace a complete fast line. Retain the
+    // union of source bounds even when the readings agree on the full span.
+    static func merge(_ fast:[ComicLine],accurate:[ComicLine])->[ComicLine]{
+        var lines=fast
+        for line in accurate where !lines.contains(where:{$0.rect.intersection(line.rect).area/min(max(1,$0.rect.area),max(1,line.rect.area))>0.5}){lines.append(line)}
+        return lines.map{line in
+            guard var replacement=accurate.filter({$0.rect.intersection(line.rect).area/max(1,line.rect.area)>0.85 && $0.confidence>line.confidence}).max(by:{$0.confidence<$1.confidence})else{return line}
+            replacement.rect=replacement.rect.union(line.rect)
+            return replacement
+        }
     }
     static func scriptProbe(_ image:CGImage,region:CGRect?)async throws->(String,[ComicLine]){
         var samples=try vision(image,languages:["ar-SA","ko-KR","ja-JP","zh-Hans","ru-RU","en-US"],accurate:true,automatic:true)

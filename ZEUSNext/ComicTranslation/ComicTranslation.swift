@@ -189,7 +189,7 @@ import CoreGraphics
                     let window=try await Task.detached{try ComicWindow.join(center,before:before,after:after)}.value
                     let image=window.image,offset=window.offset
                     let imageHash=try await Task.detached{ComicIdentity.hash(try ComicPixels.png(image))}.value
-                    let readingKey=imageHash+"|ocr-v11|\(prefs.source)|\(prefs.mode.rawValue)|vote:\(region.coreTop+offset):\(region.coreBottom-region.coreTop)"
+                    let readingKey=imageHash+"|ocr-v12|\(prefs.source)|\(prefs.mode.rawValue)|vote:\(region.coreTop+offset):\(region.coreBottom-region.coreTop)"
                     phase = .recognizing
                     let reading:ComicReading
                     if let saved=readings[readingKey]{reading=saved}

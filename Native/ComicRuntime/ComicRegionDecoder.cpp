@@ -98,3 +98,4 @@ extern "C" unsigned long long zeus_comic_available_memory(){
 }
 
 extern "C" int zeus_comic_neural_mask_valid(const unsigned char *pixels,const unsigned char *hints,const unsigned char *mask,int width,int height,int left,int top,int right,int bottom){return comic_neural_mask_valid(pixels,hints,mask,width,height,left,top,right,bottom)?1:0;}
+extern "C" int zeus_comic_mask_owned(const unsigned char *mask,int width,int height,int left,int top,int right,int bottom,const int *boxes,int count){return comic_mask_owned(mask,width,height,left,top,right,bottom,boxes,count)?1:0;}

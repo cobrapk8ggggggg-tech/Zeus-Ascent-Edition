@@ -25,22 +25,22 @@ for index,case in enumerate(cases):
  text=('This is a translated paragraph.'if len(boxes)>1 else'Translation')if case['language']=='ar'else('هذه ترجمة عربية تجريبية داخل الفقاعة'if len(boxes)>1 else'ترجمة تجريبية')
  color=(12,)*3 if np.median(rgb)>128 else(248,)*3
  # Exact same layout is used before and after erasure; declined layout is identity.
- _,fit=lettering(rgb,area,text,np.median([l['glyph_height']for l in case['lines']])*1.3,color,direction='ltr'if case['language']=='ar'else'rtl')
+ _,fit=lettering(rgb,area,text,np.median([l['glyph_height']for l in case['lines']])*1.3,color,direction='ltr'if case['language']=='ar'else'rtl',vertical=case.get('vertical_caption',False))
  source_readable=all(t.strip() and c>=.65 for t,c in zip(case.get('ocr',[]),case.get('ocr_confidence',[])))if case.get('ocr_confidence') is not None else True
  accepted=False;route='original';clean=rgb.copy();mask=np.zeros(rgb.shape[:2],np.uint8)
  if fit and source_readable:
-  clean,mask=engine.clean(rgb,boxes);accepted=engine.can_letter_light(rgb,mask,boxes)
+  clean,mask=engine.clean(rgb,boxes);accepted=engine.can_letter_light(rgb,mask,boxes,area if case.get('balloon',False)else None)
   if accepted:route='light'
   elif a.neural:
-   clean,mask,accepted=engine.restore_neural(rgb,boxes)
+   clean,mask,accepted=engine.restore_neural(rgb,boxes,area if case.get('balloon',False)else None)
    if accepted:route='neural'
  if not accepted:clean=rgb.copy()
  rendered=clean
- if accepted:rendered,_=lettering(clean,area,text,np.median([l['glyph_height']for l in case['lines']])*1.3,color,direction='ltr'if case['language']=='ar'else'rtl')
+ if accepted:rendered,_=lettering(clean,area,text,np.median([l['glyph_height']for l in case['lines']])*1.3,color,direction='ltr'if case['language']=='ar'else'rtl',vertical=case.get('vertical_caption',False))
  case.update(fit=fit,source_readable=source_readable,restoration_route=route,cleanup_accepted=accepted,outside_mask_changes=int(np.count_nonzero(np.any(clean!=rgb,axis=2)&(mask==0))))
  for name,array in [('mask',mask),('clean',clean),('rendered',rendered)]:Image.fromarray(array).save(dest/(name+'.png'))
  if index%20==0:
   print(index,case['id'],route,flush=True);(root/'cases.json').write_text(json.dumps(cases,ensure_ascii=False,indent=2))
 (root/'cases.json').write_text(json.dumps(cases,ensure_ascii=False,indent=2));gallery(root,cases)
-report=json.loads((source/'report.json').read_text());report.update(outside_mask_changes=sum(c['outside_mask_changes']for c in cases),layout_probe_fits=sum(c['fit']for c in cases),mask_refresh_seconds=time.perf_counter()-start,cleanup_gate_accepted=sum(c['cleanup_accepted']for c in cases),cleanup_gate_abstained=sum(not c['cleanup_accepted']for c in cases),neural_restored=sum(c['restoration_route']=='neural'for c in cases),light_restored=sum(c['restoration_route']=='light'for c in cases),unreadable_source_proposals=sum(not c['source_readable']for c in cases),native_kernel_sha256=engine.native_sha,protocol='adaptive-v2: owned glyphs; CCW OCR; layout preflight; .65 source OCR gate',dependency_versions={k:importlib.metadata.version(k)for k in['onnxruntime','opencv-python-headless','numpy','Pillow','PyYAML']},peak_rss_kib=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
+report=json.loads((source/'report.json').read_text());report.update(outside_mask_changes=sum(c['outside_mask_changes']for c in cases),layout_probe_fits=sum(c['fit']for c in cases),mask_refresh_seconds=time.perf_counter()-start,cleanup_gate_accepted=sum(c['cleanup_accepted']for c in cases),cleanup_gate_abstained=sum(not c['cleanup_accepted']for c in cases),neural_restored=sum(c['restoration_route']=='neural'for c in cases),light_restored=sum(c['restoration_route']=='light'for c in cases),unreadable_source_proposals=sum(not c['source_readable']for c in cases),native_kernel_sha256=engine.native_sha,protocol='adaptive-v4: whole-balloon text ownership; frozen geometry; layout preflight',dependency_versions={k:importlib.metadata.version(k)for k in['onnxruntime','opencv-python-headless','numpy','Pillow','PyYAML']},peak_rss_kib=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
 (root/'report.json').write_text(json.dumps(report,indent=2));print(json.dumps(report),flush=True)

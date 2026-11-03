@@ -188,3 +188,17 @@ static inline bool comic_neural_mask_valid(const unsigned char *rgba,const unsig
     float sx=float(maxx-minx+1)/w,sy=float(maxy-miny+1)/h;
     return w>=h?(sx>=.8f&&sy>=.55f):(sy>=.8f&&sx>=.55f);
 }
+
+// Every text-like pixel in a closed balloon needs an OCR owner before lettering.
+// This rejects a missing source line instead of translating over its remaining ink.
+static inline bool comic_mask_owned(const unsigned char *evidence,int width,int height,int left,int top,int right,int bottom,const int *boxes,int count){
+    if(!evidence||!boxes||width<=0||height<=0||count<=0)return false;
+    left=std::clamp(left,0,width);right=std::clamp(right,0,width);top=std::clamp(top,0,height);bottom=std::clamp(bottom,0,height);
+    int total=0,unowned=0;
+    for(int y=top;y<bottom;y++)for(int x=left;x<right;x++)if(evidence[y*width+x]){
+        total++;bool owner=false;
+        for(int i=0;i<count;i++){const int *r=boxes+i*4;if(x>=r[0]&&y>=r[1]&&x<r[2]&&y<r[3]){owner=true;break;}}
+        if(!owner)unowned++;
+    }
+    return unowned<=std::max(12,int(total*.05f));
+}
