@@ -34,7 +34,7 @@ enum ComicBalloons {
                 let ordered=ComicGeometry.orderedLines(lines,vertical:vertical)
                 let sourceBounds=lines.reduce(CGRect.null){$0.union($1.rect)}
                 let area=safeRectangle(lobe,pixels:pixels,width:image.width,height:image.height).union(sourceBounds.insetBy(dx:-3,dy:-3)).intersection(lobe.insetBy(dx:2,dy:2))
-                result.append(ComicSpeech(id:"",text:ordered.map(\.text).joined(separator:vertical ? "":" "),lines:ordered,rect:area,vertical:vertical,balloon:true,angle:vertical ? nil:ComicGeometry.estimateAngle(lines)))
+                result.append(ComicSpeech(id:"",text:ordered.map(\.text).joined(separator:vertical ? "":" "),lines:ordered,rect:area,vertical:vertical,balloon:true,flatCleanup:flatCleanup(plate,lines:lines,lobe:lobe,pixels:pixels,width:image.width,height:image.height),angle:vertical ? nil:ComicGeometry.estimateAngle(lines),balloonBounds:lobe))
             }
         }
         result+=ComicGeometry.group(unplated,source:source)
@@ -49,7 +49,37 @@ enum ComicBalloons {
         return rectangular ? plate.insetBy(dx:3,dy:3):plate.insetBy(dx:plate.width*0.15,dy:plate.height*0.15)
     }
     private static func overlap(_ a:CGRect,_ b:CGRect)->CGFloat{let intersection=a.intersection(b);guard !intersection.isNull else{return 0};return intersection.width*intersection.height/max(1,min(a.width*a.height,b.width*b.height))}
-    private struct Plate{var rect:CGRect;var mask:[UInt8];var width:Int;var height:Int}
+    private struct Plate{var rect:CGRect;var mask:[UInt8];var width:Int;var height:Int;var color:[UInt8];var uniform:Bool}
+    private static func flatCleanup(_ plate:Plate,lines:[ComicLine],lobe:CGRect,pixels:[UInt8],width:Int,height:Int)->ComicFlatCleanup?{
+        guard plate.uniform else{return nil}
+        let x=Int(plate.rect.minX)-1,y=Int(plate.rect.minY)-1
+        let area=lobe.offsetBy(dx:-CGFloat(x),dy:-CGFloat(y)).integral
+        let boxes:[Int32]=lines.flatMap{line in
+            let pad=max(8,min(line.rect.width,line.rect.height)*0.3),r=line.rect.insetBy(dx:-pad,dy:-pad)
+            return [Int32(floor(r.minX)-CGFloat(x)),Int32(floor(r.minY)-CGFloat(y)),Int32(ceil(r.maxX)-CGFloat(x)),Int32(ceil(r.maxY)-CGFloat(y))]
+        }
+        var mask=[UInt8](repeating:0,count:plate.width*plate.height)
+        var complete=plate.mask.withUnsafeBufferPointer{p in boxes.withUnsafeBufferPointer{b in mask.withUnsafeMutableBufferPointer{m in zeus_comic_flat_balloon_mask(p.baseAddress,m.baseAddress,Int32(plate.width),Int32(plate.height),Int32(area.minX),Int32(area.minY),Int32(area.maxX),Int32(area.maxY),b.baseAddress,Int32(lines.count)) != 0}}}
+        if complete{
+            var source:[UInt8]=[];source.reserveCapacity(plate.width*plate.height*4)
+            for yy in 0..<plate.height{let start=((yy+y)*width+x)*4;source.append(contentsOf:pixels[start..<start+plate.width*4])}
+            complete=source.withUnsafeBufferPointer{p in mask.withUnsafeBufferPointer{m in lines.allSatisfy{line in
+                let r=line.rect.offsetBy(dx:-CGFloat(x),dy:-CGFloat(y)).integral
+                return zeus_comic_mask_coverage(p.baseAddress,m.baseAddress,Int32(plate.width),Int32(plate.height),Int32(r.minX),Int32(r.minY),Int32(r.maxX),Int32(r.maxY))>=0.95
+            }}}
+        }
+        var runs:[Int]=[]
+        if complete{for yy in 0..<plate.height{
+            var xx=0
+            while xx<plate.width{
+                guard mask[yy*plate.width+xx]>0 else{xx+=1;continue}
+                let start=xx
+                while xx<plate.width&&mask[yy*plate.width+xx]>0{xx+=1}
+                runs += [start+x,yy+y,xx-start]
+            }
+        }}
+        return ComicFlatCleanup(color:plate.color,runs:runs,complete:complete)
+    }
     // A line may contain words from both connected balloons. Only split that
     // line when its measured word boxes acquire different shape owners.
     private static func split(_ lines:[ComicLine],plate:Plate)->[([ComicLine],CGRect)]{
@@ -119,7 +149,11 @@ enum ComicBalloons {
                 let mw=maxX-minX+3,mh=maxY-minY+3
                 var mask=[UInt8](repeating:0,count:mw*mh)
                 for p in queue{mask[(p/rw-minY+1)*mw+p%rw-minX+1]=255}
-                best=Plate(rect:bounds,mask:mask,width:mw,height:mh)
+                var sums=[Int](repeating:0,count:3)
+                for p in queue{let i=((p/rw+top)*width+p%rw+left)*4;for c in 0..<3{sums[c]+=Int(pixels[i+c])}}
+                let color=sums.map{UInt8($0/queue.count)}
+                let uniform=queue.reduce(0){count,p in let i=((p/rw+top)*width+p%rw+left)*4;return count+(abs(Int(pixels[i])-Int(color[0]))+abs(Int(pixels[i+1])-Int(color[1]))+abs(Int(pixels[i+2])-Int(color[2]))<=18 ? 1:0)}>=queue.count*9/10
+                best=Plate(rect:bounds,mask:mask,width:mw,height:mh,color:color,uniform:uniform)
             }
         }
         return best

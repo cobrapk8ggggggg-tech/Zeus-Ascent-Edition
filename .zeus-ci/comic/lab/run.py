@@ -69,8 +69,8 @@ def run(args):
         for page in pages:
             if count>=limit:break
             rgb=np.asarray(Image.open(root/page['path']).convert('RGB'));start=time.perf_counter();lines=engine.detect(rgb)
-            groups=paragraphs(rgb,lines,include_layout=True,engine=engine);random.Random(0).shuffle(groups)
-            for paragraph,area,closed in groups[:per_page]:
+            groups=paragraphs(rgb,lines,include_layout=True,engine=engine,include_cleanup=True);random.Random(0).shuffle(groups)
+            for paragraph,area,closed,flat in groups[:per_page]:
                 if count>=limit:break
                 boxes=[l['box'] for l in paragraph];x=min(b[0]for b in boxes);y=min(b[1]for b in boxes);r=max(b[2]for b in boxes);b=max(b[3]for b in boxes)
                 if r-x<15 or b-y<10 or (r-x)*(b-y)>750000:continue
@@ -89,8 +89,9 @@ def run(args):
                 _,fit=lettering(crop,area_local,text,np.median([l['glyph_height']for l in paragraph])*1.3,fg,direction='ltr' if chapter['language']=='ar' else 'rtl',vertical=vertical,ink_style=source_style)
                 accepted=False;route='original';clean=crop.copy();mask=np.zeros(crop.shape[:2],np.uint8)
                 if fit and readable:
-                    clean,mask=engine.clean(crop,local);accepted=engine.can_letter_light(crop,mask,local,area_local if closed else None)
-                    if accepted:route='light'
+                    if flat is not None:clean,mask,accepted=engine.apply_flat_cleanup(crop,[cx,cy],flat)
+                    else:clean,mask=engine.clean(crop,local);accepted=engine.can_letter_light(crop,mask,local,area_local if closed else None)
+                    if accepted:route='flat'if flat is not None else'light'
                     elif args.neural:
                         clean,mask,accepted=engine.restore_neural(crop,local,area_local if closed else None)
                         if accepted:route='neural'
@@ -108,7 +109,7 @@ def run(args):
             print(chapter['language'],chapter['split'],page['path'],'regions',count,flush=True)
         (out/'cases.json').write_text(json.dumps(cases,ensure_ascii=False,indent=2))
     gallery(out,cases)
-    report=dict(chapters=len(corpus['chapters']),pages=sum(len(c['pages'])for c in corpus['chapters']),regions=len(cases),languages=sorted(set(c['language']for c in cases)),outside_mask_changes=sum(c['outside_mask_changes']for c in cases),layout_probe_fits=sum(c['fit']for c in cases),neural_restored=sum(c['restoration_route']=='neural'for c in cases),light_restored=sum(c['restoration_route']=='light'for c in cases),cleanup_gate_accepted=sum(c['cleanup_accepted']for c in cases),cleanup_gate_abstained=sum(not c['cleanup_accepted']for c in cases),manually_reviewed=0,quality_acceptance_proven=False,native_kernel_sha256=engine.native_sha,protocol='adaptive-v5: connected-lobe ownership; source fill and outline; whole-balloon gate; layout preflight',peak_rss_kib=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
+    report=dict(chapters=len(corpus['chapters']),pages=sum(len(c['pages'])for c in corpus['chapters']),regions=len(cases),languages=sorted(set(c['language']for c in cases)),outside_mask_changes=sum(c['outside_mask_changes']for c in cases),layout_probe_fits=sum(c['fit']for c in cases),neural_restored=sum(c['restoration_route']=='neural'for c in cases),light_restored=sum(c['restoration_route']in['flat','light']for c in cases),flat_restored=sum(c['restoration_route']=='flat'for c in cases),cleanup_gate_accepted=sum(c['cleanup_accepted']for c in cases),cleanup_gate_abstained=sum(not c['cleanup_accepted']for c in cases),manually_reviewed=0,quality_acceptance_proven=False,native_kernel_sha256=engine.native_sha,protocol='adaptive-v5: connected-lobe ownership; source fill and outline; whole-balloon gate; layout preflight',peak_rss_kib=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
     (out/'report.json').write_text(json.dumps(report,indent=2));print(json.dumps(report),flush=True)
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--corpus',required=True);p.add_argument('--models',required=True);p.add_argument('--output',required=True);p.add_argument('--regions',type=int,default=400);p.add_argument('--ocr',action='store_true');p.add_argument('--lama',type=int,default=0);p.add_argument('--neural',action='store_true');run(p.parse_args())

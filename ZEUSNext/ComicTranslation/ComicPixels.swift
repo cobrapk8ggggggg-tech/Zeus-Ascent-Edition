@@ -48,7 +48,7 @@ enum ComicPixels {
             let background=backgroundColor(original,width:image.width,height:image.height,rect:area)
             if !precleanedIDs.contains(speech.id){
                 let mask=sourceMask(original,width:image.width,height:image.height,speech:speech)
-                if requireCleanSource && (!completeMask(original,mask:mask,width:image.width,height:image.height,speech:speech) || !simpleBackground(original,mask:mask,width:image.width,height:image.height,speech:speech) || !ownsText(original,width:image.width,height:image.height,speech:speech)){continue}
+                if requireCleanSource && speech.flatCleanup?.complete != true && (!completeMask(original,mask:mask,width:image.width,height:image.height,speech:speech) || !simpleBackground(original,mask:mask,width:image.width,height:image.height,speech:speech) || !ownsText(original,width:image.width,height:image.height,speech:speech)){continue}
                 clean(&pixels,width:image.width,height:image.height,speech:speech,source:original,approvedMask:mask)
             }
             let automatic=background.0*0.2126+background.1*0.7152+background.2*0.0722>0.5 ? CGColor(gray:0.04,alpha:1):CGColor(gray:0.98,alpha:1)
@@ -212,11 +212,13 @@ enum ComicPixels {
         return(CGFloat(value.0)/CGFloat(value.3*255),CGFloat(value.1)/CGFloat(value.3*255),CGFloat(value.2)/CGFloat(value.3*255))
     }
     static func canClean(_ pixels:[UInt8],width:Int,height:Int,speech:ComicSpeech)->Bool{
+        if let flat=speech.flatCleanup{return flat.complete && !flat.runs.isEmpty}
         let mask=sourceMask(pixels,width:width,height:height,speech:speech)
         return completeMask(pixels,mask:mask,width:width,height:height,speech:speech) && simpleBackground(pixels,mask:mask,width:width,height:height,speech:speech) && ownsText(pixels,width:width,height:height,speech:speech)
     }
     static func ownsText(_ pixels:[UInt8],width:Int,height:Int,speech:ComicSpeech,evidence:[UInt8]? = nil)->Bool{
         guard speech.balloon else{return true}
+        if let flat=speech.flatCleanup,evidence==nil{return flat.complete}
         let area=speech.rect.integral.intersection(CGRect(x:1,y:1,width:max(0,width-2),height:max(0,height-2)))
         guard !area.isNull,area.width*area.height<=1_000_000 else{return false}
         var mask=evidence ?? [UInt8](repeating:0,count:width*height)
@@ -240,6 +242,11 @@ enum ComicPixels {
         }}
     }
     private static func sourceMask(_ pixels:[UInt8],width:Int,height:Int,speech:ComicSpeech)->[UInt8]{
+        if let flat=speech.flatCleanup,flat.complete{
+            var mask=[UInt8](repeating:0,count:width*height)
+            for i in stride(from:0,to:flat.runs.count,by:3){let x=flat.runs[i],y=flat.runs[i+1],length=flat.runs[i+2];guard y>=0,y<height,x>=0,x+length<=width else{continue};for xx in x..<x+length{mask[y*width+xx]=255}}
+            return mask
+        }
         let boxes=cleanupBoxes(width:width,height:height,speech:speech)
         var mask=[UInt8](repeating:0,count:width*height)
         pixels.withUnsafeBufferPointer{buffer in mask.withUnsafeMutableBufferPointer{m in
@@ -271,6 +278,10 @@ enum ComicPixels {
         return boxes
     }
     static func clean(_ pixels:inout [UInt8],width:Int,height:Int,speech:ComicSpeech,source:[UInt8]? = nil,approvedMask:[UInt8]? = nil){
+        if let flat=speech.flatCleanup,flat.complete,flat.color.count==3{
+            for i in stride(from:0,to:flat.runs.count,by:3){let x=flat.runs[i],y=flat.runs[i+1],length=flat.runs[i+2];guard y>=0,y<height,x>=0,x+length<=width else{continue};for xx in x..<x+length{let p=(y*width+xx)*4;for c in 0..<3{pixels[p+c]=flat.color[c]}}}
+            return
+        }
         let boxes=cleanupBoxes(width:width,height:height,speech:speech)
         let original=source ?? pixels,mask=approvedMask ?? sourceMask(source ?? pixels,width:width,height:height,speech:speech)
         original.withUnsafeBufferPointer{s in mask.withUnsafeBufferPointer{m in

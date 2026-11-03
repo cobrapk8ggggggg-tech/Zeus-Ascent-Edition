@@ -138,6 +138,8 @@ actor ComicRestoration {
             guard bounds.width * bounds.height <= 1_000_000, let crop = image.cropping(to: bounds), let pixels = ComicPixels.rgba(crop,width:crop.width,height:crop.height) else { continue }
             var local = speech
             local.rect = speech.rect.offsetBy(dx: -bounds.minX, dy: -bounds.minY)
+            local.flatCleanup=speech.flatCleanup?.offsetBy(dx:-Int(bounds.minX),dy:-Int(bounds.minY))
+            local.balloonBounds=speech.balloonBounds?.offsetBy(dx:-bounds.minX,dy:-bounds.minY)
             local.lines = speech.lines.map { line in var line=line;line.rect=line.rect.offsetBy(dx:-bounds.minX,dy:-bounds.minY);line.words=line.words?.map{ComicWord(text:$0.text,rect:$0.rect.offsetBy(dx:-bounds.minX,dy:-bounds.minY))};return line }
             let neural = try await hints(pixels, width: crop.width, height: crop.height)
             try Task.checkCancellation()

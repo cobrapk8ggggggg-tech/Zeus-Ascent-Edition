@@ -424,3 +424,22 @@ static inline float comic_ink_style(const unsigned char *rgba,int w,int h,const 
     for(int c=0;c<3;c++){output[c]=float(sums[fill][c])/hist[fill];output[c+3]=stroke<0?0:hist[stroke] ? float(sums[stroke][c])/hist[stroke]:std::min(255,center(stroke,c));}
     output[6]=strokePercent;return stroke>=0?.95f:.7f;
 }
+
+
+// A closed, uniform balloon needs no image model. Its paper flood surrounds
+// glyph-shaped holes. Fill those holes only after every one has an OCR owner;
+// the exterior and balloon border can never enter this mask.
+static inline bool comic_flat_balloon_mask(const unsigned char *paper,unsigned char *mask,int w,int h,int left,int top,int right,int bottom,const int *boxes,int count){
+    if(!paper||!mask||!boxes||w<3||h<3||int64_t(w)*h>1000000||count<1)return false;
+    left=std::clamp(left,1,w-1);right=std::clamp(right,1,w-1);top=std::clamp(top,1,h-1);bottom=std::clamp(bottom,1,h-1);
+    std::vector<unsigned char> outside(w*h,0),holes(w*h,0);std::vector<int> queue;
+    auto enqueue=[&](int p){if(!paper[p]&&!outside[p]){outside[p]=1;queue.push_back(p);}};
+    for(int x=0;x<w;x++){enqueue(x);enqueue((h-1)*w+x);}for(int y=1;y<h-1;y++){enqueue(y*w);enqueue(y*w+w-1);}
+    for(size_t i=0;i<queue.size();i++){int p=queue[i],x=p%w,y=p/w;if(x)enqueue(p-1);if(x+1<w)enqueue(p+1);if(y)enqueue(p-w);if(y+1<h)enqueue(p+w);}
+    int ink=0;for(int y=top;y<bottom;y++)for(int x=left;x<right;x++)if(!paper[y*w+x]&&!outside[y*w+x]){holes[y*w+x]=255;ink++;}
+    if(ink<4||!comic_mask_owned(holes.data(),w,h,left,top,right,bottom,boxes,count))return false;
+    for(int y=top;y<bottom;y++)for(int x=left;x<right;x++)if(holes[y*w+x])for(int dy=-1;dy<=1;dy++)for(int dx=-1;dx<=1;dx++){
+        int xx=x+dx,yy=y+dy;if(xx>=left&&xx<right&&yy>=top&&yy<bottom&&!outside[yy*w+xx])mask[yy*w+xx]=255;
+    }
+    return true;
+}

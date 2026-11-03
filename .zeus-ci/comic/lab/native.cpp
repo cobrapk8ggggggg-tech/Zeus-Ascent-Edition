@@ -14,3 +14,5 @@ extern "C" int mask_owned(unsigned char*m,int w,int h,int l,int t,int r,int b,co
 extern "C" int balloon_lobes(const unsigned char*m,int w,int h,const int*b,int n,int*o,int*r){return comic_balloon_lobes(m,w,h,b,n,o,r);}
 
 extern "C" float ink_style(const unsigned char*p,int w,int h,const int*b,int n,float*o){return comic_ink_style(p,w,h,b,n,o);}
+
+extern "C" int flat_balloon_mask(const unsigned char*p,unsigned char*m,int w,int h,int l,int t,int r,int b,const int*boxes,int n){return comic_flat_balloon_mask(p,m,w,h,l,t,r,b,boxes,n);}

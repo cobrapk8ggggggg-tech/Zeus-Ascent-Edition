@@ -482,6 +482,45 @@ import UIKit
         XCTAssertEqual(decoded.settings.translation?.target,"fr");XCTAssertEqual(decoded.settings.comicTranslation?.translation?.target,"ar")
         XCTAssertEqual(ComicPreferences().mode,.balanced)
     }
+    func testVioletFastestOCRAndFlatBalloonsDoNotNeedRestoration()async throws{
+        let(data,_)=try await URLSession.shared.data(from:URL(string:"http://127.0.0.1:8765/comic-violet/image/001.jpeg")!)
+        let image=try ComicPixels.decode(data),began=Date()
+        let reading=try await ComicOCR.shared.read(image,source:"auto",mode:.fastest)
+        let flat=reading.speeches.filter{$0.flatCleanup?.complete==true}
+        XCTAssertGreaterThanOrEqual(flat.count,4,"The exact reported chapter must discover and clean ordinary dialogues without LaMa")
+        XCTAssertTrue(reading.speeches.contains{$0.text.localizedCaseInsensitiveContains("PARDON")},"The first dialogue must be recognized in the original language")
+        let restoration=try await ComicRestoration.shared.restore(image,speeches:flat,requiredHeadroom:0)
+        XCTAssertTrue(restoration.restored.isEmpty);XCTAssertNil(restoration.notice,"Uniform balloons must bypass all neural restoration")
+        let output=try ComicPixels.renderReport(image,speeches:flat,translations:flat.map{TranslationSegment(id:$0.id,text:"هل يمكنك مساعدتنا؟")},target:"ar",fontName:nil,fontScale:1,requireCleanSource:true)
+        XCTAssertTrue(output.unresolved.isEmpty)
+        let attachment=XCTAttachment(image:UIImage(cgImage:output.image));attachment.name="Violet exact page - native fastest OCR and flat cleanup without LaMa";attachment.lifetime = .keepAlways;add(attachment)
+        let note=XCTAttachment(string:"runtime: \(reading.runtime)\nlines: \(reading.lines.count)\nspeeches: \(reading.speeches.count)\nflat approved: \(flat.count)\nseconds: \(Date().timeIntervalSince(began))\nsource text:\n"+reading.speeches.map(\.text).joined(separator:"\n"));note.name="Violet native reading and elapsed time";note.lifetime = .keepAlways;add(note)
+    }
+    func testVioletRealPageThroughBrowserSessionWithoutRestoration()async throws{
+        let root=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let model=BrowserModel(profiles:ProfileStore(root:root,downloadsRoot:root.appendingPathComponent("Downloads")),useBackgroundDownloads:false)
+        model.data.settings.shieldsEnabled=false
+        var provider=AIProviderConfiguration();provider.baseURL="http://127.0.0.1:8765/v1";provider.model="comic-violet-"+UUID().uuidString;model.data.settings.aiProviders=[provider]
+        var preferences=ComicPreferences();preferences.mode = .fastest;preferences.restorationEnabled=false;preferences.showUntranslated=true;preferences.readAhead=false
+        var translation=TranslationPreferences();translation.engine = .ai;translation.providerID=provider.id;translation.target="ar";preferences.translation=translation;model.data.settings.comicTranslation=preferences
+        let tab=try XCTUnwrap(model.current);tab.url="http://127.0.0.1:8765/comic-violet/?page=1"
+        let prepared=await model.prepare(tab),view=try XCTUnwrap(prepared),session=try XCTUnwrap(tab.comicTranslation)
+        let scene=try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap{$0 as? UIWindowScene}.first)
+        let window=UIWindow(windowScene:scene);window.frame=scene.screen.bounds;window.rootViewController=UIViewController();view.frame=window.bounds;window.rootViewController?.view.addSubview(view);window.windowLevel = .normal+1;window.makeKeyAndVisible()
+        defer{tab.dispose();window.isHidden=true;try? FileManager.default.removeItem(at:root)}
+        var deadline=Date().addingTimeInterval(20)
+        while Date()<deadline{
+            if (try? await view.callAsyncJavaScript("return !!globalThis.zeusComic && document.images.length===1 && document.images[0].complete",arguments:[:],in:nil,contentWorld:ComicTranslation.world))as? Bool==true{break}
+            try await Task.sleep(for:.milliseconds(100))
+        }
+        let began=Date();session.start();deadline=Date().addingTimeInterval(65)
+        while Date()<deadline && (session.running||session.completed==0) && session.error==nil{try await Task.sleep(for:.milliseconds(200))}
+        XCTAssertGreaterThanOrEqual(session.detectedTexts,4);XCTAssertGreaterThanOrEqual(session.translatedTexts,4);XCTAssertGreaterThan(session.completed,0)
+        let painted=try await view.evaluateJavaScript("document.images[0].src.startsWith('blob:') || document.images[0].style.backgroundImage.includes('blob:')")as? Bool
+        XCTAssertEqual(painted,true,"The running browser must apply the translated chapter pixels")
+        let note=XCTAttachment(string:"restoration enabled: false\ndetected: \(session.detectedTexts)\ntranslated: \(session.translatedTexts)\nOCR runs: \(session.ocrRuns)\nseconds: \(Date().timeIntervalSince(began))\nerror: \(session.error ?? "none")\nnotice: \(session.contextNotice ?? "none")");note.name="Violet complete browser pipeline evidence";note.lifetime = .keepAlways;add(note)
+        let shot=try await view.takeSnapshot(configuration:nil);let attachment=XCTAttachment(image:shot);attachment.name="Violet real chapter in actual browser session";attachment.lifetime = .keepAlways;add(attachment)
+    }
     func testActualWebKitSwapRestoreAndStaleResults()async throws{
         let image=renderer(CGSize(width:200,height:100)).image{c in UIColor.white.setFill();c.fill(CGRect(x:0,y:0,width:200,height:100));("ORIGINAL" as NSString).draw(at:CGPoint(x:20,y:30),withAttributes:[.foregroundColor:UIColor.black,.font:UIFont.systemFont(ofSize:20)])}
         let original=try XCTUnwrap(image.pngData()).base64EncodedString(),replacement=try XCTUnwrap(ComicPixels.png(XCTUnwrap(image.cgImage))).base64EncodedString()

@@ -21,15 +21,19 @@ actor ComicOCR {
         fastRecognizers.removeAll()
         #endif
     }
-    func read(_ image:CGImage,source:String,mode:ComicReadingMode,languageRegion:CGRect? = nil,onPreparing:(@Sendable (Bool) async -> Void)? = nil)async throws->ComicReading{
+    func read(_ image:CGImage,source:String,mode:ComicReadingMode,languageRegion:CGRect? = nil,languageHint:String? = nil,onPreparing:(@Sendable (Bool) async -> Void)? = nil)async throws->ComicReading{
         try Task.checkCancellation()
         let probe:(String,[ComicLine])
-        if source=="auto"{probe=try await Self.scriptProbe(image,region:languageRegion)}
+        if source=="auto",let hint=languageHint,ComicModelStore.recognizer(hint) != "arabic"{probe=(hint,[])}
+        else if source=="auto"{probe=try await Self.scriptProbe(image,region:languageRegion)}
         else if ComicModelStore.recognizer(source)=="arabic"{probe=(source,try Self.vision(image,languages:["ar-SA"],accurate:true))}
         else{probe=(source,[])}
         var detected=probe.0
         var fastSupported=ComicModelStore.recognizer(detected)=="latin" || ["ja","zh","ko"].contains(where:detected.hasPrefix)
         var fast=fastSupported ? try await self.fast(image,source:detected):[]
+        if source=="auto",languageHint != nil,fast.isEmpty{
+            return try await read(image,source:source,mode:mode,languageRegion:languageRegion,onPreparing:onPreparing)
+        }
         // An empty first hypothesis is not evidence that the panel has no text.
         // Probe the other bundled scripts before downloading a recognizer or
         // caching an empty reading. Explicit user language always wins.
@@ -61,7 +65,7 @@ actor ComicOCR {
             #else
             runtime=fastSupported ? "MLKit+Paddle/ONNX":"Paddle/ONNX"
             #endif
-            lines=mode == .careful ? accurate:Self.merge(fast,accurate:accurate)
+            lines=Self.merge(fast,accurate:accurate)
         }
         // Keep script-consistent readings from the same local Vision
         // probe. Covers mixed-language panels without poisoning the whole page's
@@ -75,10 +79,29 @@ actor ComicOCR {
                 let overlaps=lines.indices.filter{lines[$0].rect.intersection(sample.rect).area/min(max(1,lines[$0].rect.area),max(1,sample.rect.area))>0.6}
                 if script != "latin" && script != "other" && (script != primary || overlaps.isEmpty || overlaps.contains{Self.lineScript(lines[$0].text) != script} || overlaps.allSatisfy{lines[$0].confidence<sample.confidence}){
                     lines=lines.enumerated().filter{!overlaps.contains($0.offset)}.map{$0.element};lines.append(sample)
-                }else if script=="latin",primary != "latin",overlaps.isEmpty,sample.confidence>=0.95,sample.text.filter({$0.isLetter}).count>=3{lines.append(sample)}
+                }else if script=="latin",overlaps.isEmpty,sample.confidence >= (primary=="latin" ? 0.8:0.95),sample.text.filter({$0.isLetter}).count>=2{lines.append(sample)}
             }
         }
-        return ComicReading(lines:lines,speeches:ComicBalloons.speeches(lines,image:image,source:detected),language:detected,runtime:runtime)
+        var speeches=ComicBalloons.speeches(lines,image:image,source:detected)
+        // An enclosed glyph without an OCR owner triggers a small second read,
+        // before cleanup. It must never be erased by filling the whole bubble.
+        if fastSupported{
+            let repairs=speeches.filter{$0.flatCleanup?.complete==false}.prefix(mode == .fastest ? 3:8)
+            var additional:[ComicLine]=[]
+            for speech in repairs{
+                try Task.checkCancellation()
+                let area=(speech.balloonBounds ?? speech.rect).insetBy(dx:-4,dy:-4).integral.intersection(CGRect(x:0,y:0,width:image.width,height:image.height))
+                guard area.width*area.height<=500_000,let cut=image.cropping(to:area)else{continue}
+                let local=try await self.fast(cut,source:detected)
+                for var line in local{
+                    line.rect=line.rect.offsetBy(dx:area.minX,dy:area.minY)
+                    line.words=line.words?.map{ComicWord(text:$0.text,rect:$0.rect.offsetBy(dx:area.minX,dy:area.minY))}
+                    additional.append(line)
+                }
+            }
+            if !additional.isEmpty{lines=Self.merge(lines,accurate:additional);speeches=ComicBalloons.speeches(lines,image:image,source:detected)}
+        }
+        return ComicReading(lines:lines,speeches:speeches,language:detected,runtime:runtime)
     }
     // A stronger partial word cannot replace a complete fast line. Retain the
     // union of source bounds even when the readings agree on the full span.

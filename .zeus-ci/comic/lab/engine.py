@@ -21,6 +21,20 @@ class Engine:
         owners=np.zeros(len(boxes),np.int32);bounds=np.zeros(len(boxes)*4,np.int32)
         count=self.lib.balloon_lobes(interior,w,h,boxes.reshape(-1),len(boxes),owners,bounds)
         return owners,bounds[:count*4].reshape(-1,4)
+    def flat_balloon_mask(self,paper,boxes,area=None):
+        u8=np.ctypeslib.ndpointer(dtype=np.uint8,flags='C_CONTIGUOUS');i32=np.ctypeslib.ndpointer(dtype=np.int32,flags='C_CONTIGUOUS')
+        self.lib.flat_balloon_mask.argtypes=[u8,u8]+[ctypes.c_int]*6+[i32,ctypes.c_int]
+        paper=np.ascontiguousarray(paper,np.uint8);h,w=paper.shape;mask=np.zeros_like(paper);boxes=np.ascontiguousarray(boxes,np.int32).reshape(-1,4)
+        area=area or[1,1,w-1,h-1]
+        complete=bool(self.lib.flat_balloon_mask(paper,mask,w,h,*map(int,area),boxes.reshape(-1),len(boxes)))
+        return mask,complete
+    def apply_flat_cleanup(self,rgb,origin,flat):
+        h,w=rgb.shape[:2];mask=np.zeros((h,w),np.uint8);result=rgb.copy()
+        if not flat['complete']:return result,mask,False
+        x=flat['origin'][0]-origin[0];y=flat['origin'][1]-origin[1];mh,mw=flat['mask'].shape
+        l=max(0,x);t=max(0,y);r=min(w,x+mw);b=min(h,y+mh)
+        if r>l and b>t:mask[t:b,l:r]=flat['mask'][t-y:b-y,l-x:r-x]
+        result[mask>0]=flat['color'];return result,mask,True
     def ink_style(self,rgb,boxes):
         u8=np.ctypeslib.ndpointer(dtype=np.uint8,flags='C_CONTIGUOUS');i32=np.ctypeslib.ndpointer(dtype=np.int32,flags='C_CONTIGUOUS');f32=np.ctypeslib.ndpointer(dtype=np.float32,flags='C_CONTIGUOUS')
         self.lib.ink_style.argtypes=[u8,ctypes.c_int,ctypes.c_int,i32,ctypes.c_int,f32];self.lib.ink_style.restype=ctypes.c_float

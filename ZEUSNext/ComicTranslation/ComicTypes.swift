@@ -84,7 +84,7 @@ struct ComicPreferences: Codable, Equatable {
     var letterCaseRaw: String?
     var letterSpacing: Double?
     var letterCase: ComicLetterCase { ComicLetterCase(rawValue: letterCaseRaw ?? "") ?? .original }
-    var renderIdentity: String { "render-v10|restoration:\(restorationEnabled ?? true)|\(fontName ?? "default")|\(fontScale)|\(textColor ?? "auto")|\(inkStyle.rawValue)|\(letterCase.rawValue)|\(letterSpacing ?? 0)" }
+    var renderIdentity: String { "render-v11|restoration:\(restorationEnabled ?? true)|\(fontName ?? "default")|\(fontScale)|\(textColor ?? "auto")|\(inkStyle.rawValue)|\(letterCase.rawValue)|\(letterSpacing ?? 0)" }
     var inkStyle: ComicInkStyle { get { ComicInkStyle(rawValue: inkStyleRaw ?? "") ?? .automatic } set { inkStyleRaw = newValue.rawValue } }
     var engine: ComicOnlineEngine = .existing
     var translation: TranslationPreferences?
@@ -137,6 +137,13 @@ struct ComicLine: Codable, Equatable {
     var glyphHeight: Double? = nil
     var words: [ComicWord]? = nil
 }
+struct ComicFlatCleanup: Codable, Equatable {
+    var color:[UInt8]
+    // Sparse source-pixel spans: x, y, length. Only enclosed, OCR-owned glyphs.
+    var runs:[Int]
+    var complete:Bool
+    func offsetBy(dx:Int,dy:Int)->ComicFlatCleanup{var value=self;for i in stride(from:0,to:value.runs.count,by:3){value.runs[i]+=dx;value.runs[i+1]+=dy};return value}
+}
 struct ComicSpeech: Codable, Equatable {
     var id: String
     var text: String
@@ -144,8 +151,10 @@ struct ComicSpeech: Codable, Equatable {
     var rect: CGRect
     var vertical: Bool
     var balloon: Bool = false
+    var flatCleanup: ComicFlatCleanup? = nil
     // Optional so cached results from older revisions keep decoding.
     var angle: Double? = nil
+    var balloonBounds: CGRect? = nil
 }
 struct ComicReading: Codable { var lines: [ComicLine]; var speeches: [ComicSpeech]; var language: String; var runtime: String }
 struct ComicCachedResult: Codable { var version = 1; var reading: ComicReading; var translations: [TranslationSegment] }
@@ -160,7 +169,7 @@ enum ComicIdentity {
         hash(segments.map{$0.id+"\0"+$0.text}.joined(separator:"\n"))
     }
     static func settings(_ preferences: ComicPreferences, translation: TranslationPreferences, provider: AIProviderConfiguration?) -> String {
-        hash("comic-v20|fallback:\(preferences.allowOnlineFallback ?? false)|\(preferences.mode.rawValue)|\(preferences.source)|\(translation.target)|" + TranslationMemory.namespace(page: "comic://content", preferences: translation, provider: provider))
+        hash("comic-v21|fallback:\(preferences.allowOnlineFallback ?? false)|\(preferences.mode.rawValue)|\(preferences.source)|\(translation.target)|" + TranslationMemory.namespace(page: "comic://content", preferences: translation, provider: provider))
     }
 }
 enum ComicGeometry {

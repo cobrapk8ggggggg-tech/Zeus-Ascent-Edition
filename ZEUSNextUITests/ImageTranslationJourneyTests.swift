@@ -64,6 +64,21 @@ final class ImageTranslationJourneyTests: XCTestCase {
         capture("image-translation-typography-controls")
     }
 
+    func testActualVioletChapterRendersWithRestorationDisabled(){
+        let app=XCUIApplication();app.launchArguments=["--uitesting","--layout=dualBars","--comic-violet-fixture"];app.launch()
+        let search=app.textFields["homeSearchField"];XCTAssertTrue(search.waitForExistence(timeout:20));search.tap();search.typeText("http://127.0.0.1:8765/comic-violet/?page=1\n")
+        XCTAssertTrue(app.webViews.staticTexts["Violet real chapter"].waitForExistence(timeout:30))
+        openTools(app,layout:"dualBars");app.buttons["menu-translateImagesButton"].firstMatch.tap()
+        let translated=app.staticTexts.matching(NSPredicate(format:"label CONTAINS %@","مترجمة")).firstMatch
+        let ready=NSPredicate{_,_ in
+            guard translated.exists else{return false}
+            let values=translated.label.components(separatedBy:"·").last ?? ""
+            return values.range(of:"[1-9١-٩][0-9٠-٩]*",options:.regularExpression) != nil
+        }
+        expectation(for:ready,evaluatedWith:nil);waitForExpectations(timeout:85)
+        let hierarchy=XCTAttachment(string:app.debugDescription);hierarchy.name="Violet actual app - fastest, auto language, restoration off";hierarchy.lifetime = .keepAlways;add(hierarchy)
+        capture("Violet real chapter translated in running app with restoration off")
+    }
     private func startFromMenu(_ layout: String) {
         let app = launch(layout)
         let search = app.textFields["homeSearchField"]

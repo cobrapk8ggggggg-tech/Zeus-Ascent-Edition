@@ -103,3 +103,5 @@ extern "C" int zeus_comic_mask_owned(const unsigned char *mask,int width,int hei
 extern "C" int zeus_comic_balloon_lobes(const unsigned char*m,int w,int h,const int*b,int n,int*o,int*r){return comic_balloon_lobes(m,w,h,b,n,o,r);}
 
 extern "C" float zeus_comic_ink_style(const unsigned char*p,int w,int h,const int*b,int n,float*o){return comic_ink_style(p,w,h,b,n,o);}
+
+extern "C" int zeus_comic_flat_balloon_mask(const unsigned char*p,unsigned char*m,int w,int h,int l,int t,int r,int b,const int*boxes,int n){return comic_flat_balloon_mask(p,m,w,h,l,t,r,b,boxes,n);}

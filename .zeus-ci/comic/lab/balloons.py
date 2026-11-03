@@ -2,8 +2,8 @@
 import cv2,numpy as np
 from run_geometry import group
 
-def paragraphs(rgb,lines,include_layout=False,engine=None):
- h,w=rgb.shape[:2];cache={};plates=[];shapes={}
+def paragraphs(rgb,lines,include_layout=False,engine=None,include_cleanup=False):
+ h,w=rgb.shape[:2];cache={};plates=[];shapes={};colors={}
  def plate(box):
   x,y,r,b=box
   xs=np.linspace(x+1,max(x+1,r-2),7).astype(int).clip(0,w-1);ys=np.linspace(y+1,max(y+1,b-2),7).astype(int).clip(0,h-1)
@@ -22,6 +22,8 @@ def paragraphs(rgb,lines,include_layout=False,engine=None):
   result=max(candidates,key=lambda b:(b[2]-b[0])*(b[3]-b[1]));xx,yy,rr,bb=result
   label=next(int(label)for label in np.unique(labels[np.ix_(ys,xs)])if label and list(map(int,stats[label,:4]))==[xx,yy,rr-xx,bb-yy])
   shapes[tuple(result)]=np.pad((labels[yy:bb,xx:rr]==label).astype(np.uint8)*255,1)
+  region=rgb[yy:bb,xx:rr][shapes[tuple(result)][1:-1,1:-1]>0]
+  field=region.mean(axis=0);colors[tuple(result)]=(np.round(field).astype(np.uint8),float((np.abs(region.astype(int)-field).sum(1)<=18).mean())>=.9)
   return result
  initial=group(lines)
  for g in initial+[[line]for line in lines]:
@@ -46,12 +48,23 @@ def paragraphs(rgb,lines,include_layout=False,engine=None):
    x,y,r,b=p;local=[[l['box'][0]-x+1,l['box'][1]-y+1,l['box'][2]-x+1,l['box'][3]-y+1]for l in g]
    owners,bounds=engine.balloon_lobes(shapes[tuple(p)],local)
    if len(bounds)>1:lobes=[([int(q[0]+x-1),int(q[1]+y-1),int(q[2]+x-1),int(q[3]+y-1)],[line for i,line in enumerate(g)if owners[i]==j])for j,q in enumerate(bounds)]
+  original_plate=p
   for p,g in lobes:
    if not g:continue
+   flat=None
+   if engine is not None and colors[tuple(original_plate)][1]:
+    xx,yy,rr,bb=original_plate;origin=[xx-1,yy-1];paper=shapes[tuple(original_plate)];boxes=[]
+    for line in g:
+     a,c,d,f=line['box'];pad=max(8,min(d-a,f-c)*.3);boxes.append([int(np.floor(a-pad-xx+1)),int(np.floor(c-pad-yy+1)),int(np.ceil(d+pad-xx+1)),int(np.ceil(f+pad-yy+1))])
+    mask,complete=engine.flat_balloon_mask(paper,boxes,[p[0]-xx+1,p[1]-yy+1,p[2]-xx+1,p[3]-yy+1])
+    tight=[[l['box'][0]-xx+1,l['box'][1]-yy+1,l['box'][2]-xx+1,l['box'][3]-yy+1]for l in g]
+    if complete:complete=engine.safe_to_letter(np.ascontiguousarray(rgb[yy-1:bb+1,xx-1:rr+1]),mask,tight)
+    flat=dict(mask=mask,complete=complete,color=colors[tuple(original_plate)][0],origin=origin)
+
    x,y,r,b=p;dx=(r-x)*.15;dy=(b-y)*.15
    area=[max(x+2,min(x+dx,min(l['box'][0]-3 for l in g))),max(y+2,min(y+dy,min(l['box'][1]-3 for l in g))),min(r-2,max(r-dx,max(l['box'][2]+3 for l in g))),min(b-2,max(b-dy,max(l['box'][3]+3 for l in g)))]
-   result.append((sorted(g,key=lambda l:(l['box'][1],l['box'][0])),[int(v)for v in area],True))
+   result.append((sorted(g,key=lambda l:(l['box'][1],l['box'][0])),[int(v)for v in area],True,flat))
  for g in group(unplated):
   x=min(l['box'][0]for l in g);y=min(l['box'][1]for l in g);r=max(l['box'][2]for l in g);b=max(l['box'][3]for l in g);pad=max(3,min(r-x,b-y)*.12)
-  result.append((g,[max(1,int(x-pad)),max(1,int(y-pad)),min(w-1,int(r+pad)),min(h-1,int(b+pad))],False))
- return result if include_layout else[(g,area)for g,area,_ in result]
+  result.append((g,[max(1,int(x-pad)),max(1,int(y-pad)),min(w-1,int(r+pad)),min(h-1,int(b+pad))],False,None))
+ return result if include_cleanup else[(g,area,closed)for g,area,closed,_ in result]if include_layout else[(g,area)for g,area,_,_ in result]

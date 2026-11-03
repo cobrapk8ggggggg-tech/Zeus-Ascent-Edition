@@ -23,6 +23,7 @@ jobs:
       - run: pip install -r .zeus-ci/comic/lab/requirements.txt
       - run: python .zeus-ci/comic/lab/test_masks.py
       - run: python .zeus-ci/comic/lab/test_balloons_and_ink.py
+      - run: python .zeus-ci/comic/lab/test_flat_balloons.py
       - if: inputs.real_chapters == true
         run: |
           python .zeus-ci/comic/lab/models.py .zeus-ci/comic/lab/models

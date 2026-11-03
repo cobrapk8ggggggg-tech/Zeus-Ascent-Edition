@@ -61,6 +61,8 @@ jobs:
       - name: Boot an available simulator with bounded failover
         timeout-minutes: 15
         run: python3 .zeus-ci/comic/boot_simulator.py $COMIC_SIMULATORS
+      - name: Download the exact Violet chapter pixels
+        run: python3 .zeus-ci/comic/prepare_violet.py
       - name: Start deterministic provider fixture
         run: |
           python3 .zeus-ci/fixture_server.py > results/fixture.log 2>&1 &

@@ -210,7 +210,7 @@ class Handler(BaseHTTPRequestHandler):
             if 'INPUT_JSON:' in prompt:
                 items = json.loads(prompt.split('INPUT_JSON:', 1)[1])
                 with TRANSLATION_LOCK: TRANSLATION_REQUESTS.setdefault(body.get('model', ''), []).append([x['text'] for x in items])
-                text = json.dumps([{'id': x['id'], 'text': 'ترجمة: ' + x['text']} for x in items], ensure_ascii=False)
+                text = json.dumps([{'id': x['id'], 'text': 'هل يمكنك مساعدتنا؟' if body.get('model','').startswith('comic-violet') else 'ترجمة: ' + x['text']} for x in items], ensure_ascii=False)
             else: text = 'OK'
             if body.get('model') == 'broken-json': text = '[{"id":"wrong","text":"wrong"}]'
             if body.get('model') == 'slow-translator': time.sleep(0.4)
@@ -236,6 +236,20 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if github_response(self, 'GET'): return
+        if self.path.startswith('/comic-violet/'):
+            root=Path(__file__).resolve().parent/'comic/lab/output/violet'
+            manifest=json.loads((Path(__file__).resolve().parent/'comic/violet.json').read_text())
+            pages={p['path']:p for p in manifest['pages']}
+            name=urlparse(self.path).path.removeprefix('/comic-violet/image/')
+            if self.path.startswith('/comic-violet/image/') and name in pages:
+                body=(root/name).read_bytes();kind='image/jpeg'
+            elif urlparse(self.path).path=='/comic-violet/':
+                number=int(parse_qs(urlparse(self.path).query).get('page',['1'])[0])
+                selected=manifest['pages'][number:number+1]
+                markup=''.join('<img alt="Violet original chapter page" src="/comic-violet/image/'+p['path']+'" width="'+str(p['width'])+'" height="'+str(p['height'])+'">' for p in selected)
+                body=('<meta name="viewport" content="width=device-width,initial-scale=1"><title>Violet real chapter</title><style>body{margin:0;background:#111;color:white}img{display:block;width:100%;height:auto}</style><p>Violet real chapter</p>'+markup).encode();kind='text/html; charset=utf-8'
+            else:self.send_response(404);self.end_headers();return
+            self.send_response(200);self.send_header('Content-Type',kind);self.send_header('Content-Length',str(len(body)));self.end_headers();self.wfile.write(body);return
         if self.path.startswith('/comic-quality-fixtures'):
             root=Path(__file__).resolve().parent/'comic/lab/fixtures'
             name=parse_qs(urlparse(self.path).query).get('name',[''])[0]

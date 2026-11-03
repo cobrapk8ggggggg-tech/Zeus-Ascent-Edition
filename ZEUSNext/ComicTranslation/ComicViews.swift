@@ -308,7 +308,7 @@ struct ComicTranslationCard: View {
                 else { Image(systemName:session.error == nil ? "character.viewfinder":"exclamationmark.circle").foregroundStyle(session.error == nil ? Color.accentColor:Color.orange) }
                 VStack(alignment:.leading,spacing:3) {
                     Text(session.showingOriginal ? "عرض الأصل":session.phase.title).font(.subheadline.weight(.semibold))
-                    Text(session.completed == 0 && session.phase == .completed ? "لم يُعثر على نص في الصور المتاحة":"\(session.completed) منطقة معالجة")
+                    Text(session.detectedTexts == 0 && session.phase == .completed ? "لم يُعثر على نص في الصور المتاحة":"\(session.detectedTexts) نصوص مكتشفة · \(session.translatedTexts) مترجمة")
                         .font(.caption).foregroundStyle(.secondary).monospacedDigit()
                 }
                 Image(systemName:expanded ? "chevron.down":"chevron.up").font(.caption2).foregroundStyle(.secondary)
