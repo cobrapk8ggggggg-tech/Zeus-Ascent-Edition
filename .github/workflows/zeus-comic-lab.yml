@@ -8,13 +8,13 @@ on:
       real_chapters:
         type: boolean
         default: false
-        description: Download and exercise ten real chapters (review proposals, not visual acceptance)
+        description: Download and exercise the frozen eleven real chapters (review proposals, not visual acceptance)
 permissions:
   contents: read
 jobs:
   masks:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: ${{ inputs.real_chapters && 120 || 30 }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -25,8 +25,9 @@ jobs:
       - if: inputs.real_chapters == true
         run: |
           python .zeus-ci/comic/lab/models.py .zeus-ci/comic/lab/models
-          python .zeus-ci/comic/lab/acquire.py .zeus-ci/comic/lab/data
-          python .zeus-ci/comic/lab/run.py --corpus .zeus-ci/comic/lab/data --models .zeus-ci/comic/lab/models --output .zeus-ci/comic/lab/output/review --regions 400 --ocr
+          python .zeus-ci/comic/lab/acquire.py .zeus-ci/comic/lab/data --manifest docs/comic-translation/lab/corpus.json
+          python .zeus-ci/comic/lab/run.py --corpus .zeus-ci/comic/lab/data --models .zeus-ci/comic/lab/models --output .zeus-ci/comic/lab/output/review --regions 440 --ocr --neural
+          python .zeus-ci/comic/lab/annotate.py .zeus-ci/comic/lab/output/review/index.html
       - uses: actions/upload-artifact@v4
         if: always()
         with:

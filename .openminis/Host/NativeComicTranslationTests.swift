@@ -306,9 +306,13 @@ import UIKit
             UIColor.white.setFill();context.fill(CGRect(x:0,y:0,width:700,height:220))
             ("مرحبًا بكم في هذا العالم الجميل" as NSString).draw(at:CGPoint(x:35,y:65),withAttributes:[.font:UIFont(name:"GeezaPro",size:42)!, .foregroundColor:UIColor.black])
         }.cgImage!
+        let input=XCTAttachment(image:UIImage(cgImage:image));input.name="Arabic OCR source";input.lifetime = .keepAlways;add(input)
+        let probe=try await ComicOCR.scriptProbe(image,region:nil)
+        let details="probe \(probe.0): \(probe.1.map{($0.text,$0.confidence)})"
+        let evidence=XCTAttachment(string:details);evidence.name="Arabic OCR diagnostic";evidence.lifetime = .keepAlways;add(evidence)
         let reading=try await ComicOCR.shared.read(image,source:"auto",mode:.balanced)
         XCTAssertEqual(reading.language,"ar","Arabic must not be overwritten by a Latin fallback recognizer")
-        XCTAssertTrue(reading.lines.map(\.text).joined().unicodeScalars.contains{(0x0600...0x06FF).contains($0.value)},"Arabic reading: \(reading.lines.map{($0.text,$0.confidence)})")
+        XCTAssertTrue(reading.lines.map(\.text).joined().unicodeScalars.contains{(0x0600...0x06FF).contains($0.value)},"Arabic reading: \(reading.lines.map{($0.text,$0.confidence)}); \(details)")
     }
     func testVerticalJapanesePaddleReadsTopToBottom()async throws{
         try await ComicModelStore.shared.prepare(source:"ja")
@@ -326,8 +330,12 @@ import UIKit
             ("HELLO WORLD. This chapter contains a story and a long English caption." as NSString).draw(at:CGPoint(x:25,y:35),withAttributes:[.font:UIFont.systemFont(ofSize:28),.foregroundColor:UIColor.black])
             ("مرحبًا بكم في العالم الجميل" as NSString).draw(at:CGPoint(x:35,y:150),withAttributes:[.font:UIFont(name:"GeezaPro",size:40)!, .foregroundColor:UIColor.black])
         }.cgImage!
+        let input=XCTAttachment(image:UIImage(cgImage:image));input.name="Mixed-script OCR source";input.lifetime = .keepAlways;add(input)
+        let probe=try await ComicOCR.scriptProbe(image,region:nil)
+        let details="probe \(probe.0): \(probe.1.map{($0.text,$0.confidence)})"
+        let evidence=XCTAttachment(string:details);evidence.name="Mixed OCR diagnostic";evidence.lifetime = .keepAlways;add(evidence)
         let reading=try await ComicOCR.shared.read(image,source:"auto",mode:.balanced),text=reading.lines.map(\.text).joined(separator:" ")
-        XCTAssertTrue(text.uppercased().contains("HELLO"),"Mixed Latin: \(text)");XCTAssertTrue(text.unicodeScalars.contains{(0x0600...0x06FF).contains($0.value)},"Mixed Arabic: \(text)")
+        XCTAssertTrue(text.uppercased().contains("HELLO"),"Mixed Latin: \(text)");XCTAssertTrue(text.unicodeScalars.contains{(0x0600...0x06FF).contains($0.value)},"Mixed Arabic: \(text); \(details)")
     }
     func testLanguageVoteUsesOwnedPanelInsteadOfNeighbourContext()async throws{
         let image=renderer(CGSize(width:800,height:500)).image{context in

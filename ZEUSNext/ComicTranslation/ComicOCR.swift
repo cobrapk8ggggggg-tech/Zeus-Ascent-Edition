@@ -69,23 +69,23 @@ actor ComicOCR {
         // recognizer choice or downloading every language model up front.
         if source=="auto"{
             let primary=ComicModelStore.recognizer(detected)
-            for sample in probe.1 where sample.confidence>=0.65{
+            for sample in probe.1 where sample.confidence >= (Self.lineScript(sample.text)=="arabic" ? 0.3:0.65){
                 let script=Self.lineScript(sample.text)
                 let overlaps=lines.indices.filter{lines[$0].rect.intersection(sample.rect).area/min(max(1,lines[$0].rect.area),max(1,sample.rect.area))>0.6}
-                if script != "latin" && script != "other" && (script != primary || overlaps.isEmpty || overlaps.allSatisfy{lines[$0].confidence<sample.confidence}){
+                if script != "latin" && script != "other" && (script != primary || overlaps.isEmpty || overlaps.contains{Self.lineScript(lines[$0].text) != script} || overlaps.allSatisfy{lines[$0].confidence<sample.confidence}){
                     lines=lines.enumerated().filter{!overlaps.contains($0.offset)}.map{$0.element};lines.append(sample)
                 }else if script=="latin",primary != "latin",overlaps.isEmpty,sample.confidence>=0.95,sample.text.filter({$0.isLetter}).count>=3{lines.append(sample)}
             }
         }
         return ComicReading(lines:lines,speeches:ComicBalloons.speeches(lines,image:image,source:detected),language:detected,runtime:runtime)
     }
-    private static func scriptProbe(_ image:CGImage,region:CGRect?)async throws->(String,[ComicLine]){
+    static func scriptProbe(_ image:CGImage,region:CGRect?)async throws->(String,[ComicLine]){
         var samples=try vision(image,languages:["ar-SA","ko-KR","ja-JP","zh-Hans","ru-RU","en-US"],accurate:true,automatic:true)
         // Vision's automatic language choice can select English for a mixed
         // panel and omit its Arabic line. An explicit supported Arabic pass
         // supplies only Arabic-script candidates; it cannot replace Latin text.
         if try VNRecognizeTextRequest().supportedRecognitionLanguages().contains("ar-SA"){
-            let arabic=try vision(image,languages:["ar-SA"],accurate:true).filter{lineScript($0.text)=="arabic" && $0.confidence>=0.65}
+            let arabic=try vision(image,languages:["ar-SA"],accurate:true).filter{lineScript($0.text)=="arabic" && $0.confidence>=0.3}
             for line in arabic{
                 if let index=samples.firstIndex(where:{$0.rect.intersection(line.rect).area/min(max(1,$0.rect.area),max(1,line.rect.area))>0.6 && lineScript($0.text)=="arabic"}){
                     if line.confidence>=samples[index].confidence{samples[index]=line}
