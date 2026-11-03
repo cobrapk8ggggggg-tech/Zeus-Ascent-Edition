@@ -13,7 +13,7 @@ for case in cases:
  if not case['cleanup_accepted']:clean=rgb.copy()
  case['outside_mask_changes']=int(np.count_nonzero(np.any(clean!=rgb,axis=2)&(mask==0)))
  for name,array in [('mask',mask),('clean',clean)]:Image.fromarray(array).save(dest/(name+'.png'))
- source=[min(q[i]for q in boxes)if i<2 else max(q[i]for q in boxes)for i in range(4)]
+ source=case.get("layout_box",[min(q[i]for q in boxes)if i<2 else max(q[i]for q in boxes)for i in range(4)])
  text=('This is a translated paragraph.' if len(boxes)>1 else 'Translation')if case['language']=='ar'else('هذه ترجمة عربية تجريبية داخل الفقاعة'if len(boxes)>1 else 'ترجمة تجريبية')
  color=(12,)*3 if np.median(rgb)>128 else (248,)*3
  rendered,fit=lettering(clean,source,text,np.median([l['glyph_height']for l in case['lines']])*1.3,color,direction='ltr'if case['language']=='ar'else'rtl')

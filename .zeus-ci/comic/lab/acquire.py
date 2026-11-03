@@ -42,6 +42,19 @@ def acquire(root):
             if len(existing)>=2:break
     counts={lang:len([c for c in corpus['chapters'] if c['language']==lang]) for lang in ['en','ja','ko','zh','ar']}
     print(json.dumps(counts));return corpus
+def restore(root,manifest):
+    corpus=json.loads(manifest.read_text());root.mkdir(parents=True,exist_ok=True)
+    for chapter in corpus['chapters']:
+        def page(item):
+            p=root/item['path'];p.parent.mkdir(parents=True,exist_ok=True)
+            if not p.exists() or hashlib.sha256(p.read_bytes()).hexdigest()!=item['sha256']:
+                p.write_bytes(fetch(item['url']))
+            if hashlib.sha256(p.read_bytes()).hexdigest()!=item['sha256']:raise ValueError('fixture source changed: '+item['path'])
+            with Image.open(p)as im:im.verify()
+        with concurrent.futures.ThreadPoolExecutor(4)as pool:list(pool.map(page,chapter['pages']))
+        print('restored',chapter['id'],len(chapter['pages']),flush=True)
+    (root/'corpus.json').write_text(json.dumps(corpus,ensure_ascii=False,indent=2));return corpus
 if __name__=='__main__':
     import argparse
-    p=argparse.ArgumentParser();p.add_argument('directory',type=pathlib.Path);args=p.parse_args();acquire(args.directory)
+    p=argparse.ArgumentParser();p.add_argument('directory',type=pathlib.Path);p.add_argument('--manifest',type=pathlib.Path);args=p.parse_args()
+    restore(args.directory,args.manifest) if args.manifest else acquire(args.directory)

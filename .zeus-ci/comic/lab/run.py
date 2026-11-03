@@ -1,23 +1,15 @@
-import argparse, html, json, pathlib, time, resource
+import argparse, html, json, pathlib, time, resource, random, math
 import cv2,numpy as np
 from PIL import Image,ImageDraw,ImageFont
 from engine import Engine
+from balloons import paragraphs
 FONT='/usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf'
 
-def group(lines):
-    groups=[]
-    for line in lines:
-        x,y,r,b=line['box'];matches=[]
-        for g in groups:
-            a,c,d,e=g[-1]['box'];height=max(b-y,e-c)
-            if -height*.4<=y-e<height*1.2 and min(r,d)-max(x,a)>min(r-x,d-a)*.25:matches.append(g)
-        if matches:min(matches,key=lambda g:abs(g[-1]['box'][3]-y)).append(line)
-        else:groups.append([line])
-    return groups
 
 def lettering(rgb,box,text,size,color,direction="rtl"):
     image=Image.fromarray(rgb);draw=ImageDraw.Draw(image);x,y,r,b=box
-    for size in range(max(5,int(size)),4,-1):
+    minimum=max(5,int(size*.55))
+    for size in range(max(5,int(size)),minimum-1,-1):
         font=ImageFont.truetype(FONT,size);words=text.split();rows=[];row=''
         for word in words:
             test=(row+' '+word).strip()
@@ -26,7 +18,7 @@ def lettering(rgb,box,text,size,color,direction="rtl"):
                 if row:rows.append(row)
                 row=word
         if row:rows.append(row)
-        lineheight=int(size*1.6)
+        lineheight=max(1,max(font.getbbox(row,direction=direction)[3]-font.getbbox(row,direction=direction)[1]for row in rows)+int(size*.2))
         if len(rows)*lineheight<=b-y and all(draw.textlength(row,font=font,direction=direction)<=r-x-4 for row in rows):break
     else:return rgb,False
     top=y+(b-y-len(rows)*lineheight)/2
@@ -38,14 +30,17 @@ def run(args):
     engine=Engine(args.models);corpus=json.loads((root/'corpus.json').read_text());cases=[];stages=[]
     for chapter in corpus['chapters']:
         limit=args.regions//len(corpus['chapters']);count=0
-        for page in chapter['pages']:
+        pages=list(chapter['pages']);random.Random(0).shuffle(pages)
+        per_page=math.ceil(limit/len(pages))+2
+        for page in pages:
             if count>=limit:break
             rgb=np.asarray(Image.open(root/page['path']).convert('RGB'));start=time.perf_counter();lines=engine.detect(rgb)
-            for paragraph in group(lines):
+            groups=paragraphs(rgb,lines);random.Random(0).shuffle(groups)
+            for paragraph,area in groups[:per_page]:
                 if count>=limit:break
                 boxes=[l['box'] for l in paragraph];x=min(b[0]for b in boxes);y=min(b[1]for b in boxes);r=max(b[2]for b in boxes);b=max(b[3]for b in boxes)
                 if r-x<15 or b-y<10 or (r-x)*(b-y)>750000:continue
-                pad=24;cx=max(0,x-pad);cy=max(0,y-pad);cr=min(rgb.shape[1],r+pad);cb=min(rgb.shape[0],b+pad)
+                pad=24;cx=max(0,min(x,area[0])-pad);cy=max(0,min(y,area[1])-pad);cr=min(rgb.shape[1],max(r,area[2])+pad);cb=min(rgb.shape[0],max(b,area[3])+pad)
                 crop=np.ascontiguousarray(rgb[cy:cb,cx:cr]);local=[[a-cx,c-cy,d-cx,e-cy] for a,c,d,e in boxes]
                 clean,mask=engine.clean(crop,local);accepted=engine.safe_to_letter(crop,mask,local)
                 if not accepted:clean=crop.copy()
@@ -54,13 +49,13 @@ def run(args):
                 for name,a in [('original',crop),('mask',mask),('clean',clean)]:Image.fromarray(a).save(dest/(name+'.png'))
                 text=('This is a translated paragraph.' if len(paragraph)>1 else 'Translation') if chapter['language']=='ar' else ('هذه ترجمة عربية تجريبية داخل الفقاعة' if len(paragraph)>1 else 'ترجمة تجريبية')
                 fg=(12,12,12) if np.median(crop)>128 else (248,248,248)
-                rendered,fit=lettering(clean,[x-cx,y-cy,r-cx,b-cy],text,np.median([l['glyph_height']for l in paragraph])*1.3,fg,direction='ltr' if chapter['language']=='ar' else 'rtl')
+                rendered,fit=lettering(clean,[area[0]-cx,area[1]-cy,area[2]-cx,area[3]-cy],text,np.median([l['glyph_height']for l in paragraph])*1.3,fg,direction='ltr' if chapter['language']=='ar' else 'rtl')
                 if not accepted:rendered=crop.copy()
                 Image.fromarray(rendered).save(dest/'rendered.png')
                 recognized=[]
                 if args.ocr:
                     for line in paragraph:recognized.append(engine.recognize(rgb,line['box'],chapter['language']))
-                case=dict(id=cid,language=chapter['language'],split=chapter['split'],chapter=chapter['id'],source=page['path'],source_sha256=page['sha256'],box=[cx,cy,cr,cb],lines=paragraph,ocr=recognized,outside_mask_changes=outside,fit=fit,cleanup_accepted=accepted,annotation_status='unreviewed',translation='fixed Arabic layout probe',seconds=time.perf_counter()-start)
+                case=dict(id=cid,language=chapter['language'],split=chapter['split'],chapter=chapter['id'],source=page['path'],source_sha256=page['sha256'],box=[cx,cy,cr,cb],layout_box=[area[0]-cx,area[1]-cy,area[2]-cx,area[3]-cy],lines=paragraph,ocr=recognized,outside_mask_changes=outside,fit=fit,cleanup_accepted=accepted,annotation_status='unreviewed',translation='fixed Arabic layout probe',seconds=time.perf_counter()-start)
                 cases.append(case);count+=1;start=time.perf_counter()
                 if args.lama and count<=args.lama:
                     restored=engine.lama(crop,mask);Image.fromarray(restored).save(dest/'lama.png')

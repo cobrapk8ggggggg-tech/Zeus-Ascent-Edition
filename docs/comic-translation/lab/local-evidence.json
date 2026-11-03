@@ -10,13 +10,13 @@
     "zh"
   ],
   "outside_mask_changes": 0,
-  "layout_probe_fits": 415,
+  "layout_probe_fits": 197,
   "manually_reviewed": 0,
   "quality_acceptance_proven": false,
-  "peak_rss_kib": 749368,
+  "peak_rss_kib": 802948,
   "mask_refresh_seconds": 18.950681800999973,
-  "cleanup_gate_accepted": 184,
-  "cleanup_gate_abstained": 256,
+  "cleanup_gate_accepted": 177,
+  "cleanup_gate_abstained": 263,
   "contact_sheet_triaged": 40,
   "accepted_gold_regions": 0,
   "missing_acceptance": [
@@ -30,5 +30,20 @@
   "known_background_maximum_channel_error": 3,
   "standalone_lama_peak_rss_kib": 773772,
   "ctd_lama_ocr_comparison_peak_rss_kib": 1996620,
-  "neural_models_shipped_in_app": false
+  "neural_models_shipped_in_app": false,
+  "triage_applies_to": "initial sequential sweep, not the stratified sweep",
+  "reproduced_with_verify_sh": true,
+  "dependency_versions": {
+    "onnxruntime": "1.23.2",
+    "opencv": "4.12.0",
+    "numpy": "2.2.6",
+    "Pillow": "11.3.0",
+    "PyYAML": "6.0.3"
+  },
+  "earlier_stratified_protocol": {
+    "cleanup_gate_accepted": 186,
+    "cleanup_gate_abstained": 254,
+    "layout_probe_fits": 418
+  },
+  "protocol": "deterministic page sampling, plate ownership, source-relative readability floor"
 }

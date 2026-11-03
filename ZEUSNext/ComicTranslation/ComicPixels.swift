@@ -41,6 +41,7 @@ enum ComicPixels {
             let heights=speech.lines.map{CGFloat($0.glyphHeight ?? Double(min($0.rect.height,$0.rect.width)))}.sorted()
             let sourceSize=heights[heights.count/2]*1.3
             guard let placed=place(text,area:area,imageHeight:image.height,target:target,fontName:fontName,fontScale:fontScale,theta:CGFloat(speech.angle ?? 0),letterSpacing:letterSpacing,maximumSize:sourceSize)else{continue}
+            if requireCleanSource && placed.layout.size<sourceSize*CGFloat(min(1.5,max(0.5,fontScale)))*0.55{continue}
             if requireCleanSource && !canClean(original,width:image.width,height:image.height,speech:speech){continue}
             clean(&pixels,width:image.width,height:image.height,speech:speech)
             let automatic=background.0*0.2126+background.1*0.7152+background.2*0.0722>0.5 ? CGColor(gray:0.04,alpha:1):CGColor(gray:0.98,alpha:1)

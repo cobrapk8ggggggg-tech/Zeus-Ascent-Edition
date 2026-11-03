@@ -149,6 +149,15 @@ import UIKit
         let speech=ComicSpeech(id:"0",text:line.text,lines:[line],rect:line.rect,vertical:false)
         XCTAssertThrowsError(try ComicPixels.render(image,speeches:[speech],translations:[TranslationSegment(id:"0",text:"ترجمة")],target:"ar",fontName:nil,fontScale:1,requireCleanSource:true))
     }
+    func testUnreadableTranslationKeepsOriginalInsteadOfMicroscopicLettering()throws{
+        let image=renderer(CGSize(width:200,height:100)).image{context in
+            UIColor.white.setFill();context.fill(CGRect(x:0,y:0,width:200,height:100))
+            ("HELLO" as NSString).draw(at:CGPoint(x:40,y:30),withAttributes:[.font:UIFont.boldSystemFont(ofSize:30),.foregroundColor:UIColor.black])
+        }.cgImage!
+        let line=ComicLine(text:"HELLO",confidence:1,rect:CGRect(x:40,y:35,width:110,height:30))
+        let speech=ComicSpeech(id:"0",text:line.text,lines:[line],rect:line.rect,vertical:false)
+        XCTAssertThrowsError(try ComicPixels.render(image,speeches:[speech],translations:[TranslationSegment(id:"0",text:String(repeating:"هل يمكنكم مساعدتنا؟ ",count:20))],target:"ar",fontName:nil,fontScale:1,requireCleanSource:true))
+    }
     func testSourceFontCapPreventsOneWordFillingHugeBalloon()throws{
         let short=try XCTUnwrap(ComicPixels.layout("سجن",rect:CGRect(x:0,y:0,width:450,height:350),target:"ar",fontName:nil,fontScale:1,maximumSize:26))
         let long=try XCTUnwrap(ComicPixels.layout("عذرًا، لكن هل يمكنكم مساعدتنا؟",rect:CGRect(x:0,y:0,width:450,height:350),target:"ar",fontName:nil,fontScale:1,maximumSize:26))

@@ -45,3 +45,29 @@ CTD segmentation is intersected with text ownership, not applied to an entire pa
 The lock file records exact revisions, sizes and digests. These are experimental
 comparators: no new deep restoration model is enabled in the shipped app merely
 because it downloaded or produced an image.
+
+The gallery can be augmented with a pixel annotation editor:
+
+```sh
+python .zeus-ci/comic/lab/annotate.py .zeus-ci/comic/lab/output/review/index.html
+python .zeus-ci/comic/lab/refresh.py --models .zeus-ci/comic/lab/models --cases .zeus-ci/comic/lab/output/review
+```
+
+Ink/protection brush strokes are exported in original pixel coordinates along
+with source transcription. Annotation requires independent human review. Samples
+use deterministic page/group shuffling with a per-page cap, to avoid filling a
+language's quota with only the cover and contents pages. Layout-fit and cleanup-
+coverage counters are diagnostics, not recall or visual-acceptance percentages.
+
+For the frozen 11-chapter corpus and the full sequence, use one command (Python,
+g++, FreeType/RAQM and the fonts above must be installed):
+
+```sh
+bash .zeus-ci/comic/lab/verify.sh /tmp/zeus-comic-review
+```
+
+This verifies all retained source hashes, installs an isolated Python environment,
+runs independent mask tests, downloads pinned OCR models and emits the review
+artifacts. If a frozen CDN URL has expired it fails rather than silently accepting
+different images; refresh it through the recorded chapter endpoint and retain the
+same SHA-256 before retrying.
