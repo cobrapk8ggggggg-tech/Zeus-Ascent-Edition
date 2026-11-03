@@ -120,15 +120,41 @@ actor ComicRestoration {
         } }
         return result
     }
-    private struct MaskedCrop{var id:String;var pixels:[UInt8];var mask:[UInt8];var bounds:CGRect;var width:Int;var height:Int}
+    private struct MaskedCrop{var id:String;var pixels:[UInt8];var mask:[UInt8];var bounds:CGRect;var width:Int;var height:Int;var boxes:[CGRect];var protected:CGRect;var retryMargin:Int}
+    private func grow(_ mask:inout [UInt8],width:Int,height:Int,area:CGRect,radius:Int){
+        mask.withUnsafeMutableBufferPointer{m in zeus_comic_grow_text_mask(m.baseAddress,Int32(width),Int32(height),Int32(area.minX),Int32(area.minY),Int32(area.maxX),Int32(area.maxY),Int32(radius))}
+    }
+    private func reconstructed(_ job:MaskedCrop,mask:[UInt8])async throws->[UInt8]{
+        let r=job.protected
+        let simple=job.pixels.withUnsafeBufferPointer{p in mask.withUnsafeBufferPointer{m in zeus_comic_simple_background(p.baseAddress,m.baseAddress,Int32(job.width),Int32(job.height),Int32(r.minX),Int32(r.minY),Int32(r.maxX),Int32(r.maxY)) != 0}}
+        if simple{
+            var clean=job.pixels
+            job.pixels.withUnsafeBufferPointer{s in mask.withUnsafeBufferPointer{m in clean.withUnsafeMutableBufferPointer{c in zeus_comic_inpaint_mask(s.baseAddress,c.baseAddress,m.baseAddress,Int32(job.width),Int32(job.height),Int32(r.minX),Int32(r.minY),Int32(r.maxX),Int32(r.maxY))}}}
+            if ComicPixels.inkResidue(job.pixels,clean:clean,mask:mask,width:job.width,height:job.height,boxes:job.boxes)<=0.08{return clean}
+        }
+        return try await inpaint(job.pixels,mask:mask,width:job.width,height:job.height)
+    }
     private func paint(_ jobs:[MaskedCrop],into result:inout [UInt8],imageWidth:Int)async throws->Set<String>{
         var ids=Set<String>()
         for job in jobs{
             try Task.checkCancellation()
             do{
-                let restored=try await inpaint(job.pixels,mask:job.mask,width:job.width,height:job.height)
+                var mask=job.mask
+                var restored=try await reconstructed(job,mask:mask)
+                if ComicPixels.inkResidue(job.pixels,clean:restored,mask:mask,width:job.width,height:job.height,boxes:job.boxes)>0.08{
+                    // Long letter shadows can teach LaMa to reconstruct the
+                    // original word. On retry hide the full OCR-owned line and
+                    // its immediate margin, clipped to the protected interior.
+                    for box in job.boxes{
+                        let r=box.insetBy(dx:-CGFloat(job.retryMargin),dy:-CGFloat(job.retryMargin)).integral.intersection(job.protected)
+                        guard !r.isNull else{continue}
+                        for y in Int(r.minY)..<Int(r.maxY){for x in Int(r.minX)..<Int(r.maxX){mask[y*job.width+x]=255}}
+                    }
+                    restored=try await reconstructed(job,mask:mask)
+                }
                 try Task.checkCancellation()
-                for y in 0..<job.height{for x in 0..<job.width where job.mask[y*job.width+x]>0{
+                guard ComicPixels.inkResidue(job.pixels,clean:restored,mask:mask,width:job.width,height:job.height,boxes:job.boxes)<=0.08 else{continue}
+                for y in 0..<job.height{for x in 0..<job.width where mask[y*job.width+x]>0{
                     let source=(y*job.width+x)*4,destination=((y+Int(job.bounds.minY))*imageWidth+x+Int(job.bounds.minX))*4
                     for c in 0..<4{result[destination+c]=restored[source+c]}
                 }}
@@ -184,7 +210,11 @@ actor ComicRestoration {
             }}}
             guard valid else{continue}
             try Task.checkCancellation()
-            jobs.append(MaskedCrop(id:speech.id,pixels:pixels,mask:mask,bounds:bounds,width:crop.width,height:crop.height));pendingPixels+=crop.width*crop.height
+            let glyphs=local.lines.map{min($0.rect.width,$0.rect.height)}.sorted(),glyph=glyphs[glyphs.count/2]
+            let textBounds=local.lines.reduce(CGRect.null){$0.union($1.rect)}
+            let protected=(local.balloon ? local.rect:textBounds.insetBy(dx:-max(8,min(18,glyph*0.4)),dy:-max(8,min(18,glyph*0.4)))).integral.intersection(CGRect(x:1,y:1,width:crop.width-2,height:crop.height-2))
+            grow(&mask,width:crop.width,height:crop.height,area:protected,radius:2)
+            jobs.append(MaskedCrop(id:speech.id,pixels:pixels,mask:mask,bounds:bounds,width:crop.width,height:crop.height,boxes:local.lines.map(\.rect),protected:protected,retryMargin:max(8,min(18,Int(ceil(glyph*0.4))))));pendingPixels+=crop.width*crop.height
         }
         if !jobs.isEmpty{ids.formUnion(try await paint(jobs,into:&result,imageWidth:image.width))}
         return Result(image: try ComicPixels.fromRGBA(result,width:image.width,height:image.height), restored:ids, notice:ids.count<candidates.count ? "احتُفظ ببعض النصوص الأصلية لتعذّر ترميمها كاملًا.":nil)

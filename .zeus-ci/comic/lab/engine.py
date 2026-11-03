@@ -14,6 +14,18 @@ class Engine:
             os.replace(temporary,library)
         self.lib=ctypes.CDLL(str(library));p=np.ctypeslib.ndpointer(dtype=np.uint8,flags='C_CONTIGUOUS')
         self.lib.clean.argtypes=[p]+[ctypes.c_int]*6;self.lib.text_mask.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.clean_source.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.coverage.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.coverage.restype=ctypes.c_float;self.lib.refine.argtypes=[p,p,p]+[ctypes.c_int]*6;self.lib.refine_ocr.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.clean_mask.argtypes=[p,p,p]+[ctypes.c_int]*6;self.lib.simple_background.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.neural_valid.argtypes=[p,p,p]+[ctypes.c_int]*6;self.lib.mask_owned.argtypes=[p]+[ctypes.c_int]*6+[np.ctypeslib.ndpointer(dtype=np.int32,flags='C_CONTIGUOUS'),ctypes.c_int]
+    def plate_has_edge(self,rgb,paper,origin,boxes):
+        u8=np.ctypeslib.ndpointer(dtype=np.uint8,flags='C_CONTIGUOUS');i32=np.ctypeslib.ndpointer(dtype=np.int32,flags='C_CONTIGUOUS')
+        self.lib.plate_has_edge.argtypes=[u8,ctypes.c_int,ctypes.c_int,u8]+[ctypes.c_int]*4+[i32,ctypes.c_int]
+        rgba=np.ascontiguousarray(cv2.cvtColor(rgb,cv2.COLOR_RGB2RGBA));ih,iw=rgb.shape[:2];h,w=paper.shape;boxes=np.ascontiguousarray(boxes,np.int32).reshape(-1,4)
+        return bool(self.lib.plate_has_edge(rgba,iw,ih,paper,w,h,*map(int,origin),boxes.reshape(-1),len(boxes)))
+    def grow_mask(self,mask,area,radius):
+        u8=np.ctypeslib.ndpointer(dtype=np.uint8,flags='C_CONTIGUOUS');self.lib.grow_text_mask.argtypes=[u8]+[ctypes.c_int]*7
+        result=mask.copy();h,w=mask.shape;self.lib.grow_text_mask(result,w,h,*map(int,area),int(radius));return result
+    def ink_residue(self,rgb,clean,mask,boxes):
+        u8=np.ctypeslib.ndpointer(dtype=np.uint8,flags='C_CONTIGUOUS');self.lib.ink_residue.argtypes=[u8,u8,u8]+[ctypes.c_int]*6;self.lib.ink_residue.restype=ctypes.c_float
+        source=np.ascontiguousarray(cv2.cvtColor(rgb,cv2.COLOR_RGB2RGBA));output=np.ascontiguousarray(cv2.cvtColor(clean,cv2.COLOR_RGB2RGBA));h,w=mask.shape
+        return max((float(self.lib.ink_residue(source,output,mask,w,h,*map(int,box)))for box in boxes),default=1)
     def balloon_lobes(self,interior,boxes):
         u8=np.ctypeslib.ndpointer(dtype=np.uint8,flags='C_CONTIGUOUS');i32=np.ctypeslib.ndpointer(dtype=np.int32,flags='C_CONTIGUOUS')
         self.lib.balloon_lobes.argtypes=[u8,ctypes.c_int,ctypes.c_int,i32,ctypes.c_int,i32,i32]
@@ -125,6 +137,12 @@ class Engine:
         image=cv2.copyMakeBorder(cv2.resize(rgb,(cw,ch)),0,1024-ch,0,1024-cw,cv2.BORDER_CONSTANT,value=(0,0,0))
         session=self.session('ctd.onnx');output=session.run(['seg'],{session.get_inputs()[0].name:image.astype(np.float32).transpose(2,0,1)[None]/255})[0][0,0]
         return ((cv2.resize(output[:ch,:cw],(w,h)))>.3).astype(np.uint8)*255
+    def reconstruct(self,rgb,mask,protected,boxes):
+        rgba=np.ascontiguousarray(cv2.cvtColor(rgb,cv2.COLOR_RGB2RGBA));h,w=mask.shape;area=[max(1,int(protected[0])),max(1,int(protected[1])),min(w-1,int(protected[2])),min(h-1,int(protected[3]))]
+        if self.lib.simple_background(rgba,mask,w,h,*area):
+            out=rgba.copy();self.lib.clean_mask(rgba,out,mask,w,h,*area);clean=out[:,:,:3]
+            if self.ink_residue(rgb,clean,mask,boxes)<=.08:return clean
+        return self.lama(rgb,mask)
     def restore_neural(self,rgb,boxes,balloon=None):
         h,w=rgb.shape[:2];bounds=balloon if balloon is not None else[min(q[0]for q in boxes),min(q[1]for q in boxes),max(q[2]for q in boxes),max(q[3]for q in boxes)]
         x=max(0,int(bounds[0])-48);y=max(0,int(bounds[1])-48);r=min(w,int(bounds[2])+48);b=min(h,int(bounds[3])+48)
@@ -135,7 +153,18 @@ class Engine:
         mask=self.refine(crop,hint,local)
         rgba=np.ascontiguousarray(cv2.cvtColor(crop,cv2.COLOR_RGB2RGBA))
         if not all(self.lib.neural_valid(rgba,hint,mask,crop.shape[1],crop.shape[0],*map(int,box))for box in local):return rgb.copy(),np.zeros((h,w),np.uint8),False
-        restored=self.lama(crop,mask);result=rgb.copy();result[y:b,x:r]=restored
+        glyph=float(np.median([min(q[2]-q[0],q[3]-q[1])for q in local]));pad=max(8,min(18,glyph*.4))
+        protected=owned if owned is not None else[max(1,min(q[0]for q in local)-pad),max(1,min(q[1]for q in local)-pad),min(crop.shape[1]-1,max(q[2]for q in local)+pad),min(crop.shape[0]-1,max(q[3]for q in local)+pad)]
+        mask=self.grow_mask(mask,protected,2)
+        restored=self.reconstruct(crop,mask,protected,local)
+        if self.ink_residue(crop,restored,mask,local)>.08:
+            margin=max(8,min(18,int(np.ceil(glyph*.4))))
+            for a,c,d,f in local:
+                left=max(int(protected[0]),int(np.floor(a-margin)));top=max(int(protected[1]),int(np.floor(c-margin)));right=min(int(protected[2]),int(np.ceil(d+margin)));bottom=min(int(protected[3]),int(np.ceil(f+margin)))
+                mask[top:bottom,left:right]=255
+            restored=self.reconstruct(crop,mask,protected,local)
+        if self.ink_residue(crop,restored,mask,local)>.08:return rgb.copy(),np.zeros((h,w),np.uint8),False
+        result=rgb.copy();result[y:b,x:r]=restored
         whole_mask=np.zeros((h,w),np.uint8);whole_mask[y:b,x:r]=mask
         return result,whole_mask,True
     def owns_text(self,rgb,boxes,balloon=None,evidence=None):

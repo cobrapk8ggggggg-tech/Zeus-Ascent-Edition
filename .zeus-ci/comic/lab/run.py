@@ -91,6 +91,7 @@ def run(args):
                 if fit and readable:
                     if flat is not None:clean,mask,accepted=engine.apply_flat_cleanup(crop,[cx,cy],flat)
                     else:clean,mask=engine.clean(crop,local);accepted=engine.can_letter_light(crop,mask,local,area_local if closed else None)
+                    if accepted and engine.ink_residue(crop,clean,mask,local)>.08:accepted=False
                     if accepted:route='flat'if flat is not None and flat['uniform']else'light'
                     elif args.neural:
                         clean,mask,accepted=engine.restore_neural(crop,local,area_local if closed else None)

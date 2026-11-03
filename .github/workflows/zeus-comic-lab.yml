@@ -24,6 +24,7 @@ jobs:
       - run: python .zeus-ci/comic/lab/test_masks.py
       - run: python .zeus-ci/comic/lab/test_balloons_and_ink.py
       - run: python .zeus-ci/comic/lab/test_flat_balloons.py
+      - run: python .zeus-ci/comic/lab/test_cleanup_quality.py
       - if: inputs.real_chapters == true
         run: |
           python .zeus-ci/comic/lab/models.py .zeus-ci/comic/lab/models

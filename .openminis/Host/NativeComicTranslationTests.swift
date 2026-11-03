@@ -141,6 +141,40 @@ import UIKit
             XCTAssertTrue(stride(from:0,to:pixels.count,by:4).contains{Int(pixels[$0+2])>Int(pixels[$0])+25},"real comic crop must contain rendered Arabic")
         }
     }
+    func testGradientColourContoursDoNotSplitOneCaption()async throws{
+        struct Line:Decodable{var text:String;var x:Double;var y:Double;var width:Double;var height:Double;var glyphHeight:Double}
+        struct Fixture:Decodable{var image:String;var lines:[Line]}
+        let(data,_)=try await URLSession.shared.data(from:URL(string:"http://127.0.0.1:8765/comic-quality-fixtures?name=neural-gradient-caption.json")!)
+        let fixture=try JSONDecoder().decode(Fixture.self,from:data),image=try ComicPixels.decode(XCTUnwrap(Data(base64Encoded:fixture.image)))
+        let lines=fixture.lines.map{ComicLine(text:$0.text,confidence:1,rect:CGRect(x:$0.x,y:$0.y,width:$0.width,height:$0.height),glyphHeight:$0.glyphHeight)}
+        let speeches=ComicBalloons.speeches(lines,image:image,source:"en")
+        XCTAssertEqual(speeches.count,1);XCTAssertEqual(speeches.first?.lines.count,4)
+        XCTAssertTrue(speeches.first?.text.contains("AFTER ALL, SHE BELONGS")==true)
+    }
+    func testPostRestorationGateRejectsCapturedRemainingEnglish()async throws{
+        struct Line:Decodable{var x:Double;var y:Double;var width:Double;var height:Double}
+        struct Fixture:Decodable{var image:String;var badRestoration:String;var mask:String;var lines:[Line]}
+        let(data,_)=try await URLSession.shared.data(from:URL(string:"http://127.0.0.1:8765/comic-quality-fixtures?name=neural-remaining-caption.json")!)
+        let f=try JSONDecoder().decode(Fixture.self,from:data)
+        func raster(_ base64:String)throws->CGImage{try ComicPixels.decode(XCTUnwrap(Data(base64Encoded:base64)))}
+        let source=try raster(f.image),bad=try raster(f.badRestoration),maskImage=try raster(f.mask)
+        let p=try XCTUnwrap(ComicPixels.rgba(source,width:source.width,height:source.height)),c=try XCTUnwrap(ComicPixels.rgba(bad,width:bad.width,height:bad.height)),m=try XCTUnwrap(ComicPixels.rgba(maskImage,width:source.width,height:source.height))
+        let mask=stride(from:0,to:m.count,by:4).map{m[$0]},boxes=f.lines.map{CGRect(x:$0.x,y:$0.y,width:$0.width,height:$0.height)}
+        XCTAssertGreaterThan(ComicPixels.inkResidue(p,clean:c,mask:mask,width:source.width,height:source.height,boxes:boxes),0.5,"A valid supplied mask must not certify visibly surviving source words")
+    }
+    func testShadowedRealCaptionIsFullyErasedBeforeLettering()async throws{
+        struct Line:Decodable{var text:String;var x:Double;var y:Double;var width:Double;var height:Double;var glyphHeight:Double}
+        struct Fixture:Decodable{var image:String;var lines:[Line]}
+        let(data,_)=try await URLSession.shared.data(from:URL(string:"http://127.0.0.1:8765/comic-quality-fixtures?name=neural-remaining-caption.json")!)
+        let f=try JSONDecoder().decode(Fixture.self,from:data),image=try ComicPixels.decode(XCTUnwrap(Data(base64Encoded:f.image)))
+        let lines=f.lines.map{ComicLine(text:$0.text,confidence:1,rect:CGRect(x:$0.x,y:$0.y,width:$0.width,height:$0.height),glyphHeight:$0.glyphHeight)}
+        let speech=ComicSpeech(id:"shadow",text:lines.map(\.text).joined(separator:" "),lines:lines,rect:lines.reduce(CGRect.null){$0.union($1.rect)},vertical:false)
+        let result=try await ComicRestoration.shared.restore(image,speeches:[speech],requiredHeadroom:0)
+        XCTAssertTrue(result.restored.contains("shadow"));XCTAssertNil(result.notice)
+        let p=try XCTUnwrap(ComicPixels.rgba(image,width:image.width,height:image.height)),clean=try XCTUnwrap(ComicPixels.rgba(result.image,width:image.width,height:image.height))
+        XCTAssertLessThanOrEqual(ComicPixels.inkResidue(p,clean:clean,mask:[UInt8](repeating:255,count:image.width*image.height),width:image.width,height:image.height,boxes:lines.map(\.rect)),0.08)
+        let attachment=XCTAttachment(image:UIImage(cgImage:result.image));attachment.name="Shadowed Violet caption - source fully erased";attachment.lifetime = .keepAlways;add(attachment)
+    }
     func testBatchedNeuralRestorationReusesModelsAndPreservesBothCrops()async throws{
         struct Line:Decodable{var x:Double;var y:Double;var width:Double;var height:Double;var glyphHeight:Double}
         struct Fixture:Decodable{var lines:[Line];var image:String}
@@ -159,7 +193,7 @@ import UIKit
         let result=try await ComicRestoration.shared.restore(image,speeches:speeches,requiredHeadroom:0)
         let loads=await ComicRestoration.shared.sessionLoads-before
         XCTAssertEqual(result.restored,["0","1"]);XCTAssertNil(result.notice)
-        XCTAssertEqual(loads,2,"Two real crops in one image should load CTD and LaMa once each")
+        XCTAssertLessThanOrEqual(loads,2,"Two real crops must not reload the restoration graphs for each dialogue");XCTAssertGreaterThan(loads,0)
         let original=try XCTUnwrap(ComicPixels.rgba(image,width:width,height:height)),clean=try XCTUnwrap(ComicPixels.rgba(result.image,width:width,height:height))
         var outside=0
         let protected=speeches.flatMap(\.lines).map{$0.rect.insetBy(dx:-20,dy:-20)}
@@ -645,7 +679,6 @@ import UIKit
         imageURL.percentEncodedQuery=imageURL.percentEncodedQuery?.replacingOccurrences(of:"+",with:"%2B")
         let sourceURL=crossOrigin ? imageURL.url!.absoluteString : "data:image/png;base64,"+encoded
         view.loadHTMLString("<html><body><p id='text'>Original page text stays unchanged.</p><img id='comic' referrerpolicy='no-referrer' style='width:100%;height:auto' src='\(sourceURL)'></body></html>",baseURL:URL(string:tab.url))
-        view.load(URLRequest(url:URL(string:tab.url)!))
         var deadline=Date().addingTimeInterval(20)
         while Date()<deadline{if (try? await view.callAsyncJavaScript("return !!globalThis.zeusComic && document.images[0]?.complete",arguments:[:],in:nil,contentWorld:ComicTranslation.world))as? Bool==true{break};try await Task.sleep(for:.milliseconds(100))}
         if crossOrigin {

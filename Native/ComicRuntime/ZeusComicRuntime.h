@@ -11,6 +11,9 @@ int zeus_comic_simple_background(const unsigned char *pixels, const unsigned cha
 int zeus_comic_balloon_lobes(const unsigned char *interior, int width, int height, const int *boxes, int count, int *owners, int *bounds);
 float zeus_comic_ink_style(const unsigned char *pixels, int width, int height, const int *boxes, int count, float *output);
 int zeus_comic_flat_balloon_mask(const unsigned char *paper, unsigned char *mask, int width, int height, int left, int top, int right, int bottom, const int *boxes, int count);
+int zeus_comic_plate_has_edge(const unsigned char *pixels, int image_width, int image_height, const unsigned char *paper, int width, int height, int origin_x, int origin_y, const int *boxes, int count);
+void zeus_comic_grow_text_mask(unsigned char *mask, int width, int height, int left, int top, int right, int bottom, int radius);
+float zeus_comic_ink_residue(const unsigned char *source, const unsigned char *clean, const unsigned char *mask, int width, int height, int left, int top, int right, int bottom);
 unsigned long long zeus_comic_available_memory(void);
 void zeus_comic_refine_text_mask(const unsigned char *pixels, const unsigned char *hints, unsigned char *mask, int width, int height, int left, int top, int right, int bottom);
 void zeus_comic_inpaint_mask(const unsigned char *source, unsigned char *pixels, const unsigned char *mask, int width, int height, int left, int top, int right, int bottom);

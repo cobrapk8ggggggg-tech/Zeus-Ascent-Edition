@@ -49,7 +49,10 @@ enum ComicPixels {
             if !precleanedIDs.contains(speech.id){
                 let mask=sourceMask(original,width:image.width,height:image.height,speech:speech)
                 if requireCleanSource && !(speech.flatCleanup?.complete==true && speech.flatCleanup?.uniform==true) && (!completeMask(original,mask:mask,width:image.width,height:image.height,speech:speech) || !simpleBackground(original,mask:mask,width:image.width,height:image.height,speech:speech) || !ownsText(original,width:image.width,height:image.height,speech:speech)){continue}
-                clean(&pixels,width:image.width,height:image.height,speech:speech,source:original,approvedMask:mask)
+                var candidate=pixels
+                clean(&candidate,width:image.width,height:image.height,speech:speech,source:original,approvedMask:mask)
+                if requireCleanSource && inkResidue(original,clean:candidate,mask:mask,width:image.width,height:image.height,boxes:speech.lines.map(\.rect))>0.08{continue}
+                pixels=candidate
             }
             let automatic=background.0*0.2126+background.1*0.7152+background.2*0.0722>0.5 ? CGColor(gray:0.04,alpha:1):CGColor(gray:0.98,alpha:1)
             let sourceStyle=ink == .automatic ? appearance(styleSource ?? image,speech:speech):nil
@@ -212,9 +215,14 @@ enum ComicPixels {
         return(CGFloat(value.0)/CGFloat(value.3*255),CGFloat(value.1)/CGFloat(value.3*255),CGFloat(value.2)/CGFloat(value.3*255))
     }
     static func canClean(_ pixels:[UInt8],width:Int,height:Int,speech:ComicSpeech)->Bool{
-        if let flat=speech.flatCleanup{guard flat.complete && !flat.runs.isEmpty else{return false};if flat.uniform{return true};let mask=sourceMask(pixels,width:width,height:height,speech:speech);return simpleBackground(pixels,mask:mask,width:width,height:height,speech:speech)}
+        if let flat=speech.flatCleanup,!flat.complete || flat.runs.isEmpty{return false}
         let mask=sourceMask(pixels,width:width,height:height,speech:speech)
-        return completeMask(pixels,mask:mask,width:width,height:height,speech:speech) && simpleBackground(pixels,mask:mask,width:width,height:height,speech:speech) && ownsText(pixels,width:width,height:height,speech:speech)
+        if speech.flatCleanup?.uniform != true{
+            guard completeMask(pixels,mask:mask,width:width,height:height,speech:speech),simpleBackground(pixels,mask:mask,width:width,height:height,speech:speech),ownsText(pixels,width:width,height:height,speech:speech)else{return false}
+        }
+        var cleaned=pixels
+        clean(&cleaned,width:width,height:height,speech:speech,source:pixels,approvedMask:mask)
+        return inkResidue(pixels,clean:cleaned,mask:mask,width:width,height:height,boxes:speech.lines.map(\.rect))<=0.08
     }
     static func ownsText(_ pixels:[UInt8],width:Int,height:Int,speech:ComicSpeech,evidence:[UInt8]? = nil)->Bool{
         guard speech.balloon else{return true}
@@ -233,6 +241,9 @@ enum ComicPixels {
         pixels.withUnsafeBufferPointer{p in mask.withUnsafeBufferPointer{m in
             cleanupBoxes(width:width,height:height,speech:speech).allSatisfy{b in zeus_comic_simple_background(p.baseAddress,m.baseAddress,Int32(width),Int32(height),Int32(b.minX),Int32(b.minY),Int32(b.maxX),Int32(b.maxY)) != 0}
         }}
+    }
+    static func inkResidue(_ source:[UInt8],clean:[UInt8],mask:[UInt8],width:Int,height:Int,boxes:[CGRect])->Float{
+        source.withUnsafeBufferPointer{s in clean.withUnsafeBufferPointer{c in mask.withUnsafeBufferPointer{m in boxes.map{box in let r=box.integral;return zeus_comic_ink_residue(s.baseAddress,c.baseAddress,m.baseAddress,Int32(width),Int32(height),Int32(r.minX),Int32(r.minY),Int32(r.maxX),Int32(r.maxY))}.max() ?? 1}}}
     }
     static func completeMask(_ pixels:[UInt8],mask:[UInt8],width:Int,height:Int,speech:ComicSpeech)->Bool{
         pixels.withUnsafeBufferPointer{buffer in mask.withUnsafeBufferPointer{m in

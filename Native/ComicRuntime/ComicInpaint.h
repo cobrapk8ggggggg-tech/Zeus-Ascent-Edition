@@ -169,7 +169,7 @@ static inline bool comic_simple_background(const unsigned char *rgba,const unsig
     int edges=0,samples=0;
     for(int y=top;y<bottom;y++)for(int x=left;x<right;x++)if(!mask[y*width+x]){
         int p=(y*width+x)*4;bool edge=false;
-        for(auto delta:{1,width})if(!mask[y*width+x+delta]){int q=p+delta*4,d=0;for(int c=0;c<3;c++)d+=std::abs(int(rgba[p+c])-int(rgba[q+c]));edge=edge||d>60;}
+        for(auto delta:{1,width})if(!mask[y*width+x+delta]){int q=p+delta*4,d=0;for(int c=0;c<3;c++)d+=std::abs(int(rgba[p+c])-int(rgba[q+c]));edge=edge||d>24;}
         samples++;if(edge)edges++;
     }
     return samples>0&&edges<double(samples)*.003;
@@ -475,4 +475,62 @@ static inline bool comic_flat_balloon_mask(const unsigned char *paper,unsigned c
         int xx=x+dx,yy=y+dy;if(xx>=left&&xx<right&&yy>=top&&yy<bottom&&!outside[yy*w+xx])mask[yy*w+xx]=255;
     }
     return true;
+}
+
+
+// A colour contour inside a gradient is not a balloon border. Filled interiors
+// must meet an actual contrast edge in every outward direction, excluding glyph
+// holes from the boundary vote.
+static inline bool comic_plate_has_edge(const unsigned char *rgba,int imagew,int imageh,const unsigned char *paper,int w,int h,int ox,int oy,const int *boxes,int count){
+    if(!rgba||!paper||w<3||h<3||int64_t(w)*h>1000000)return false;
+    std::vector<unsigned char> outside(w*h,0);std::vector<int> queue;
+    auto enqueue=[&](int p){if(!paper[p]&&!outside[p]){outside[p]=1;queue.push_back(p);}};
+    for(int x=0;x<w;x++){enqueue(x);enqueue((h-1)*w+x);}for(int y=1;y<h-1;y++){enqueue(y*w);enqueue(y*w+w-1);}
+    for(size_t i=0;i<queue.size();i++){int p=queue[i],x=p%w,y=p/w;if(x)enqueue(p-1);if(x+1<w)enqueue(p+1);if(y)enqueue(p-w);if(y+1<h)enqueue(p+w);}
+    int samples[4]={},edges[4]={};int dx[4]={-1,1,0,0},dy[4]={0,0,-1,1};
+    for(int y=1;y<h-1;y++)for(int x=1;x<w-1;x++)if(!outside[y*w+x])for(int d=0;d<4;d++)if(outside[(y+dy[d])*w+x+dx[d]]){
+        bool text=false;for(int i=0;i<count;i++){const int*r=boxes+i*4;if(x+ox>=r[0]&&x+ox<r[2]&&y+oy>=r[1]&&y+oy<r[3]){text=true;break;}}if(text)continue;
+        samples[d]++;int a=((y+oy)*imagew+x+ox)*4,xx=std::clamp(x+ox+dx[d]*2,0,imagew-1),yy=std::clamp(y+oy+dy[d]*2,0,imageh-1),b=(yy*imagew+xx)*4,difference=0;
+        for(int c=0;c<3;c++)difference+=std::abs(int(rgba[a+c])-int(rgba[b+c]));if(difference>=60)edges[d]++;
+    }
+    int total=0,strong=0;for(int d=0;d<4;d++){if(samples[d]<4||edges[d]<samples[d]*.6f)return false;total+=samples[d];strong+=edges[d];}
+    return strong>=total*.65f;
+}
+
+static inline void comic_grow_text_mask(unsigned char *mask,int w,int h,int left,int top,int right,int bottom,int radius){
+    if(!mask||w<3||h<3||int64_t(w)*h>1000000)return;
+    left=std::clamp(left,1,w-1);right=std::clamp(right,1,w-1);top=std::clamp(top,1,h-1);bottom=std::clamp(bottom,1,h-1);radius=std::clamp(radius,0,12);
+    std::vector<unsigned char> original(mask,mask+w*h);
+    for(int y=0;y<h;y++)for(int x=0;x<w;x++)if(x<left||x>=right||y<top||y>=bottom)mask[y*w+x]=0;
+    for(int y=top;y<bottom;y++)for(int x=left;x<right;x++)if(original[y*w+x])for(int dy=-radius;dy<=radius;dy++)for(int dx=-radius;dx<=radius;dx++){
+        int xx=x+dx,yy=y+dy;if(xx>=left&&xx<right&&yy>=top&&yy<bottom)mask[yy*w+xx]=255;
+    }
+}
+
+// Detect a surviving glyph edge template after reconstruction. Background
+// intensity alone is insufficient: black lettering can sit on dark artwork.
+// Evaluate all foreground in the OCR bounds, including strokes missed by the
+// proposed mask; the mask cannot certify its own omissions.
+static inline float comic_ink_residue(const unsigned char *source,const unsigned char *clean,const unsigned char *mask,int w,int h,int left,int top,int right,int bottom){
+    if(!source||!clean||!mask||w<3||h<3)return 1;
+    left=std::clamp(left,1,w-1);right=std::clamp(right,1,w-1);top=std::clamp(top,1,h-1);bottom=std::clamp(bottom,1,h-1);
+    int hist[256]={},total=0;double sum=0;
+    auto gray=[&](int p){return (source[p*4]*54+source[p*4+1]*183+source[p*4+2]*19)/256;};
+    for(int y=top;y<bottom;y++)for(int x=left;x<right;x++){int v=gray(y*w+x);hist[v]++;sum+=v;total++;}
+    double partial=0,best=-1;int weight=0,threshold=0;
+    for(int v=0;v<255;v++){weight+=hist[v];partial+=double(v)*hist[v];if(!weight||weight==total)continue;double d=partial/weight-(sum-partial)/(total-weight),score=double(weight)*(total-weight)*d*d;if(score>best){best=score;threshold=v;}}
+    if(best<=0)return 0;
+    std::vector<int> border;for(int x=left;x<right;x++){border.push_back(gray(std::max(0,top-3)*w+x));border.push_back(gray(std::min(h-1,bottom+2)*w+x));}
+    if(border.empty())return 1;std::nth_element(border.begin(),border.begin()+border.size()/2,border.end());bool bright=border[border.size()/2]<=threshold;
+    int evidence=0,retained=0;
+    for(int y=top;y<bottom;y++)for(int x=left;x<right;x++){
+        int p=y*w+x,v=gray(p);if(!(bright?v>threshold:v<=threshold))continue;
+        float strongest=0;int neighbour=-1;
+        for(int dy:{-3,0,3})for(int dx:{-3,0,3})if(dx||dy){int xx=std::clamp(x+dx,0,w-1),yy=std::clamp(y+dy,0,h-1),q=yy*w+xx;float norm=0;for(int c=0;c<3;c++){float d=int(source[p*4+c])-int(source[q*4+c]);norm+=d*d;}if(norm>strongest){strongest=norm;neighbour=q;}}
+        if(strongest<1800||neighbour<0)continue;
+        evidence++;float dot=0,outputNorm=0;
+        for(int c=0;c<3;c++){float a=int(source[p*4+c])-int(source[neighbour*4+c]),b=int(clean[p*4+c])-int(clean[neighbour*4+c]);dot+=a*b;outputNorm+=b*b;}
+        if(dot>strongest*.22f&&dot*dot>=strongest*outputNorm*.64f)retained++;
+    }
+    return evidence>=8?float(retained)/evidence:0;
 }

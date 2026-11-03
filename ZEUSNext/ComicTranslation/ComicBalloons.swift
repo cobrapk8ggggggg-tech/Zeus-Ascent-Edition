@@ -13,7 +13,7 @@ enum ComicBalloons {
         // window can end inside a large balloon and miss its enclosure.
         let probes=ComicGeometry.group(lines,source:source).map(\.rect)+lines.map(\.rect)
         for probe in probes{
-            guard let plate=closedInterior(probe,pixels:pixels,width:image.width,height:image.height)else{continue}
+            guard let plate=closedInterior(probe,pixels:pixels,width:image.width,height:image.height,textBounds:lines.map(\.rect))else{continue}
             if let index=plates.firstIndex(where:{overlap($0.rect,plate.rect)>0.7}){
                 if plate.rect.width*plate.rect.height>plates[index].rect.width*plates[index].rect.height{plates[index]=plate}
             }else{plates.append(plate)}
@@ -117,7 +117,7 @@ enum ComicBalloons {
         }
     }
     static func interior(_ text:CGRect,pixels:[UInt8],width:Int,height:Int)->CGRect?{closedInterior(text,pixels:pixels,width:width,height:height)?.rect}
-    private static func closedInterior(_ text:CGRect,pixels:[UInt8],width:Int,height:Int)->Plate?{
+    private static func closedInterior(_ text:CGRect,pixels:[UInt8],width:Int,height:Int,textBounds:[CGRect] = [])->Plate?{
         guard text.width>2,text.height>2,pixels.count>=width*height*4 else{return nil}
         var margin=min(600,max(240,max(text.width*1.6,text.height*4)))
         var roi=text.insetBy(dx:-margin,dy:-margin).integral.intersection(CGRect(x:0,y:0,width:width,height:height))
@@ -149,10 +149,13 @@ enum ComicBalloons {
                 let mw=maxX-minX+3,mh=maxY-minY+3
                 var mask=[UInt8](repeating:0,count:mw*mh)
                 for p in queue{mask[(p/rw-minY+1)*mw+p%rw-minX+1]=255}
+                let exclusions:[Int32]=(textBounds.isEmpty ? [text]:textBounds).flatMap{r in [Int32(floor(r.minX)-4),Int32(floor(r.minY)-4),Int32(ceil(r.maxX)+4),Int32(ceil(r.maxY)+4)]}
+                let edge=pixels.withUnsafeBufferPointer{p in mask.withUnsafeBufferPointer{m in exclusions.withUnsafeBufferPointer{b in zeus_comic_plate_has_edge(p.baseAddress,Int32(width),Int32(height),m.baseAddress,Int32(mw),Int32(mh),Int32(bounds.minX)-1,Int32(bounds.minY)-1,b.baseAddress,Int32(exclusions.count/4)) != 0}}}
+                guard edge else{continue}
                 var sums=[Int](repeating:0,count:3)
                 for p in queue{let i=((p/rw+top)*width+p%rw+left)*4;for c in 0..<3{sums[c]+=Int(pixels[i+c])}}
                 let color=sums.map{UInt8($0/queue.count)}
-                let uniform=queue.reduce(0){count,p in let i=((p/rw+top)*width+p%rw+left)*4;return count+(abs(Int(pixels[i])-Int(color[0]))+abs(Int(pixels[i+1])-Int(color[1]))+abs(Int(pixels[i+2])-Int(color[2]))<=18 ? 1:0)}>=queue.count*9/10
+                let uniform=queue.reduce(0){count,p in let i=((p/rw+top)*width+p%rw+left)*4;return count+(abs(Int(pixels[i])-Int(color[0]))+abs(Int(pixels[i+1])-Int(color[1]))+abs(Int(pixels[i+2])-Int(color[2]))<=6 ? 1:0)}>=queue.count*95/100
                 best=Plate(rect:bounds,mask:mask,width:mw,height:mh,color:color,uniform:uniform)
             }
         }
