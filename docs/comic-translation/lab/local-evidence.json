@@ -32,13 +32,14 @@
   "contact_sheet_triaged": 57,
   "triage_file": "visual-triage.json",
   "native_confirmed": {
-    "source_commit": "c692a835980f79e3b8262d565b7ee9423fb7abd3",
-    "native_tests": 40,
+    "source_commit": "3b1e5d843b3486e57e4f407483b94b9c760bae56",
+    "native_tests": 42,
     "ui_tests": 6,
     "failures": 0,
     "device_build": true,
     "physical_device": false,
-    "run_id": 41626998339
+    "run_id": 41632591355,
+    "simulator_build": true
   },
   "local_adaptive_v1": {
     "chapters": 11,
@@ -99,11 +100,145 @@
   },
   "visual_recheck_file": "visual-recheck.json",
   "harness_snapshot": {
-    "Native/ComicRuntime/ComicInpaint.h": "db30afbceaac7632fca6c48f8deddf3a45f3ff79df6741eea1750af4c26b68aa",
-    ".zeus-ci/comic/lab/engine.py": "19abd594ebb1b0a18c51a89c1ba0bcc1088a3d1622b81668d8415c519098722f",
-    ".zeus-ci/comic/lab/run.py": "5902e034e13c7efd352c6a4e450d5ede30f22aaf436252e20a6bb020c64584cf",
-    ".zeus-ci/comic/lab/refresh.py": "40010af62fe56520e73912f16e19b73d43de23cf85ecc83ddc938dcbe39f5dd7"
+    "Native/ComicRuntime/ComicInpaint.h": "49c2be1a5d9f5c08b5d536666239dab2d8e6e2e3036cd2ebf3dda64c9582c009",
+    ".zeus-ci/comic/lab/native.cpp": "e4b1602941825451a571a35f33388b47d687e185dcbed84fee2fb214f6269bf7",
+    ".zeus-ci/comic/lab/engine.py": "930848a527972403eafeb90e031c7faca290f1da55b958211b817bf2bad448a1",
+    ".zeus-ci/comic/lab/run.py": "482da2647dc02af832793212844ba47ed598275a5b0b70c845bbed2a04ff40b0",
+    ".zeus-ci/comic/lab/refresh.py": "1695cca2be3b56da349f0aa9016d59f0639239b19aed277253ac673bf496c4bf"
   },
-  "local_adaptive_v3_status": "running; native rectangle grouping and vertical caption parity",
-  "vision_arabic_observed_confidence": 0.5
+  "vision_arabic_observed_confidence": 0.5,
+  "local_adaptive_v4": {
+    "chapters": 11,
+    "pages": 251,
+    "regions": 440,
+    "languages": [
+      "ar",
+      "en",
+      "ja",
+      "ko",
+      "zh"
+    ],
+    "outside_mask_changes": 0,
+    "layout_probe_fits": 364,
+    "neural_restored": 100,
+    "light_restored": 69,
+    "cleanup_gate_accepted": 169,
+    "cleanup_gate_abstained": 271,
+    "manually_reviewed": 0,
+    "quality_acceptance_proven": false,
+    "native_kernel_sha256": "b45f12f7c41c63d4f9a776eae922d586158663ad22eae9c5c947482a60480bcb",
+    "protocol": "adaptive-v4: whole-balloon text ownership; frozen geometry; layout preflight",
+    "peak_rss_kib": 1365080,
+    "unreadable_source_proposals": 183,
+    "render_pipeline_source_commit": "3b1e5d843b3486e57e4f407483b94b9c760bae56",
+    "gold_annotated_regions": 0,
+    "source_translation_accuracy_evaluated": false,
+    "mask_refresh_seconds": 1300.560315032002,
+    "dependency_versions": {
+      "onnxruntime": "1.23.2",
+      "opencv-python-headless": "4.12.0.88",
+      "numpy": "2.2.6",
+      "Pillow": "11.3.0",
+      "PyYAML": "6.0.3"
+    },
+    "proposal_geometry_source_commit": "4a03298cc41e7667e483432b1010d8ce0a4051cc",
+    "ownership_declined_previous_acceptances": [
+      "en-0aaf8b27-calibration-009",
+      "en-0aaf8b27-calibration-012",
+      "en-0aaf8b27-calibration-015",
+      "ja-ad6defe1-calibration-017",
+      "ja-ad6defe1-calibration-027",
+      "ja-9708bf5a-holdout-010",
+      "ja-9708bf5a-holdout-023",
+      "ja-9708bf5a-holdout-028",
+      "ja-9708bf5a-holdout-039",
+      "ko-7d0c0550-calibration-000",
+      "ko-7d0c0550-calibration-021",
+      "ko-82c68de5-holdout-019",
+      "ar-e11b2b83-calibration-010",
+      "ar-e11b2b83-calibration-031",
+      "ar-e11b2b83-calibration-037",
+      "en-comix-14-calibration-005",
+      "en-comix-14-calibration-011"
+    ],
+    "neural_context_new_acceptances": [
+      "zh-22bc4eb8-holdout-035",
+      "ar-81355b0b-holdout-010"
+    ],
+    "native_ios_evidence_revision": "3b1e5d843b3486e57e4f407483b94b9c760bae56",
+    "real_provider_probe": {
+      "crops": 11,
+      "cleanup_accepted": 10,
+      "outside_mask_changes": 0,
+      "provider": "Google actual batch endpoint",
+      "linguistic_acceptance_proven": false,
+      "native_kernel_sha256": "b45f12f7c41c63d4f9a776eae922d586158663ad22eae9c5c947482a60480bcb",
+      "shared_kernel_source_commit": "3b1e5d843b3486e57e4f407483b94b9c760bae56",
+      "font_harness_sha256": "fa9b1f1cf845fa8cb7e2ccbc0c481a14f71c214f87c13e3d6e9d2396c4864b8f",
+      "font_fallback": "Noto Naskh Arabic, with DejaVu Sans for unsupported mixed punctuation",
+      "observed_linguistic_error": "Google interpreted elongated IIIIIIT as a Roman-number-like word in one source phrase"
+    },
+    "declined_output_identity_failures": 0
+  },
+  "mask_test_methods": 4,
+  "whole_balloon_missing_line_test": "passed in shared C++ and native CTD route",
+  "real_provider_probe": {
+    "engine": "Google",
+    "protocol": "same batch endpoint and response shape as ComicWebEngines",
+    "linguistic_acceptance_proven": false,
+    "rows": [
+      {
+        "source": "DAMN IT...",
+        "translation": "عليك اللعنة..."
+      },
+      {
+        "source": "DAMN IIIIIIT?!!",
+        "translation": "اللعنة الثالثة؟!!"
+      },
+      {
+        "source": "WHY DO ALL THESE FANS HAVE NOTHING BUT WORTHLESS JUNK ON THEM?!",
+        "translation": "لماذا لا يملك كل هؤلاء المعجبين سوى النفايات عديمة القيمة؟!"
+      },
+      {
+        "source": "WHAT A BUNCH OF USELESS TRASH!!",
+        "translation": "يا لها من مجموعة من القمامة عديمة الفائدة!!"
+      },
+      {
+        "source": "MORE...",
+        "translation": "أكثر..."
+      },
+      {
+        "source": "I NEED TO FIND MORE \"COLLECTIBLES\".",
+        "translation": "أحتاج إلى العثور على المزيد من \"المقتنيات\"."
+      },
+      {
+        "source": "ONLY THEN—",
+        "translation": "عندها فقط —"
+      },
+      {
+        "source": "CAN I BECOME THE ONLY ONE IN SISTER LI’S HEART!",
+        "translation": "هل يمكنني أن أصبح الشخص الوحيد في قلب الأخت لي!"
+      },
+      {
+        "source": "IT’S A TALISMAN USED BY THE FENG SHUI MASTER CLASS.",
+        "translation": "إنها تعويذة يستخدمها طلاب الصف الأول في فنغ شوي."
+      },
+      {
+        "source": "VANISH.",
+        "translation": "تتلاشى."
+      },
+      {
+        "source": "AT THIS MEETING...",
+        "translation": "في هذا الاجتماع..."
+      }
+    ]
+  },
+  "ipa": {
+    "run_id": 41632591306,
+    "artifact_id": 13230334103,
+    "source_commit": "3b1e5d843b3486e57e4f407483b94b9c760bae56",
+    "sha256": "c6a81e62639b0d6d36dcf884db640cd799e5a9eae1796aa16d6d389aedf07b6d",
+    "unsigned": true,
+    "embedded_commit_verified": true
+  }
 }

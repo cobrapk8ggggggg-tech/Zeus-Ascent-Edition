@@ -1,10 +1,24 @@
 import argparse, html, json, pathlib, time, resource, random, math
+from functools import lru_cache
 import cv2,numpy as np
 from PIL import Image,ImageDraw,ImageFont
 from engine import Engine
 from balloons import paragraphs
 FONT='/usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf'
 LATIN_FONT='/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf'
+FALLBACK_FONT='/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'
+@lru_cache(maxsize=4096)
+def supported_glyph(path,char):
+    font=coverage_font(path);missing=font.getmask(chr(0x10FFFF));glyph=font.getmask(char)
+    return glyph.size!=missing.size or bytes(glyph)!=bytes(missing)
+@lru_cache(maxsize=3)
+def coverage_font(path):return ImageFont.truetype(path,16)
+def font_path(text,direction):
+    preferred=LATIN_FONT if direction=='ltr'else FONT
+    for path in [preferred,FALLBACK_FONT]:
+        if all(char.isspace()or supported_glyph(path,char)for char in set(text)):return path
+    return None
+
 
 
 def lettering(rgb,box,text,size,color,direction="rtl",vertical=False):
@@ -15,10 +29,12 @@ def lettering(rgb,box,text,size,color,direction="rtl",vertical=False):
         result=rgb.copy()
         if fit:result[y:b,x:r]=np.rot90(drawn,-1)
         return result,fit
+    selected=font_path(text,direction)
+    if selected is None:return rgb,False
     image=Image.fromarray(rgb);draw=ImageDraw.Draw(image);x,y,r,b=box
     minimum=max(5,int(size*.55))
     for size in range(max(5,int(size)),minimum-1,-1):
-        font=ImageFont.truetype(LATIN_FONT if direction=="ltr" else FONT,size);words=text.split();rows=[];row=''
+        font=ImageFont.truetype(selected,size);words=text.split();rows=[];row=''
         for word in words:
             test=(row+' '+word).strip()
             if draw.textlength(test,font=font,direction=direction)<=r-x-4:row=test
