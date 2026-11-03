@@ -194,19 +194,22 @@ import CoreGraphics
                     let window=try await Task.detached{try ComicWindow.join(center,before:before,after:after)}.value
                     let image=window.image,offset=window.offset
                     let imageHash=try await Task.detached{ComicIdentity.hash(try ComicPixels.png(image))}.value
+                    // A cover's Latin title must not choose the script for the
+                    // following Japanese/Arabic page. Hints belong to one image.
+                    let languageHintKey=document+"|"+candidate.id+"|"+candidate.revision
                     let readingKey=imageHash+"|ocr-v15|\(prefs.source)|\(prefs.mode.rawValue)|vote:\(region.coreTop+offset):\(region.coreBottom-region.coreTop)"
                     phase = .recognizing
                     let reading:ComicReading
                     if let saved=readings[readingKey]{reading=saved}
                     else if persistent,let stored=await ComicMemory.shared.data(profile:owner,layer:.reading,key:readingKey),let saved=try? JSONDecoder().decode(ComicReading.self,from:stored){reading=saved}
-                    else{ocrRuns+=1;reading=try await ComicOCR.shared.read(image,source:prefs.source,mode:prefs.mode,languageRegion:CGRect(x:0,y:region.coreTop+offset,width:region.width,height:region.coreBottom-region.coreTop),languageHint:languageHints[document],onPreparing: { [weak self] preparing in
+                    else{ocrRuns+=1;reading=try await ComicOCR.shared.read(image,source:prefs.source,mode:prefs.mode,languageRegion:CGRect(x:0,y:region.coreTop+offset,width:region.width,height:region.coreBottom-region.coreTop),languageHint:languageHints[languageHintKey],onPreparing: { [weak self] preparing in
                             await MainActor.run { if self?.epoch == ticket { self?.phase = preparing ? .downloading:.recognizing } }
                         })
                         try valid(ticket)
                         if persistent{do{try await ComicMemory.shared.save(JSONEncoder().encode(reading),profile:owner,layer:.reading,key:readingKey)}catch{storageNotice="تعذّر حفظ قراءة الصورة؛ ستظل الجلسة الحالية متاحة."}}
                     }
                     if readings.count>=128{readings.removeAll()};readings[readingKey]=reading
-                    if reading.lines.count>=2,!reading.language.isEmpty{languageHints[document]=reading.language}
+                    if reading.lines.count>=2,!reading.language.isEmpty{languageHints[languageHintKey]=reading.language}
                     try valid(ticket)
                     // A speech touching this core is rendered from its complete context,
                     // then clipped to this core. Its neighbour renders the other half.
