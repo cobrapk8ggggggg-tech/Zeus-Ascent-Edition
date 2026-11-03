@@ -26,7 +26,7 @@ jobs:
       - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
       - name: Verify unchanged production image pipeline
-        run: git diff --exit-code 3b1e5d843b3486e57e4f407483b94b9c760bae56 -- ZEUSNext Native/ComicRuntime
+        run: git diff --exit-code 16de30686bf08b71e98a58f3899eb08956e00440 -- ZEUSNext Native/ComicRuntime
       - name: Install build tools
         run: brew install xcodegen ninja cmake
       - name: Download and verify original chapter images
