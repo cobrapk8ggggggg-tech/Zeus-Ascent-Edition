@@ -14,6 +14,19 @@ class Engine:
             os.replace(temporary,library)
         self.lib=ctypes.CDLL(str(library));p=np.ctypeslib.ndpointer(dtype=np.uint8,flags='C_CONTIGUOUS')
         self.lib.clean.argtypes=[p]+[ctypes.c_int]*6;self.lib.text_mask.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.clean_source.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.coverage.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.coverage.restype=ctypes.c_float;self.lib.refine.argtypes=[p,p,p]+[ctypes.c_int]*6;self.lib.refine_ocr.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.clean_mask.argtypes=[p,p,p]+[ctypes.c_int]*6;self.lib.simple_background.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.neural_valid.argtypes=[p,p,p]+[ctypes.c_int]*6;self.lib.mask_owned.argtypes=[p]+[ctypes.c_int]*6+[np.ctypeslib.ndpointer(dtype=np.int32,flags='C_CONTIGUOUS'),ctypes.c_int]
+    def balloon_lobes(self,interior,boxes):
+        u8=np.ctypeslib.ndpointer(dtype=np.uint8,flags='C_CONTIGUOUS');i32=np.ctypeslib.ndpointer(dtype=np.int32,flags='C_CONTIGUOUS')
+        self.lib.balloon_lobes.argtypes=[u8,ctypes.c_int,ctypes.c_int,i32,ctypes.c_int,i32,i32]
+        interior=np.ascontiguousarray(interior,np.uint8);boxes=np.ascontiguousarray(boxes,np.int32).reshape(-1,4);h,w=interior.shape
+        owners=np.zeros(len(boxes),np.int32);bounds=np.zeros(len(boxes)*4,np.int32)
+        count=self.lib.balloon_lobes(interior,w,h,boxes.reshape(-1),len(boxes),owners,bounds)
+        return owners,bounds[:count*4].reshape(-1,4)
+    def ink_style(self,rgb,boxes):
+        u8=np.ctypeslib.ndpointer(dtype=np.uint8,flags='C_CONTIGUOUS');i32=np.ctypeslib.ndpointer(dtype=np.int32,flags='C_CONTIGUOUS');f32=np.ctypeslib.ndpointer(dtype=np.float32,flags='C_CONTIGUOUS')
+        self.lib.ink_style.argtypes=[u8,ctypes.c_int,ctypes.c_int,i32,ctypes.c_int,f32];self.lib.ink_style.restype=ctypes.c_float
+        rgba=np.ascontiguousarray(cv2.cvtColor(rgb,cv2.COLOR_RGB2RGBA));h,w=rgb.shape[:2];boxes=np.ascontiguousarray(boxes,np.int32).reshape(-1,4);output=np.zeros(7,np.float32)
+        confidence=self.lib.ink_style(rgba,w,h,boxes.reshape(-1),len(boxes),output)
+        return dict(confidence=confidence,fill=output[:3].tolist(),stroke=output[3:6].tolist()if output[6]>0 else None,stroke_percent=float(output[6]))
     def session(self,name):
         if name not in self.sessions:
             # Match the app's memory discipline: only one restoration graph,

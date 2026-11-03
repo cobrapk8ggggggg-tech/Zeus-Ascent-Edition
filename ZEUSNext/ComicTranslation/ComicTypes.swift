@@ -5,8 +5,8 @@ import CryptoKit
 enum ComicReadingMode: String, Codable, CaseIterable { case fastest, balanced, careful
     var title: String { switch self { case .fastest: return "الأسرع"; case .balanced: return "متوازن"; case .careful: return "دقيق" } }
 }
-enum ComicInkStyle: String, Codable, CaseIterable { case plain, outline, shadow
-    var title: String { switch self { case .plain: return "عادي"; case .outline: return "محدّد (حواف بارزة)"; case .shadow: return "مظلّل" } }
+enum ComicInkStyle: String, Codable, CaseIterable { case automatic, plain, outline, shadow
+    var title: String { switch self { case .automatic: return "مطابقة ألوان وحدود الأصل"; case .plain: return "عادي"; case .outline: return "محدّد (حواف بارزة)"; case .shadow: return "مظلّل" } }
 }
 enum ComicLetterCase: String, Codable, CaseIterable {
     case original, upper, lower, sentence
@@ -84,8 +84,8 @@ struct ComicPreferences: Codable, Equatable {
     var letterCaseRaw: String?
     var letterSpacing: Double?
     var letterCase: ComicLetterCase { ComicLetterCase(rawValue: letterCaseRaw ?? "") ?? .original }
-    var renderIdentity: String { "render-v9|restoration:\(restorationEnabled ?? true)|\(fontName ?? "default")|\(fontScale)|\(textColor ?? "auto")|\(inkStyle.rawValue)|\(letterCase.rawValue)|\(letterSpacing ?? 0)" }
-    var inkStyle: ComicInkStyle { get { ComicInkStyle(rawValue: inkStyleRaw ?? "") ?? .plain } set { inkStyleRaw = newValue.rawValue } }
+    var renderIdentity: String { "render-v10|restoration:\(restorationEnabled ?? true)|\(fontName ?? "default")|\(fontScale)|\(textColor ?? "auto")|\(inkStyle.rawValue)|\(letterCase.rawValue)|\(letterSpacing ?? 0)" }
+    var inkStyle: ComicInkStyle { get { ComicInkStyle(rawValue: inkStyleRaw ?? "") ?? .automatic } set { inkStyleRaw = newValue.rawValue } }
     var engine: ComicOnlineEngine = .existing
     var translation: TranslationPreferences?
     func resolvedTranslation(_ settings:BrowserSettings)->TranslationPreferences{
@@ -125,12 +125,17 @@ struct ComicRegion: Codable, Equatable {
     var coreBottom: Int
     var rect: CGRect { CGRect(x: x, y: y, width: width, height: height) }
 }
+struct ComicWord: Codable, Equatable {
+    var text: String
+    var rect: CGRect
+}
 struct ComicLine: Codable, Equatable {
     var text: String
     var confidence: Float
     var rect: CGRect
     var angle: Double = 0
     var glyphHeight: Double? = nil
+    var words: [ComicWord]? = nil
 }
 struct ComicSpeech: Codable, Equatable {
     var id: String
@@ -155,7 +160,7 @@ enum ComicIdentity {
         hash(segments.map{$0.id+"\0"+$0.text}.joined(separator:"\n"))
     }
     static func settings(_ preferences: ComicPreferences, translation: TranslationPreferences, provider: AIProviderConfiguration?) -> String {
-        hash("comic-v19|fallback:\(preferences.allowOnlineFallback ?? false)|\(preferences.mode.rawValue)|\(preferences.source)|\(translation.target)|" + TranslationMemory.namespace(page: "comic://content", preferences: translation, provider: provider))
+        hash("comic-v20|fallback:\(preferences.allowOnlineFallback ?? false)|\(preferences.mode.rawValue)|\(preferences.source)|\(translation.target)|" + TranslationMemory.namespace(page: "comic://content", preferences: translation, provider: provider))
     }
 }
 enum ComicGeometry {
@@ -192,7 +197,10 @@ enum ComicGeometry {
         for line in lines.sorted(by:{$0.rect.midY<$1.rect.midY}){
             if let index=rows.firstIndex(where:{row in abs(row[0].rect.midY-line.rect.midY)<min(row[0].rect.height,line.rect.height)*0.5}){rows[index].append(line)}else{rows.append([line])}
         }
-        return rows.flatMap{$0.sorted{$0.rect.minX<$1.rect.minX}}
+        return rows.flatMap{row in
+            let arabic=row.map(\.text).joined().unicodeScalars.filter{(0x0600...0x06ff).contains($0.value)}.count>1
+            return row.sorted{arabic ? $0.rect.midX>$1.rect.midX:$0.rect.minX<$1.rect.minX}
+        }
     }
     static func uniqueLines(_ input:[ComicLine])->[ComicLine]{
         let candidates=input.filter{line in

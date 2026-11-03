@@ -8,6 +8,8 @@ float zeus_comic_mask_coverage(const unsigned char *pixels, const unsigned char 
 int zeus_comic_mask_owned(const unsigned char *mask, int width, int height, int left, int top, int right, int bottom, const int *boxes, int count);
 int zeus_comic_neural_mask_valid(const unsigned char *pixels, const unsigned char *hints, const unsigned char *mask, int width, int height, int left, int top, int right, int bottom);
 int zeus_comic_simple_background(const unsigned char *pixels, const unsigned char *mask, int width, int height, int left, int top, int right, int bottom);
+int zeus_comic_balloon_lobes(const unsigned char *interior, int width, int height, const int *boxes, int count, int *owners, int *bounds);
+float zeus_comic_ink_style(const unsigned char *pixels, int width, int height, const int *boxes, int count, float *output);
 unsigned long long zeus_comic_available_memory(void);
 void zeus_comic_refine_text_mask(const unsigned char *pixels, const unsigned char *hints, unsigned char *mask, int width, int height, int left, int top, int right, int bottom);
 void zeus_comic_inpaint_mask(const unsigned char *source, unsigned char *pixels, const unsigned char *mask, int width, int height, int left, int top, int right, int bottom);

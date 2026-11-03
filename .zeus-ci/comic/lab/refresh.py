@@ -23,9 +23,10 @@ for index,case in enumerate(cases):
  boxes=[[aa-x,bb-y,rr-x,ee-y]for aa,bb,rr,ee in [l['box']for l in case['lines']]]
  area=case.get('layout_box',[min(q[i]for q in boxes)if i<2 else max(q[i]for q in boxes)for i in range(4)])
  text=('This is a translated paragraph.'if len(boxes)>1 else'Translation')if case['language']=='ar'else('هذه ترجمة عربية تجريبية داخل الفقاعة'if len(boxes)>1 else'ترجمة تجريبية')
+ source_style=engine.ink_style(rgb,boxes)
  color=(12,)*3 if np.median(rgb)>128 else(248,)*3
  # Exact same layout is used before and after erasure; declined layout is identity.
- _,fit=lettering(rgb,area,text,np.median([l['glyph_height']for l in case['lines']])*1.3,color,direction='ltr'if case['language']=='ar'else'rtl',vertical=case.get('vertical_caption',False))
+ _,fit=lettering(rgb,area,text,np.median([l['glyph_height']for l in case['lines']])*1.3,color,direction='ltr'if case['language']=='ar'else'rtl',vertical=case.get('vertical_caption',False),ink_style=source_style)
  source_readable=all(t.strip() and c>=.65 for t,c in zip(case.get('ocr',[]),case.get('ocr_confidence',[])))if case.get('ocr_confidence') is not None else True
  accepted=False;route='original';clean=rgb.copy();mask=np.zeros(rgb.shape[:2],np.uint8)
  if fit and source_readable:
@@ -36,8 +37,8 @@ for index,case in enumerate(cases):
    if accepted:route='neural'
  if not accepted:clean=rgb.copy()
  rendered=clean
- if accepted:rendered,_=lettering(clean,area,text,np.median([l['glyph_height']for l in case['lines']])*1.3,color,direction='ltr'if case['language']=='ar'else'rtl',vertical=case.get('vertical_caption',False))
- case.update(fit=fit,source_readable=source_readable,restoration_route=route,cleanup_accepted=accepted,outside_mask_changes=int(np.count_nonzero(np.any(clean!=rgb,axis=2)&(mask==0))))
+ if accepted:rendered,_=lettering(clean,area,text,np.median([l['glyph_height']for l in case['lines']])*1.3,color,direction='ltr'if case['language']=='ar'else'rtl',vertical=case.get('vertical_caption',False),ink_style=source_style)
+ case.update(source_ink_style=source_style,fit=fit,source_readable=source_readable,restoration_route=route,cleanup_accepted=accepted,outside_mask_changes=int(np.count_nonzero(np.any(clean!=rgb,axis=2)&(mask==0))))
  for name,array in [('mask',mask),('clean',clean),('rendered',rendered)]:Image.fromarray(array).save(dest/(name+'.png'))
  if index%20==0:
   print(index,case['id'],route,flush=True);(root/'cases.json').write_text(json.dumps(cases,ensure_ascii=False,indent=2))

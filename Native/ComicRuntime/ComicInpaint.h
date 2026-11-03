@@ -1,6 +1,7 @@
 #pragma once
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <vector>
 
 // A bounded, CPU-only text mask. The surrounding colour field seeds a harmonic
@@ -201,4 +202,191 @@ static inline bool comic_mask_owned(const unsigned char *evidence,int width,int 
         if(!owner)unowned++;
     }
     return unowned<=std::max(12,int(total*.05f));
+}
+
+
+
+// Opposing inward corners identify joined lobes even when their diagonal neck
+// is too broad for erosion. A cut requires both geometric concavities and a full
+// glyph-sized whitespace gap; ordinary cloud scallops or line spacing are insufficient.
+static inline int comic_concave_cut(const std::vector<unsigned char>&mask,int w,int h,const int*boxes,int count,float glyph,int*owners,int*bounds){
+    struct Point{int x,y;};std::vector<Point> edge;
+    auto cross=[](Point a,Point b,Point c){return int64_t(b.x-a.x)*(c.y-a.y)-int64_t(b.y-a.y)*(c.x-a.x);};
+    for(int y=1;y<h-1;y++)for(int x=1;x<w-1;x++)if(mask[y*w+x]&&(!mask[y*w+x-1]||!mask[y*w+x+1]||!mask[(y-1)*w+x]||!mask[(y+1)*w+x]))edge.push_back({x,y});
+    if(edge.size()<8||edge.size()>20000)return 0;
+    std::sort(edge.begin(),edge.end(),[](Point a,Point b){return a.x<b.x||(a.x==b.x&&a.y<b.y);});
+    std::vector<Point> hull(edge.size()*2);int k=0;
+    for(Point p:edge){while(k>=2&&cross(hull[k-2],hull[k-1],p)<=0)k--;hull[k++]=p;}
+    int lower=k;for(int i=int(edge.size())-2;i>=0;i--){Point p=edge[i];while(k>lower&&cross(hull[k-2],hull[k-1],p)<=0)k--;hull[k++]=p;}hull.resize(k-1);if(hull.size()>256)return 0;
+    struct Defect{Point p;float depth;};std::vector<Defect> defects;
+    for(size_t i=0;i<hull.size();i++){
+        Point a=hull[i],b=hull[(i+1)%hull.size()];float dx=b.x-a.x,dy=b.y-a.y,length=std::hypot(dx,dy);if(length<glyph)continue;
+        float deepest=0;Point found=a;
+        for(Point p:edge){float u=((p.x-a.x)*dx+(p.y-a.y)*dy)/(length*length);if(u<=0||u>=1)continue;
+            float depth=float(cross(a,b,p))/length;
+            // Only boundary visible from this hull edge belongs to its defect:
+            // the segment from the edge to this pixel must lie outside the mask.
+            if(depth<=deepest||depth<glyph*.45f)continue;
+            float qx=a.x+u*dx,qy=a.y+u*dy;bool visible=true;
+            for(int step=1;step<12;step++){float v=float(step)/12;int xx=int(qx+(p.x-qx)*v),yy=int(qy+(p.y-qy)*v);if(xx>=0&&xx<w&&yy>=0&&yy<h&&mask[yy*w+xx]){visible=false;break;}}
+            if(visible){deepest=depth;found=p;}
+        }
+        if(deepest>=glyph*.45f)defects.push_back({found,deepest});
+    }
+    float best=0;Point ca{},cb{};
+    for(size_t a=0;a<defects.size();a++)for(size_t b=a+1;b<defects.size();b++){
+        Point p=defects[a].p,q=defects[b].p;float dx=q.x-p.x,dy=q.y-p.y,len=std::hypot(dx,dy);if(len<glyph||len>std::min(w,h)*1.5f)continue;
+        float score=(defects[a].depth+defects[b].depth)/len;if(score<.4f||score<=best)continue;
+        int inside=0;for(int t=1;t<20;t++){int x=int(p.x+dx*t/20),y=int(p.y+dy*t/20);inside+=mask[y*w+x]>0;}if(inside<17)continue;
+        int sides[2]={0,0},regions[8]={w,h,0,0,w,h,0,0};bool clear=true;
+        for(int i=0;i<count;i++){
+            const int*r=boxes+4*i;float lo=1e9f,hi=-1e9f;
+            for(int x:{r[0],r[2]})for(int y:{r[1],r[3]}){float d=(dx*(y-p.y)-dy*(x-p.x))/len;lo=std::min(lo,d);hi=std::max(hi,d);}
+            if(lo<0&&hi>0){clear=false;break;}int side=hi<=0?0:1;sides[side]++;int*region=regions+side*4;for(int c=0;c<2;c++)region[c]=std::min(region[c],r[c]);for(int c=2;c<4;c++)region[c]=std::max(region[c],r[c]);
+        }
+        int gx=std::max(regions[0],regions[4])-std::min(regions[2],regions[6]),gy=std::max(regions[1],regions[5])-std::min(regions[3],regions[7]);
+        if(clear&&sides[0]&&sides[1]&&std::max(gx,gy)>=glyph*.8f){best=score;ca=p;cb=q;}
+    }
+    if(!best)return 0;
+    for(int i=0;i<2;i++){bounds[i*4]=w;bounds[i*4+1]=h;bounds[i*4+2]=bounds[i*4+3]=0;}
+    auto side=[&](float x,float y){return (cb.x-ca.x)*(y-ca.y)-(cb.y-ca.y)*(x-ca.x)>0?1:0;};
+    for(int i=0;i<count;i++)owners[i]=side((boxes[i*4]+boxes[i*4+2])*.5f,(boxes[i*4+1]+boxes[i*4+3])*.5f);
+    for(int y=0;y<h;y++)for(int x=0;x<w;x++)if(mask[y*w+x]){int*r=bounds+side(x,y)*4;r[0]=std::min(r[0],x);r[1]=std::min(r[1],y);r[2]=std::max(r[2],x+1);r[3]=std::max(r[3],y+1);}
+    // Convert diagonal ownership to nonoverlapping lettering rectangles wherever
+    // an axis-aligned whitespace separator exists between the source groups.
+    int text[8]={w,h,0,0,w,h,0,0};for(int i=0;i<count;i++){int*t=text+owners[i]*4;for(int c=0;c<2;c++)t[c]=std::min(t[c],boxes[i*4+c]);for(int c=2;c<4;c++)t[c]=std::max(t[c],boxes[i*4+c]);}
+    int gx=std::max(text[0],text[4])-std::min(text[2],text[6]),gy=std::max(text[1],text[5])-std::min(text[3],text[7]);
+    if(std::max(gx,gy)<glyph*.5f)return 0;
+    int axis=gx>gy?0:1,first=text[axis]<text[4+axis]?0:1,second=1-first,cut=(text[first*4+axis+2]+text[second*4+axis])/2;
+    bounds[first*4+axis+2]=std::min(bounds[first*4+axis+2],cut);bounds[second*4+axis]=std::max(bounds[second*4+axis],cut);return 2;
+}
+// Split a closed interior only at a narrow geometric neck. Text holes are filled
+// before erosion, so the gaps between letters/rows never become bubble borders.
+// Boxes and returned bounds use local top-left coordinates; owners are 0-based.
+static inline int comic_balloon_lobes(const unsigned char *interior,int w,int h,
+                                     const int *boxes,int count,int *owners,int *bounds){
+    if(!interior||!boxes||!owners||!bounds||w<3||h<3||int64_t(w)*h>1000000||count<1||count>2000)return 0;
+    const int n=w*h;std::fill(owners,owners+count,0);
+    std::vector<unsigned char> outside(n,0),filled(n,0);std::vector<int> queue;
+    auto enqueue=[&](int p){if(!interior[p]&&!outside[p]){outside[p]=1;queue.push_back(p);}};
+    for(int x=0;x<w;x++){enqueue(x);enqueue((h-1)*w+x);}for(int y=1;y<h-1;y++){enqueue(y*w);enqueue(y*w+w-1);}
+    for(size_t k=0;k<queue.size();k++){int p=queue[k],x=p%w,y=p/w;if(x)enqueue(p-1);if(x+1<w)enqueue(p+1);if(y)enqueue(p-w);if(y+1<h)enqueue(p+w);}
+    std::vector<int> distance(n,0);int maximum=0;
+    for(int p=0;p<n;p++){filled[p]=!outside[p];distance[p]=filled[p]?w+h:0;}
+    for(int y=0;y<h;y++)for(int x=0;x<w;x++){int p=y*w+x;if(filled[p])distance[p]=std::min({distance[p],x?distance[p-1]+1:1,y?distance[p-w]+1:1});}
+    for(int y=h-1;y>=0;y--)for(int x=w-1;x>=0;x--){int p=y*w+x;if(filled[p]){distance[p]=std::min({distance[p],x+1<w?distance[p+1]+1:1,y+1<h?distance[p+w]+1:1});maximum=std::max(maximum,distance[p]);}}
+    std::vector<int> heights;for(int i=0;i<count;i++)heights.push_back(std::min(boxes[i*4+2]-boxes[i*4],boxes[i*4+3]-boxes[i*4+1]));
+    std::sort(heights.begin(),heights.end());float glyph=std::max(4,heights[count/2]);
+    for(int threshold=std::max(3,int(glyph*.35f));threshold<=maximum*.55f;threshold+=std::max(2,int(glyph*.15f))){
+        std::vector<int> labels(n,0),peaks(1,0),sizes(1,0);int components=0;
+        for(int p=0;p<n;p++)if(distance[p]>=threshold&&!labels[p]){
+            components++;peaks.push_back(0);sizes.push_back(0);queue.assign(1,p);labels[p]=components;
+            for(size_t k=0;k<queue.size();k++){int q=queue[k],x=q%w,y=q/w;sizes.back()++;peaks.back()=std::max(peaks.back(),distance[q]);
+                auto visit=[&](int r){if(distance[r]>=threshold&&!labels[r]){labels[r]=components;queue.push_back(r);}};
+                if(x)visit(q-1);if(x+1<w)visit(q+1);if(y)visit(q-w);if(y+1<h)visit(q+w);
+            }
+        }
+        if(components<2)continue;
+        // Grow substantial cores through the original filled shape. Tiny tails
+        // and scallops cannot acquire their own translation segment.
+        queue.clear();for(int p=0;p<n;p++)if(labels[p]){int c=labels[p];if(sizes[c]>=glyph*glyph*.4f&&peaks[c]>=threshold*1.8f)queue.push_back(p);else labels[p]=0;}
+        for(size_t k=0;k<queue.size();k++){int p=queue[k],x=p%w,y=p/w;
+            auto visit=[&](int r){if(filled[r]&&!labels[r]){labels[r]=labels[p];queue.push_back(r);}};
+            if(x)visit(p-1);if(x+1<w)visit(p+1);if(y)visit(p-w);if(y+1<h)visit(p+w);
+        }
+        std::vector<int> votes(components+1,0),assignment(count,0);
+        for(int i=0;i<count;i++){
+            const int*b=boxes+4*i;std::vector<int> hits(components+1,0);
+            for(int y=std::max(0,b[1]);y<std::min(h,b[3]);y++)for(int x=std::max(0,b[0]);x<std::min(w,b[2]);x++)if(labels[y*w+x])hits[labels[y*w+x]]++;
+            int owner=int(std::max_element(hits.begin(),hits.end())-hits.begin());assignment[i]=owner;if(owner)votes[owner]++;
+        }
+        int supported=0;for(int c=1;c<=components;c++)if(votes[c])supported++;
+        if(supported<2||std::any_of(assignment.begin(),assignment.end(),[](int c){return !c;}))continue;
+        // Every pair must have a whitespace cut between its source paragraphs.
+        // Never cut through a recognized word, even when the shape is scalloped.
+        std::vector<int> text((components+1)*4,0);for(int c=1;c<=components;c++){text[c*4]=w;text[c*4+1]=h;}
+        for(int i=0;i<count;i++){int c=assignment[i];for(int a=0;a<2;a++)text[c*4+a]=std::min(text[c*4+a],boxes[i*4+a]);for(int a=2;a<4;a++)text[c*4+a]=std::max(text[c*4+a],boxes[i*4+a]);}
+        bool separate=true;for(int a=1;a<=components;a++)if(votes[a])for(int b=a+1;b<=components;b++)if(votes[b]){
+            int gx=std::max(text[a*4],text[b*4])-std::min(text[a*4+2],text[b*4+2]);
+            int gy=std::max(text[a*4+1],text[b*4+1])-std::min(text[a*4+3],text[b*4+3]);
+            if(std::max(gx,gy)<glyph*.5f)separate=false;
+        }
+        if(!separate)continue;
+        std::vector<int> remap(components+1,-1);int result=0;for(int c=1;c<=components;c++)if(votes[c])remap[c]=result++;
+        for(int i=0;i<count;i++)owners[i]=remap[assignment[i]];
+        for(int c=0;c<result;c++){bounds[c*4]=w;bounds[c*4+1]=h;bounds[c*4+2]=bounds[c*4+3]=0;}
+        for(int p=0;p<n;p++)if(labels[p]&&remap[labels[p]]>=0){int*c=bounds+4*remap[labels[p]],x=p%w,y=p/w;c[0]=std::min(c[0],x);c[1]=std::min(c[1],y);c[2]=std::max(c[2],x+1);c[3]=std::max(c[3],y+1);}
+        // Clip overlapping lobe rectangles at a whitespace midpoint. This also
+        // prevents a diagonal neighbour's cleanup/lettering entering this lobe.
+        for(int a=1;a<=components;a++)if(votes[a])for(int b=a+1;b<=components;b++)if(votes[b]){
+            int *ta=text.data()+a*4,*tb=text.data()+b*4,*ra=bounds+remap[a]*4,*rb=bounds+remap[b]*4;
+            int gx=std::max(ta[0],tb[0])-std::min(ta[2],tb[2]),gy=std::max(ta[1],tb[1])-std::min(ta[3],tb[3]);
+            int axis=gx>gy?0:1;if(ta[axis]>tb[axis]){std::swap(ta,tb);std::swap(ra,rb);}int cut=(ta[axis+2]+tb[axis])/2;
+            ra[axis+2]=std::min(ra[axis+2],cut);rb[axis]=std::max(rb[axis],cut);
+        }
+        return result;
+    }
+    if(comic_concave_cut(filled,w,h,boxes,count,glyph,owners,bounds)==2)return 2;
+    std::fill(owners,owners+count,0);bounds[0]=bounds[1]=0;bounds[2]=w;bounds[3]=h;return 1;
+}
+
+
+// Infer foreground and a surrounding stroke from untouched OCR crops. The
+// enclosing colour transition, rather than merely a second histogram peak,
+// distinguishes outlined letters from plain text on a contrasting background.
+// output = fill RGB, outline RGB, CoreText stroke percentage; returns confidence.
+static inline float comic_ink_style(const unsigned char *rgba,int w,int h,const int *boxes,int count,float *output){
+    if(!rgba||!boxes||!output||w<3||h<3||int64_t(w)*h>1000000||count<1||count>2000)return 0;
+    int hist[512]={},sums[512][3]={},edgeHist[512]={};
+    std::vector<unsigned char> roi(w*h,0);std::vector<int> heights;
+    auto key=[&](int p){return (rgba[p*4]/32)*64+(rgba[p*4+1]/32)*8+rgba[p*4+2]/32;};
+    for(int i=0;i<count;i++){
+        int l=std::clamp(boxes[i*4],1,w-2),t=std::clamp(boxes[i*4+1],1,h-2),r=std::clamp(boxes[i*4+2],l+1,w-1),b=std::clamp(boxes[i*4+3],t+1,h-1);heights.push_back(std::min(r-l,b-t));
+        for(int y=t;y<b;y++)for(int x=l;x<r;x++)roi[y*w+x]=1;
+        int pad=std::max(2,std::min(r-l,b-t)/6);
+        for(int x=l;x<r;x++){edgeHist[key(std::max(0,t-pad)*w+x)]++;edgeHist[key(std::min(h-1,b+pad)*w+x)]++;}
+        for(int y=t;y<b;y++){edgeHist[key(y*w+std::max(0,l-pad))]++;edgeHist[key(y*w+std::min(w-1,r+pad))]++;}
+    }
+    for(int p=0;p<w*h;p++)if(roi[p]){int k=key(p);hist[k]++;for(int c=0;c<3;c++)sums[k][c]+=rgba[p*4+c];}
+    int bg=int(std::max_element(edgeHist,edgeHist+512)-edgeHist);
+    auto center=[&](int k,int c){return (c==0?k/64:c==1?(k/8)%8:k%8)*32+16;};
+    auto delta=[&](int a,int b){int d=0;for(int c=0;c<3;c++)d+=std::abs(center(a,c)-center(b,c));return d;};
+    std::vector<int> palette;for(int k=0;k<512;k++)if(hist[k]>=8&&delta(k,bg)>=80)palette.push_back(k);
+    std::sort(palette.begin(),palette.end(),[&](int a,int b){return hist[a]>hist[b];});if(palette.size()>8)palette.resize(8);
+    if(palette.empty())return 0;
+    std::sort(heights.begin(),heights.end());float glyph=std::max(4,heights[heights.size()/2]);
+    int fill=palette[0],stroke=-1;float best=0,strokePercent=0;
+    for(int a:palette)for(int b:palette)if(a!=b&&delta(a,b)>=160&&hist[b]<hist[a]*4){
+        int ab=0,otherA=0,otherB=0,cores=0;
+        auto classify=[&](int p){
+            int winner=bg,bestDistance=1000000;
+            for(int candidate:{a,b,bg}){int d=0;for(int c=0;c<3;c++){int v=int(rgba[p*4+c])-center(candidate,c);d+=v*v;}if(d<bestDistance){bestDistance=d;winner=candidate;}}
+            return winner;
+        };
+        for(int y=1;y<h-1;y++)for(int x=1;x<w-1;x++){int p=y*w+x;if(!roi[p])continue;int k=key(p);if(k!=a&&k!=b)continue;
+            bool core=true;
+            for(int d:{-1,1,-w,w}){int q=classify(p+d);if(q==k)continue;core=false;
+                // Cross the thin antialias ramp to the next solid ink. Classing
+                // its middle grey as background would lose half every boundary.
+                for(int step=2;step<=3&&q!=a&&q!=b;step++){
+                    int next=p+d*step,nx=next%w,ny=next/w;
+                    if(next<0||next>=w*h||std::abs(nx-x)>3||std::abs(ny-y)>3)break;
+                    q=classify(next);
+                }
+                if(k==a){if(q==b)ab++;else if(q!=a)otherA++;}
+                else if(q!=a&&q!=b)otherB++;
+            }
+            if(k==a&&core)cores++;
+        }
+        float enclosure=float(ab)/std::max(1,ab+otherA),outer=float(otherB)/std::max(1,ab+otherB);
+        float thickness=float(hist[b])/std::max(1,ab);
+        if(ab<12||cores<8||enclosure<.75f||outer<.12f||thickness>glyph*.22f)continue;
+        float score=enclosure+outer*.25f;
+        if(score>best){best=score;fill=a;stroke=b;strokePercent=std::clamp(160.f*thickness/glyph,2.f,20.f);}
+    }
+    // A weak dominant non-background colour on a photograph is not a confident
+    // lettering style. Leave the renderer's contrast fallback available.
+    int mass=0;for(int k:palette)mass+=hist[k];if(hist[fill]<std::max(12,int(mass*.18f)))return 0;
+    for(int c=0;c<3;c++){output[c]=float(sums[fill][c])/hist[fill];output[c+3]=stroke<0?0:float(sums[stroke][c])/hist[stroke];}
+    output[6]=strokePercent;return stroke>=0?.95f:.7f;
 }

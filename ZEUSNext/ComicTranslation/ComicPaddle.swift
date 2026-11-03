@@ -61,7 +61,7 @@ actor ComicPaddle {
             guard s.count==3 else{throw ComicFailure.message("أبعاد خرج قارئ النص غير صالحة.")}
             let result=Self.ctc(logits,steps:s[1],classes:s[2],dictionary:dictionary)
             let text=name=="arabic" ? ComicBidi.logicalFromVisual(result.0):result.0
-            if result.1>=0.65 && text.contains(where:{$0.isLetter || $0.isNumber}){lines.append(ComicLine(text:text,confidence:result.1,rect:rect,glyphHeight:Double(min(rect.height,rect.width))*0.72))}
+            if result.1>=0.65 && text.contains(where:{$0.isLetter || $0.isNumber}){lines.append(ComicLine(text:text,confidence:result.1,rect:rect,glyphHeight:Double(min(rect.height,rect.width))*0.72,words:Self.words(logits,steps:s[1],classes:s[2],dictionary:dictionary,rect:rect,arabic:name=="arabic")))}
         }
         // Careful mode re-detects at native-sized overlapping crops, retaining lines
         // missed by a reduced global pass. The scheduler bounds image dimensions.
@@ -71,7 +71,7 @@ actor ComicPaddle {
                 let rect=CGRect(x:0,y:max(0,y-64),width:image.width,height:min(image.height-max(0,y-64),step+128))
                 guard let part=image.cropping(to:rect)else{continue}
                 let additional=try await read(part,source:source,careful:false)
-                for var line in additional{line.rect.origin.y+=rect.minY;if !lines.contains(where:{$0.rect.intersection(line.rect).width>min($0.rect.width,line.rect.width)*0.6 && abs($0.rect.midY-line.rect.midY)<min($0.rect.height,line.rect.height)*0.6}){lines.append(line)}}
+                for var line in additional{line.rect.origin.y+=rect.minY;line.words=line.words?.map{ComicWord(text:$0.text,rect:$0.rect.offsetBy(dx:0,dy:rect.minY))};if !lines.contains(where:{$0.rect.intersection(line.rect).width>min($0.rect.width,line.rect.width)*0.6 && abs($0.rect.midY-line.rect.midY)<min($0.rect.height,line.rect.height)*0.6}){lines.append(line)}}
             }
         }
         return lines
@@ -89,6 +89,33 @@ actor ComicPaddle {
         var text="",last=0,total:Float=0,count=0
         for t in 0..<steps{let start=t*classes;var best=0;for c in 1..<classes where values[start+c]>values[start+best]{best=c};if best != 0 && best != last && best<dictionary.count{text+=dictionary[best];total+=values[start+best];count+=1};last=best}
         return(text,count==0 ? 0:total/Float(count))
+    }
+    // CTC positions are measured on the recognizer crop. Keep real word spans
+    // for lines spanning two lobes; never divide a string by guessed character count.
+    static func words(_ values:[Float],steps:Int,classes:Int,dictionary:[String],rect:CGRect,arabic:Bool)->[ComicWord]?{
+        guard steps>0,classes>0,values.count>=steps*classes else{return nil}
+        var tokens:[(String,Int,Int)]=[],last=0
+        for t in 0..<steps{
+            let start=t*classes;var best=0
+            for c in 1..<classes where values[start+c]>values[start+best]{best=c}
+            if best != 0,best<dictionary.count{
+                if best==last,!tokens.isEmpty{tokens[tokens.count-1].2=t+1}
+                else{tokens.append((dictionary[best],t,t+1))}
+            }
+            last=best
+        }
+        var words:[ComicWord]=[],text="",begin=0,end=0
+        func append(){
+            guard !text.isEmpty else{return}
+            let a=max(0,CGFloat(begin)-0.5)/CGFloat(steps),b=min(CGFloat(steps),CGFloat(end)+0.5)/CGFloat(steps)
+            let box=rect.height>rect.width*1.5 ? CGRect(x:rect.minX,y:rect.minY+rect.height*a,width:rect.width,height:rect.height*(b-a)):CGRect(x:rect.minX+rect.width*a,y:rect.minY,width:rect.width*(b-a),height:rect.height)
+            words.append(ComicWord(text:arabic ? ComicBidi.logicalFromVisual(text):text,rect:box));text=""
+        }
+        for token in tokens{
+            if token.0.allSatisfy({$0.isWhitespace}){append()}
+            else{if text.isEmpty{begin=token.1};text+=token.0;end=token.2}
+        }
+        append();return words.count>1 ? words:nil
     }
     static func boxes(_ map:[Float],width:Int,height:Int)->[CGRect]{
         guard width>0,height>0,map.count>=width*height else{return []}

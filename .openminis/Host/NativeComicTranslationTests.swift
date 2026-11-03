@@ -165,7 +165,7 @@ import UIKit
         }}
         XCTAssertGreaterThan(before,1000);XCTAssertLessThan(after,Int(Double(before)*0.1),"The source white title ink must disappear")
         XCTAssertEqual(outside,0,"Restoration must preserve artwork beyond the owned text regions")
-        let drawn=try ComicPixels.render(restored.image,speeches:[speech],translations:[TranslationSegment(id:"cover",text:fixture.translation)],target:"ar",fontName:nil,fontScale:1,requireCleanSource:true,precleanedIDs:restored.restored)
+        let drawn=try ComicPixels.render(restored.image,speeches:[speech],translations:[TranslationSegment(id:"cover",text:fixture.translation)],target:"ar",fontName:nil,fontScale:1,requireCleanSource:true,precleanedIDs:restored.restored,styleSource:image)
         for (name,output)in [("Neural original artwork",image),("Neural cleaned artwork",restored.image),("Neural Arabic artwork",drawn)]{let attachment=XCTAttachment(image:UIImage(cgImage:output));attachment.name=name;attachment.lifetime = .keepAlways;add(attachment)}
     }
     func testMissingSourceLineIsNeverErasedOrOverpainted()async throws{
@@ -263,6 +263,57 @@ import UIKit
         XCTAssertEqual(speeches.first?.angle,0)
         let translated=try ComicPixels.render(image,speeches:speeches,translations:[TranslationSegment(id:"0",text:"عذرًا، لكن هل يمكنكم مساعدتنا؟")],target:"ar",fontName:nil,fontScale:1)
         let attachment=XCTAttachment(image:UIImage(cgImage:translated));attachment.name="One balloon one paragraph - source sized Arabic";attachment.lifetime = .keepAlways;add(attachment)
+    }
+    func testJoinedBalloonLobesBecomeIndependentTranslationSegments()throws{
+        for vertical in [false,true]{
+            let size=vertical ? CGSize(width:240,height:440):CGSize(width:440,height:240)
+            let image=renderer(size).image{context in
+                UIColor.black.setFill();context.fill(CGRect(origin:.zero,size:size));UIColor.white.setFill()
+                UIBezierPath(ovalIn:CGRect(x:20,y:20,width:200,height:200)).fill()
+                UIBezierPath(ovalIn:CGRect(x:vertical ? 20:220,y:vertical ? 220:20,width:200,height:200)).fill()
+                context.fill(vertical ? CGRect(x:112,y:200,width:16,height:40):CGRect(x:200,y:112,width:40,height:16))
+            }.cgImage!
+            let a=ComicLine(text:"FIRST SPEAKER",confidence:1,rect:CGRect(x:60,y:85,width:120,height:25))
+            let b=ComicLine(text:"SECOND SPEAKER",confidence:1,rect:CGRect(x:vertical ? 60:260,y:vertical ? 285:85,width:120,height:25))
+            // Deliberately represent the horizontal pair as a single OCR line:
+            // word geometry must recover both original segment texts.
+            let input=vertical ? [a,b]:[ComicLine(text:a.text+" "+b.text,confidence:1,rect:a.rect.union(b.rect),words:[ComicWord(text:a.text,rect:a.rect),ComicWord(text:b.text,rect:b.rect)])]
+            let speeches=ComicBalloons.speeches(input,image:image,source:"en")
+            let request=speeches.map{TranslationSegment(id:$0.id,text:$0.text)}
+            XCTAssertEqual(request.map(\.text),["FIRST SPEAKER","SECOND SPEAKER"])
+            XCTAssertEqual(Set(request.map(\.id)).count,2)
+            if speeches.count==2{XCTAssertTrue(speeches[0].rect.intersection(speeches[1].rect).isNull)}
+        }
+    }
+    func testRealDiagonalConnectedBalloonsKeepTheirOwnDialogues()async throws{
+        struct Line:Decodable{var text:String;var confidence:Float;var x:Double;var y:Double;var width:Double;var height:Double;var glyphHeight:Double}
+        struct Fixture:Decodable{var image:String;var lines:[Line]}
+        let(data,_)=try await URLSession.shared.data(from:URL(string:"http://127.0.0.1:8765/comic-quality-fixtures?name=neural-connected.json")!)
+        let fixture=try JSONDecoder().decode(Fixture.self,from:data),image=try ComicPixels.decode(XCTUnwrap(Data(base64Encoded:fixture.image)))
+        let lines=fixture.lines.map{ComicLine(text:$0.text,confidence:$0.confidence,rect:CGRect(x:$0.x,y:$0.y,width:$0.width,height:$0.height),glyphHeight:$0.glyphHeight)}
+        let speeches=ComicBalloons.speeches(lines,image:image,source:"en")
+        XCTAssertEqual(speeches.map(\.text),["…I guess so.","It would be gross for me to be a girl."])
+        for speech in speeches{XCTAssertTrue(speech.lines.allSatisfy{speech.rect.insetBy(dx:-1,dy:-1).contains($0.rect)})}
+        let result=try ComicPixels.render(image,speeches:speeches,translations:[TranslationSegment(id:"0",text:"أظن ذلك."),TranslationSegment(id:"1",text:"سيكون الأمر محرجًا لو كنت فتاة.")],target:"ar",fontName:nil,fontScale:1)
+        let attachment=XCTAttachment(image:UIImage(cgImage:result));attachment.name="Connected real balloons - separate Arabic paragraphs";attachment.lifetime = .keepAlways;add(attachment)
+    }
+    func testAutomaticInkKeepsSourceOutlineAfterRestoration()throws{
+        XCTAssertEqual(ComicPreferences().inkStyle,.automatic)
+        let size=CGSize(width:400,height:160),bg=UIColor(red:0.25,green:0.4,blue:0.6,alpha:1)
+        func raster(text:Bool)->CGImage{renderer(size).image{context in
+            bg.setFill();context.fill(CGRect(origin:.zero,size:size))
+            if text{("HELLO" as NSString).draw(at:CGPoint(x:40,y:45),withAttributes:[.font:UIFont.boldSystemFont(ofSize:50),.foregroundColor:UIColor.black,.strokeColor:UIColor.white,.strokeWidth:-12])}
+        }.cgImage!}
+        let source=raster(text:true),clean=raster(text:false),line=ComicLine(text:"HELLO",confidence:1,rect:CGRect(x:38,y:50,width:180,height:58),glyphHeight:40)
+        let speech=ComicSpeech(id:"0",text:"HELLO",lines:[line],rect:CGRect(x:30,y:30,width:270,height:100),vertical:false,balloon:false)
+        let style=try XCTUnwrap(ComicPixels.appearance(source,speech:speech))
+        XCTAssertNotNil(style.stroke);XCTAssertGreaterThan(style.strokePercent,2)
+        let colored=try ComicPixels.render(clean,speeches:[speech],translations:[TranslationSegment(id:"0",text:"مرحبا")],target:"ar",fontName:nil,fontScale:1,precleanedIDs:["0"],styleSource:source)
+        let plain=try ComicPixels.render(clean,speeches:[speech],translations:[TranslationSegment(id:"0",text:"مرحبا")],target:"ar",fontName:nil,fontScale:1,textColor:"000000",ink:.plain,precleanedIDs:["0"])
+        func white(_ image:CGImage)throws->Int{let p=try XCTUnwrap(ComicPixels.rgba(image,width:image.width,height:image.height));return stride(from:0,to:p.count,by:4).filter{p[$0]>235&&p[$0+1]>235&&p[$0+2]>235}.count}
+        XCTAssertGreaterThan(try white(colored),30,"Arabic must retain the original white outline even after the source letters were erased")
+        XCTAssertEqual(try white(plain),0,"an explicit plain style remains plain")
+        let attachment=XCTAttachment(image:UIImage(cgImage:colored));attachment.name="Automatic black Arabic with original white outline";attachment.lifetime = .keepAlways;add(attachment)
     }
     func testCleanupRemovesOutlinedOriginalOnLightAndDarkGradients()throws{
         for dark in [false,true]{

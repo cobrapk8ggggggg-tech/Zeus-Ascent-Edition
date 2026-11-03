@@ -31,15 +31,15 @@ enum ComicPixels {
         func normal(_ text:String)->String{text.split(whereSeparator:{$0.isWhitespace}).joined(separator:" ").lowercased()}
         return normal(source) != normal(translated)
     }
-    static func render(_ image:CGImage,speeches:[ComicSpeech],translations:[TranslationSegment],target:String,fontName:String?,fontScale:Double,textColor:String? = nil,ink:ComicInkStyle = .plain,letterSpacing:Double = 0,requireCleanSource:Bool = false,precleanedIDs:Set<String> = [])throws->CGImage{
-        try renderReport(image,speeches:speeches,translations:translations,target:target,fontName:fontName,fontScale:fontScale,textColor:textColor,ink:ink,letterSpacing:letterSpacing,requireCleanSource:requireCleanSource,precleanedIDs:precleanedIDs).image
+    static func render(_ image:CGImage,speeches:[ComicSpeech],translations:[TranslationSegment],target:String,fontName:String?,fontScale:Double,textColor:String? = nil,ink:ComicInkStyle = .automatic,letterSpacing:Double = 0,requireCleanSource:Bool = false,precleanedIDs:Set<String> = [],styleSource:CGImage? = nil)throws->CGImage{
+        try renderReport(image,speeches:speeches,translations:translations,target:target,fontName:fontName,fontScale:fontScale,textColor:textColor,ink:ink,letterSpacing:letterSpacing,requireCleanSource:requireCleanSource,precleanedIDs:precleanedIDs,styleSource:styleSource).image
     }
     struct Rendering{var image:CGImage;var unresolved:[String]}
-    static func renderReport(_ image:CGImage,speeches:[ComicSpeech],translations:[TranslationSegment],target:String,fontName:String?,fontScale:Double,textColor:String? = nil,ink:ComicInkStyle = .plain,letterSpacing:Double = 0,requireCleanSource:Bool = false,precleanedIDs:Set<String> = [])throws->Rendering{
+    static func renderReport(_ image:CGImage,speeches:[ComicSpeech],translations:[TranslationSegment],target:String,fontName:String?,fontScale:Double,textColor:String? = nil,ink:ComicInkStyle = .automatic,letterSpacing:Double = 0,requireCleanSource:Bool = false,precleanedIDs:Set<String> = [],styleSource:CGImage? = nil)throws->Rendering{
         guard let context=context(width:image.width,height:image.height),var pixels=rgba(image,width:image.width,height:image.height)else{throw ComicFailure.message("ذاكرة غير كافية للرسم.")}
         let original=pixels
         let translated=Dictionary(translations.map{($0.id,$0.text)},uniquingKeysWith:{$1})
-        var prepared:[(CGRect,Placement,CGColor)]=[]
+        var prepared:[(CGRect,Placement,CGColor,InkAppearance?)]=[]
         var resolved=Set<String>()
         for speech in speeches {
             guard let text=translated[speech.id],!text.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty else{continue}
@@ -52,7 +52,8 @@ enum ComicPixels {
                 clean(&pixels,width:image.width,height:image.height,speech:speech,source:original,approvedMask:mask)
             }
             let automatic=background.0*0.2126+background.1*0.7152+background.2*0.0722>0.5 ? CGColor(gray:0.04,alpha:1):CGColor(gray:0.98,alpha:1)
-            prepared.append((area,placed,textColor.flatMap(Self.color) ?? automatic));resolved.insert(speech.id)
+            let sourceStyle=ink == .automatic ? appearance(styleSource ?? image,speech:speech):nil
+            prepared.append((area,placed,textColor.flatMap(Self.color) ?? sourceStyle?.fill ?? automatic,sourceStyle));resolved.insert(speech.id)
         }
         // Finish every source mask before lettering. A later cleanup pass must
         // never erase an earlier Arabic glyph where source boxes touch.
@@ -60,7 +61,7 @@ enum ComicPixels {
         let data=Data(pixels)
         guard let provider=CGDataProvider(data:data as CFData),let cleaned=CGImage(width:image.width,height:image.height,bitsPerComponent:8,bitsPerPixel:32,bytesPerRow:image.width*4,space:CGColorSpace(name:CGColorSpace.sRGB)!,bitmapInfo:CGBitmapInfo(rawValue:CGImageAlphaInfo.premultipliedLast.rawValue|CGBitmapInfo.byteOrder32Big.rawValue),provider:provider,decode:nil,shouldInterpolate:false,intent:.defaultIntent)else{throw ComicFailure.message("فشل تجهيز الصورة النظيفة.")}
         context.draw(cleaned,in:CGRect(x:0,y:0,width:image.width,height:image.height))
-        for (area,placed,color) in prepared{letter(context,image:image,area:area,placed:placed,color:color,ink:ink)}
+        for (area,placed,color,appearance) in prepared{letter(context,image:image,area:area,placed:placed,color:color,ink:ink,appearance:appearance)}
         guard let result=context.makeImage()else{throw ComicFailure.message("فشل رسم النص.")};return Rendering(image:result,unresolved:speeches.filter{translated[$0.id] != nil && !resolved.contains($0.id)}.map(\.id))
     }
     // Resolve the exact layout before any neural erasure. A restoration that
@@ -134,7 +135,7 @@ enum ComicPixels {
     }
     // Draw one speech with the chosen ink. All passes share the same frame path so
     // stroke, shadow and fill stay perfectly registered on every font and rotation.
-    private static func letter(_ context:CGContext,image:CGImage,area:CGRect,placed:Placement,color:CGColor,ink:ComicInkStyle){
+    private static func letter(_ context:CGContext,image:CGImage,area:CGRect,placed:Placement,color:CGColor,ink:ComicInkStyle,appearance:InkAppearance?){
         context.saveGState();context.textMatrix = .identity
         context.translateBy(x:area.midX,y:CGFloat(image.height)-area.midY)
         context.clip(to:CGRect(x:-area.width/2,y:-area.height/2,width:area.width,height:area.height))
@@ -146,17 +147,34 @@ enum ComicPixels {
                 context.textPosition=CGPoint(x:-bounds.midX,y:-bounds.midY);CTLineDraw(line,context);return
             }
             let frame=CTFramesetterCreateFrame(CTFramesetterCreateWithAttributedString(value),CFRange(),CGPath(rect:placed.box,transform:nil),nil);CTFrameDraw(frame,context)}
-        switch ink{
-        case .plain:draw(attributed)
+        let resolved=ink == .automatic ? (appearance?.stroke == nil ? ComicInkStyle.plain:.outline):ink
+        switch resolved{
+        case .automatic,.plain:draw(attributed)
         case .shadow:
             // Soft drop copy under the glyphs: readable over gradients and SFX.
             context.saveGState();context.translateBy(x:1.5,y:-1.5)
             let shade=NSMutableAttributedString(attributedString:attributed);shade.addAttribute(NSAttributedString.Key(kCTForegroundColorAttributeName as String),value:CGColor(gray:0,alpha:0.55),range:NSRange(location:0,length:shade.length));draw(shade);context.restoreGState();draw(attributed)
         case .outline:
             // Manga lettering: stroke the opposite ink first, then fill on top.
-            let stroke=NSMutableAttributedString(attributedString:attributed);stroke.addAttribute(NSAttributedString.Key(kCTStrokeWidthAttributeName as String),value:12.0,range:NSRange(location:0,length:stroke.length));stroke.addAttribute(NSAttributedString.Key(kCTStrokeColorAttributeName as String),value:contrast(color),range:NSRange(location:0,length:stroke.length));draw(stroke);draw(attributed)
+            let stroke=NSMutableAttributedString(attributedString:attributed);stroke.addAttribute(NSAttributedString.Key(kCTStrokeWidthAttributeName as String),value:ink == .automatic ? appearance?.strokePercent ?? 12:12,range:NSRange(location:0,length:stroke.length));stroke.addAttribute(NSAttributedString.Key(kCTStrokeColorAttributeName as String),value:ink == .automatic ? appearance?.stroke ?? contrast(color):contrast(color),range:NSRange(location:0,length:stroke.length));draw(stroke);draw(attributed)
         }
         context.restoreGState()
+    }
+    struct InkAppearance{var fill:CGColor;var stroke:CGColor?;var strokePercent:Double}
+    // Read a bounded crop from the untouched image, including when LaMa has
+    // already removed every original letter from the rendering image.
+    static func appearance(_ image:CGImage,speech:ComicSpeech)->InkAppearance?{
+        let source=speech.lines.reduce(CGRect.null){$0.union($1.rect)}
+        guard !source.isNull else{return nil}
+        let pad=max(8,min(source.width,source.height)*0.3)
+        let area=source.insetBy(dx:-pad,dy:-pad).integral.intersection(CGRect(x:0,y:0,width:image.width,height:image.height))
+        guard area.width*area.height<=1_000_000,let cut=image.cropping(to:area),let pixels=rgba(cut,width:cut.width,height:cut.height)else{return nil}
+        let boxes:[Int32]=speech.lines.flatMap{line in [Int32(floor(line.rect.minX-area.minX)),Int32(floor(line.rect.minY-area.minY)),Int32(ceil(line.rect.maxX-area.minX)),Int32(ceil(line.rect.maxY-area.minY))]}
+        var values=[Float](repeating:0,count:7)
+        let confidence=pixels.withUnsafeBufferPointer{p in boxes.withUnsafeBufferPointer{b in values.withUnsafeMutableBufferPointer{o in zeus_comic_ink_style(p.baseAddress,Int32(cut.width),Int32(cut.height),b.baseAddress,Int32(speech.lines.count),o.baseAddress)}}}
+        guard confidence>=0.65 else{return nil}
+        func color(_ start:Int)->CGColor{CGColor(red:CGFloat(values[start])/255,green:CGFloat(values[start+1])/255,blue:CGFloat(values[start+2])/255,alpha:1)}
+        return InkAppearance(fill:color(0),stroke:values[6]>0 ? color(3):nil,strokePercent:Double(values[6]))
     }
     private static func contrast(_ color:CGColor)->CGColor{
         let components=color.converted(to:CGColorSpace(name:CGColorSpace.sRGB)!,intent:.defaultIntent,options:nil)?.components ?? [1]
