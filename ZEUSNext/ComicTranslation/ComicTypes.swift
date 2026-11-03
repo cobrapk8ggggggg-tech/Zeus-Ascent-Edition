@@ -84,7 +84,7 @@ struct ComicPreferences: Codable, Equatable {
     var letterCaseRaw: String?
     var letterSpacing: Double?
     var letterCase: ComicLetterCase { ComicLetterCase(rawValue: letterCaseRaw ?? "") ?? .original }
-    var renderIdentity: String { "render-v7|restoration:\(restorationEnabled ?? true)|\(fontName ?? "default")|\(fontScale)|\(textColor ?? "auto")|\(inkStyle.rawValue)|\(letterCase.rawValue)|\(letterSpacing ?? 0)" }
+    var renderIdentity: String { "render-v8|restoration:\(restorationEnabled ?? true)|\(fontName ?? "default")|\(fontScale)|\(textColor ?? "auto")|\(inkStyle.rawValue)|\(letterCase.rawValue)|\(letterSpacing ?? 0)" }
     var inkStyle: ComicInkStyle { get { ComicInkStyle(rawValue: inkStyleRaw ?? "") ?? .plain } set { inkStyleRaw = newValue.rawValue } }
     var engine: ComicOnlineEngine = .existing
     var translation: TranslationPreferences?
@@ -155,7 +155,7 @@ enum ComicIdentity {
         hash(segments.map{$0.id+"\0"+$0.text}.joined(separator:"\n"))
     }
     static func settings(_ preferences: ComicPreferences, translation: TranslationPreferences, provider: AIProviderConfiguration?) -> String {
-        hash("comic-v13|fallback:\(preferences.allowOnlineFallback ?? false)|\(preferences.mode.rawValue)|\(preferences.source)|\(translation.target)|" + TranslationMemory.namespace(page: "comic://content", preferences: translation, provider: provider))
+        hash("comic-v15|fallback:\(preferences.allowOnlineFallback ?? false)|\(preferences.mode.rawValue)|\(preferences.source)|\(translation.target)|" + TranslationMemory.namespace(page: "comic://content", preferences: translation, provider: provider))
     }
 }
 enum ComicGeometry {

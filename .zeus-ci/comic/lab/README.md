@@ -13,7 +13,7 @@ pip install -r .zeus-ci/comic/lab/requirements.txt
 python .zeus-ci/comic/lab/models.py .zeus-ci/comic/lab/models
 python .zeus-ci/comic/lab/acquire.py .zeus-ci/comic/lab/data
 python .zeus-ci/comic/lab/test_masks.py
-python .zeus-ci/comic/lab/run.py --corpus .zeus-ci/comic/lab/data --models .zeus-ci/comic/lab/models --output .zeus-ci/comic/lab/output/review --regions 400 --ocr
+python .zeus-ci/comic/lab/run.py --corpus .zeus-ci/comic/lab/data --models .zeus-ci/comic/lab/models --output .zeus-ci/comic/lab/output/review --regions 440 --ocr --neural
 ```
 
 Use a fontconfig installation including `NotoNaskhArabic-Regular.ttf` (Ubuntu:
@@ -26,13 +26,13 @@ before accepting a case. Fixed Arabic strings do not evaluate translation qualit
 
 `docs/comic-translation/lab/corpus.json` records the downloaded 11 chapters, 251
 original images, source URLs and SHA-256 hashes. Full chapters and model weights
-stay outside git; six small real crops are retained for native regression tests.
+stay outside git; six small real crops and one colored-art neural fixture are retained for native regression tests.
 The acquisition command selects two different works per language and records the
 selection once. To reproduce the frozen set, download each manifest page URL and
 verify its hash, rather than selecting new chapters. CDN URLs may expire; resolve
 the recorded MangaDex chapter through its at-home API in that case and check hashes.
 
-Optional model comparison (not enabled in the app):
+Additional side-by-side model diagnostics:
 
 ```sh
 python .zeus-ci/comic/lab/models.py .zeus-ci/comic/lab/models --comparison
@@ -42,9 +42,12 @@ python .zeus-ci/comic/lab/compare_models.py --models .zeus-ci/comic/lab/models -
 LaMa inputs are RGB float32 [0,1] plus a binary mask, letterboxed to 512x512;
 output is RGB float32 [0,255]. Composite only the original-resolution mask pixels.
 CTD segmentation is intersected with text ownership, not applied to an entire page.
-The lock file records exact revisions, sizes and digests. These are experimental
-comparators: no new deep restoration model is enabled in the shipped app merely
-because it downloaded or produced an image.
+The lock file and app catalog record exact revisions, sizes and digests. The app
+uses CTD and LaMa adaptively when a complete lightweight mask cannot safely clean
+the source. OCR/translation models are unloaded first; restoration graphs execute
+serially, with a 1.2 GB available-memory check before LaMa. The default setting is
+enabled; model download is roughly 303 MB. Memory refusal preserves the source
+and reports partial processing. Physical iPhone peak memory remains unmeasured.
 
 The gallery can be augmented with a pixel annotation editor:
 
@@ -67,7 +70,21 @@ bash .zeus-ci/comic/lab/verify.sh /tmp/zeus-comic-review
 ```
 
 This verifies all retained source hashes, installs an isolated Python environment,
-runs independent mask tests, downloads pinned OCR models and emits the review
+runs independent mask tests, downloads pinned OCR and restoration models and emits the review
 artifacts. If a frozen CDN URL has expired it fails rather than silently accepting
 different images; refresh it through the recorded chapter endpoint and retain the
 same SHA-256 before retrying.
+
+To re-evaluate frozen proposals after a kernel/OCR change without re-selecting
+pages, keep the old review and write a new one:
+
+```sh
+python .zeus-ci/comic/lab/refresh.py --models /tmp/zeus-comic-review/models --cases /tmp/zeus-comic-review/review --output /tmp/zeus-comic-review/recheck --ocr --neural
+```
+
+The source confidence gate matches the Paddle 0.65 cutoff. False detections remain
+in the review set and are explicitly declined. Layout is checked before erasure;
+an unplaceable translation preserves original pixels. Arabic and Latin use
+separate Linux fonts. The script records kernel SHA and dependency versions.
+This diagnostic harness does not reproduce ML Kit/Vision or native balloon
+segmentation exactly; production behavior is verified by the native test suite.

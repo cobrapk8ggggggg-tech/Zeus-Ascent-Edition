@@ -40,6 +40,8 @@ class Engine:
             lines.append(dict(box=box,confidence=confidence,glyph_height=min(box[2]-box[0],box[3]-box[1])*.72))
         return sorted(lines,key=lambda l:(l['box'][1],l['box'][0]))
     def recognize(self,rgb,box,language):
+        return self.recognize_info(rgb,box,language)[0]
+    def recognize_info(self,rgb,box,language):
         name={'en':'latin','ja':'han','zh':'han','ko':'korean','ar':'arabic'}[language]
         if name not in self.dictionaries:self.dictionaries[name]=['']+yaml.safe_load((self.models/(name+'.yml')).read_text())['PostProcess']['character_dict']+[' ']
         x,y,r,b=box;cut=rgb[y:b,x:r]
@@ -47,11 +49,11 @@ class Engine:
         width=max(8,min(4096,int(np.ceil(cut.shape[1]*48/cut.shape[0]))))
         tensor=cv2.resize(cut[:,:,::-1],(width,48)).astype(np.float32)/127.5-1
         s=self.session(name+'.onnx');logits=s.run(None,{s.get_inputs()[0].name:tensor.transpose(2,0,1)[None]})[0][0]
-        indices=np.argmax(logits,axis=1);text=[];last=0
-        for i in indices:
-            if i and i!=last and i<len(self.dictionaries[name]):text.append(self.dictionaries[name][i])
+        indices=np.argmax(logits,axis=1);text=[];scores=[];last=0
+        for timestep,i in enumerate(indices):
+            if i and i!=last and i<len(self.dictionaries[name]):text.append(self.dictionaries[name][i]);scores.append(float(logits[timestep,i]))
             last=i
-        return ''.join(text)
+        return ''.join(text),float(np.mean(scores)) if scores else 0
     def clean(self,rgb,boxes):
         rgba=np.ascontiguousarray(cv2.cvtColor(rgb,cv2.COLOR_RGB2RGBA));mask=np.zeros(rgb.shape[:2],np.uint8);h,w=mask.shape
         merged=[]
@@ -76,7 +78,7 @@ class Engine:
     def refine(self,rgb,hints,boxes):
         rgba=np.ascontiguousarray(cv2.cvtColor(rgb,cv2.COLOR_RGB2RGBA));mask=np.zeros(rgb.shape[:2],np.uint8);h,w=mask.shape
         for x,y,r,b in boxes:
-            pad=max(3,(b-y)*.18);box=[max(1,int(x-pad)),max(1,int(y-pad)),min(w-1,int(r+pad)),min(h-1,int(b+pad))]
+            pad=max(3,min(r-x,b-y)*.18);box=[max(1,int(x-pad)),max(1,int(y-pad)),min(w-1,int(r+pad)),min(h-1,int(b+pad))]
             self.lib.refine(rgba,hints,mask,w,h,*box)
         return mask
     def hints(self,rgb):

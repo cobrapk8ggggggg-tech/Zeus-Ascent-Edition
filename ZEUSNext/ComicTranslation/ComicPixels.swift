@@ -44,23 +44,8 @@ enum ComicPixels {
         for speech in speeches {
             guard let text=translated[speech.id],!text.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty else{continue}
             if !needsLettering(speech.text,text){resolved.insert(speech.id);continue}
-            let source=speech.lines.reduce(CGRect.null){$0.union($1.rect)}
-            guard !source.isNull else{continue}
-            let pad=max(3,min(source.width,source.height)*0.12)
-            let area=(speech.balloon ? speech.rect:source.insetBy(dx:-pad,dy:-pad)).intersection(CGRect(x:0,y:0,width:image.width,height:image.height)).integral
-            guard area.width>6,area.height>6 else{continue}
+            guard let (area,placed)=planned(speech,text:text,width:image.width,height:image.height,target:target,fontName:fontName,fontScale:fontScale,letterSpacing:letterSpacing,requireReadable:requireCleanSource)else{continue}
             let background=backgroundColor(original,width:image.width,height:image.height,rect:area)
-            // Anchor the em size to source glyph height, rather than balloon size.
-            // A one-word translation must never grow to fill an entire balloon.
-            let heights=speech.lines.map{CGFloat($0.glyphHeight ?? Double(min($0.rect.height,$0.rect.width)))}.sorted()
-            let sourceSize=heights[heights.count/2]*1.3
-            let placement:Placement?
-            if speech.vertical && !speech.balloon{
-                let baseline=speech.lines.map(\.angle).first(where:{abs($0) > .pi/3}) ?? .pi/2
-                placement=placeVertical(text,area:area,target:target,fontName:fontName,fontScale:fontScale,letterSpacing:letterSpacing,maximumSize:sourceSize,theta:baseline<0 ? -.pi/2:.pi/2)
-            }else{placement=place(text,area:area,imageHeight:image.height,target:target,fontName:fontName,fontScale:fontScale,theta:CGFloat(speech.angle ?? 0),letterSpacing:letterSpacing,maximumSize:sourceSize)}
-            guard let placed=placement else{continue}
-            if requireCleanSource && placed.layout.size<sourceSize*CGFloat(min(1.5,max(0.5,fontScale)))*0.55{continue}
             if !precleanedIDs.contains(speech.id){
                 let mask=sourceMask(original,width:image.width,height:image.height,speech:speech)
                 if requireCleanSource && (!completeMask(original,mask:mask,width:image.width,height:image.height,speech:speech) || !simpleBackground(original,mask:mask,width:image.width,height:image.height,speech:speech)){continue}
@@ -77,6 +62,32 @@ enum ComicPixels {
         context.draw(cleaned,in:CGRect(x:0,y:0,width:image.width,height:image.height))
         for (area,placed,color) in prepared{letter(context,image:image,area:area,placed:placed,color:color,ink:ink)}
         guard let result=context.makeImage()else{throw ComicFailure.message("فشل رسم النص.")};return Rendering(image:result,unresolved:speeches.filter{translated[$0.id] != nil && !resolved.contains($0.id)}.map(\.id))
+    }
+    // Resolve the exact layout before any neural erasure. A restoration that
+    // succeeds for an unplaceable translation must never leave an empty bubble.
+    static func restorableSpeeches(_ speeches:[ComicSpeech],translations:[TranslationSegment],width:Int,height:Int,target:String,fontName:String?,fontScale:Double,letterSpacing:Double = 0)->[ComicSpeech]{
+        let values=Dictionary(translations.map{($0.id,$0.text)},uniquingKeysWith:{$1})
+        return speeches.filter{speech in
+            guard let text=values[speech.id],!text.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty,needsLettering(speech.text,text)else{return false}
+            return planned(speech,text:text,width:width,height:height,target:target,fontName:fontName,fontScale:fontScale,letterSpacing:letterSpacing,requireReadable:true) != nil
+        }
+    }
+    private static func planned(_ speech:ComicSpeech,text:String,width:Int,height:Int,target:String,fontName:String?,fontScale:Double,letterSpacing:Double,requireReadable:Bool)->(CGRect,Placement)?{
+        let source=speech.lines.reduce(CGRect.null){$0.union($1.rect)}
+        guard !source.isNull,!speech.lines.isEmpty else{return nil}
+        let pad=max(3,min(source.width,source.height)*0.12)
+        let area=(speech.balloon ? speech.rect:source.insetBy(dx:-pad,dy:-pad)).intersection(CGRect(x:0,y:0,width:width,height:height)).integral
+        guard area.width>6,area.height>6 else{return nil}
+        let heights=speech.lines.map{CGFloat($0.glyphHeight ?? Double(min($0.rect.height,$0.rect.width)))}.sorted()
+        let sourceSize=heights[heights.count/2]*1.3
+        let placement:Placement?
+        if speech.vertical && !speech.balloon{
+            let baseline=speech.lines.map(\.angle).first(where:{abs($0) > .pi/3}) ?? .pi/2
+            placement=placeVertical(text,area:area,target:target,fontName:fontName,fontScale:fontScale,letterSpacing:letterSpacing,maximumSize:sourceSize,theta:baseline<0 ? -.pi/2:.pi/2)
+        }else{placement=place(text,area:area,imageHeight:height,target:target,fontName:fontName,fontScale:fontScale,theta:CGFloat(speech.angle ?? 0),letterSpacing:letterSpacing,maximumSize:sourceSize)}
+        guard let placed=placement else{return nil}
+        if requireReadable && placed.layout.size<sourceSize*CGFloat(min(1.5,max(0.5,fontScale)))*0.55{return nil}
+        return(area,placed)
     }
     struct Placement{var layout:TextLayout;var box:CGRect;var theta:CGFloat}
     // Fit the translation inside the speech area. Non-zero theta (diagonal tails,

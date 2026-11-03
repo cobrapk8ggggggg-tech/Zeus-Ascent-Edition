@@ -69,10 +69,10 @@ actor ComicOCR {
         // recognizer choice or downloading every language model up front.
         if source=="auto"{
             let primary=ComicModelStore.recognizer(detected)
-            for sample in probe.1 where sample.confidence>=0.8{
+            for sample in probe.1 where sample.confidence>=0.65{
                 let script=Self.lineScript(sample.text)
                 let overlaps=lines.indices.filter{lines[$0].rect.intersection(sample.rect).area/min(max(1,lines[$0].rect.area),max(1,sample.rect.area))>0.6}
-                if script != "latin" && script != "other" && script != primary{
+                if script != "latin" && script != "other" && (script != primary || overlaps.isEmpty || overlaps.allSatisfy{lines[$0].confidence<sample.confidence}){
                     lines=lines.enumerated().filter{!overlaps.contains($0.offset)}.map{$0.element};lines.append(sample)
                 }else if script=="latin",primary != "latin",overlaps.isEmpty,sample.confidence>=0.95,sample.text.filter({$0.isLetter}).count>=3{lines.append(sample)}
             }
@@ -80,7 +80,18 @@ actor ComicOCR {
         return ComicReading(lines:lines,speeches:ComicBalloons.speeches(lines,image:image,source:detected),language:detected,runtime:runtime)
     }
     private static func scriptProbe(_ image:CGImage,region:CGRect?)async throws->(String,[ComicLine]){
-        let samples=try vision(image,languages:["ar-SA","ko-KR","ja-JP","zh-Hans","ru-RU","en-US"],accurate:true,automatic:true)
+        var samples=try vision(image,languages:["ar-SA","ko-KR","ja-JP","zh-Hans","ru-RU","en-US"],accurate:true,automatic:true)
+        // Vision's automatic language choice can select English for a mixed
+        // panel and omit its Arabic line. An explicit supported Arabic pass
+        // supplies only Arabic-script candidates; it cannot replace Latin text.
+        if try VNRecognizeTextRequest().supportedRecognitionLanguages().contains("ar-SA"){
+            let arabic=try vision(image,languages:["ar-SA"],accurate:true).filter{lineScript($0.text)=="arabic" && $0.confidence>=0.65}
+            for line in arabic{
+                if let index=samples.firstIndex(where:{$0.rect.intersection(line.rect).area/min(max(1,$0.rect.area),max(1,line.rect.area))>0.6 && lineScript($0.text)=="arabic"}){
+                    if line.confidence>=samples[index].confidence{samples[index]=line}
+                }else{samples.append(line)}
+            }
+        }
         let owned=region.map{area in samples.filter{area.contains(CGPoint(x:$0.rect.midX,y:$0.rect.midY))}} ?? samples
         let text=(owned.isEmpty ? samples:owned).map(\.text).joined(separator:" ")
         let recognizer=NLLanguageRecognizer();recognizer.processString(text)

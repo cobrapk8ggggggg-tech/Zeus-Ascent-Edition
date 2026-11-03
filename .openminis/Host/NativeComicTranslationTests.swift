@@ -185,6 +185,20 @@ import UIKit
         let speech=ComicSpeech(id:"0",text:line.text,lines:[line],rect:line.rect,vertical:false)
         XCTAssertThrowsError(try ComicPixels.render(image,speeches:[speech],translations:[TranslationSegment(id:"0",text:String(repeating:"هل يمكنكم مساعدتنا؟ ",count:20))],target:"ar",fontName:nil,fontScale:1,requireCleanSource:true))
     }
+    func testUnreadableTranslationIsExcludedBeforeNeuralErasure()async throws{
+        let image=renderer(CGSize(width:300,height:200)).image{context in
+            UIColor.white.setFill();context.fill(CGRect(x:0,y:0,width:300,height:200))
+            ("ORIGINAL" as NSString).draw(at:CGPoint(x:30,y:40),withAttributes:[.font:UIFont.systemFont(ofSize:28),.foregroundColor:UIColor.black])
+        }.cgImage!
+        let line=ComicLine(text:"ORIGINAL",confidence:1,rect:CGRect(x:30,y:40,width:160,height:35),glyphHeight:28)
+        let speech=ComicSpeech(id:"0",text:line.text,lines:[line],rect:line.rect,vertical:false)
+        let values=[TranslationSegment(id:"0",text:String(repeating:"هل يمكنكم مساعدتنا؟ ",count:20))]
+        let eligible=ComicPixels.restorableSpeeches([speech],translations:values,width:image.width,height:image.height,target:"ar",fontName:nil,fontScale:1)
+        XCTAssertTrue(eligible.isEmpty)
+        let restored=try await ComicRestoration.shared.restore(image,speeches:eligible,requiredHeadroom:0)
+        XCTAssertEqual(ComicPixels.rgba(image,width:300,height:200),ComicPixels.rgba(restored.image,width:300,height:200))
+        XCTAssertTrue(restored.restored.isEmpty)
+    }
     func testUnplatedVerticalArabicKeepsWholeRotatedWords()throws{
         let image=renderer(CGSize(width:200,height:500)).image{context in UIColor.white.setFill();context.fill(CGRect(x:0,y:0,width:200,height:500))}.cgImage!
         let line=ComicLine(text:"VERTICAL TITLE",confidence:1,rect:CGRect(x:80,y:50,width:30,height:400),angle:.pi/2,glyphHeight:24)
@@ -294,7 +308,7 @@ import UIKit
         }.cgImage!
         let reading=try await ComicOCR.shared.read(image,source:"auto",mode:.balanced)
         XCTAssertEqual(reading.language,"ar","Arabic must not be overwritten by a Latin fallback recognizer")
-        XCTAssertTrue(reading.lines.map(\.text).joined().unicodeScalars.contains{(0x0600...0x06FF).contains($0.value)})
+        XCTAssertTrue(reading.lines.map(\.text).joined().unicodeScalars.contains{(0x0600...0x06FF).contains($0.value)},"Arabic reading: \(reading.lines.map{($0.text,$0.confidence)})")
     }
     func testVerticalJapanesePaddleReadsTopToBottom()async throws{
         try await ComicModelStore.shared.prepare(source:"ja")
@@ -313,7 +327,7 @@ import UIKit
             ("مرحبًا بكم في العالم الجميل" as NSString).draw(at:CGPoint(x:35,y:150),withAttributes:[.font:UIFont(name:"GeezaPro",size:40)!, .foregroundColor:UIColor.black])
         }.cgImage!
         let reading=try await ComicOCR.shared.read(image,source:"auto",mode:.balanced),text=reading.lines.map(\.text).joined(separator:" ")
-        XCTAssertTrue(text.uppercased().contains("HELLO"));XCTAssertTrue(text.unicodeScalars.contains{(0x0600...0x06FF).contains($0.value)})
+        XCTAssertTrue(text.uppercased().contains("HELLO"),"Mixed Latin: \(text)");XCTAssertTrue(text.unicodeScalars.contains{(0x0600...0x06FF).contains($0.value)},"Mixed Arabic: \(text)")
     }
     func testLanguageVoteUsesOwnedPanelInsteadOfNeighbourContext()async throws{
         let image=renderer(CGSize(width:800,height:500)).image{context in

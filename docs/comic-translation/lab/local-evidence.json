@@ -9,30 +9,18 @@
     "ko",
     "zh"
   ],
-  "outside_mask_changes": 0,
-  "layout_probe_fits": 197,
-  "manually_reviewed": 0,
   "quality_acceptance_proven": false,
-  "peak_rss_kib": 802948,
-  "mask_refresh_seconds": 18.950681800999973,
-  "cleanup_gate_accepted": 177,
-  "cleanup_gate_abstained": 263,
-  "contact_sheet_triaged": 40,
   "accepted_gold_regions": 0,
   "missing_acceptance": [
     "400 hand-labelled gold regions including full-page missed-text annotations",
     "95% annotated recall measurement",
     "95% blind visual acceptance on held-out chapters",
     "actual Android output comparison",
-    "approved deep restoration on textured or decorative text"
+    "physical iPhone restoration memory/time",
+    "full-resolution visual review of complex restoration"
   ],
   "known_background_scenarios": 10,
   "known_background_maximum_channel_error": 3,
-  "standalone_lama_peak_rss_kib": 773772,
-  "ctd_lama_ocr_comparison_peak_rss_kib": 1996620,
-  "neural_models_shipped_in_app": false,
-  "triage_applies_to": "initial sequential sweep, not the stratified sweep",
-  "reproduced_with_verify_sh": true,
   "dependency_versions": {
     "onnxruntime": "1.23.2",
     "opencv": "4.12.0",
@@ -40,10 +28,48 @@
     "Pillow": "11.3.0",
     "PyYAML": "6.0.3"
   },
-  "earlier_stratified_protocol": {
-    "cleanup_gate_accepted": 186,
-    "cleanup_gate_abstained": 254,
-    "layout_probe_fits": 418
+  "neural_restoration_enabled": true,
+  "contact_sheet_triaged": 57,
+  "triage_file": "visual-triage.json",
+  "native_confirmed": {
+    "source_commit": "3479bfda08fdc21653034b4eb4db625368d65240",
+    "native_tests": 33,
+    "ui_tests": 6,
+    "failures": 0,
+    "device_build": true,
+    "physical_device": false,
+    "run_id": 41585256165
   },
-  "protocol": "deterministic page sampling, plate ownership, source-relative readability floor"
+  "next_candidate": {
+    "source_commit": "7424efe54b33d7778a72a096ec1b0051ff294a21",
+    "native_tests": 39,
+    "failures": 2,
+    "failed_tests": [
+      "testAutomaticArabicScriptUsesTheArabicRecognizer",
+      "testAutomaticReadingRetainsMixedArabicAndEnglishLines"
+    ],
+    "status": "repair pending validation"
+  },
+  "local_adaptive_v1": {
+    "chapters": 11,
+    "pages": 251,
+    "regions": 440,
+    "languages": [
+      "ar",
+      "en",
+      "ja",
+      "ko",
+      "zh"
+    ],
+    "outside_mask_changes": 0,
+    "layout_probe_fits": 309,
+    "neural_restored": 116,
+    "light_restored": 93,
+    "cleanup_gate_accepted": 209,
+    "cleanup_gate_abstained": 231,
+    "manually_reviewed": 0,
+    "quality_acceptance_proven": false,
+    "peak_rss_kib": 1258144
+  },
+  "local_adaptive_v2_status": "running with layout preflight and OCR confidence gating"
 }
