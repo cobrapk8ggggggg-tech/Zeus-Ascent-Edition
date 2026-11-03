@@ -30,7 +30,14 @@ import CryptoKit
         for chapter in manifest.chapters{
             var count=0
             let cap=max(3,Int(ceil(Double(manifest.quota)/Double(chapter.pages.count)))+2)
-            for page in chapter.pages.sorted(by:{$0.sha256<$1.sha256}){
+            // Revisit concrete full-page failures before filling the remaining
+            // deterministic diagnostic quota. These are disclosed regressions,
+            // not an unseen acceptance set.
+            let regressions:Set<String>=["ko/7d0c0550-3a83-4107-b6ea-918ebe820309/009.jpg","ja/ad6defe1-80da-46a9-aca2-2464fb991d3f/001.png","violet/001.jpeg","violet/018.jpeg","violet/020.jpg"]
+            for page in chapter.pages.sorted(by:{a,b in
+                if regressions.contains(a.path) != regressions.contains(b.path){return regressions.contains(a.path)}
+                return a.sha256<b.sha256
+            }){
                 if count>=manifest.quota{break}
                 let began=Date();let bytes=try await data(page.path)
                 XCTAssertEqual(SHA256.hash(data:bytes).map{String(format:"%02x",$0)}.joined(),page.sha256)
