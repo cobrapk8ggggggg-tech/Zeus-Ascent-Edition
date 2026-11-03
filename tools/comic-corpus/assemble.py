@@ -4,6 +4,8 @@ p=argparse.ArgumentParser();p.add_argument('results',type=pathlib.Path);a=p.pars
 manifest=json.loads((screens/'manifest.json').read_text());attachments=[item for test in manifest for item in test.get('attachments',[])];friendly=lambda x:x.get('suggestedHumanReadableName','').split('_0_')[0]
 def get_json(prefix):
  item=next(x for x in attachments if friendly(x).startswith(prefix));return json.loads((screens/item['exportedFileName']).read_text())
+if not any(friendly(x).startswith('native-corpus-cases')for x in attachments):
+ (out/'report.json').write_text(json.dumps(dict(status='native test did not export corpus cases',quality_acceptance_proven=False),indent=2));raise SystemExit('No corpus result; inspect native.log and summary.json')
 cases=get_json('native-corpus-cases');pages=get_json('native-corpus-pages');provenance=get_json('native-corpus-provenance')
 rows=[]
 for case in cases:

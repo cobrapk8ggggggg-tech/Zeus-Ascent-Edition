@@ -42,6 +42,9 @@ jobs:
           python3 .zeus-ci/project.py
           xcodegen generate --spec zeus-project.json
           mkdir -p results
+      - name: Initialize the simulator catalogue
+        timeout-minutes: 4
+        run: xcrun simctl list devices available -j > results/simulators.json
       - name: Boot an available simulator
         timeout-minutes: 15
         run: python3 .zeus-ci/comic/boot_simulator.py
@@ -53,7 +56,7 @@ jobs:
         timeout-minutes: 65
         run: |
           set -o pipefail
-          xcodebuild -project ZEUSNext.xcodeproj -scheme ZEUSNext -configuration Release -sdk iphonesimulator -destination "platform=iOS Simulator,id=$COMIC_SIMULATOR" -derivedDataPath "$RUNNER_TEMP/ZeusCorpus" -resultBundlePath results/corpus.xcresult -only-testing:ZEUSNextTests/NativeComicTranslationTests/testRealChapterCorpus -parallel-testing-enabled NO -test-timeouts-enabled YES -default-test-execution-time-allowance 3000 -maximum-test-execution-time-allowance 3300 test ENABLE_TESTABILITY=YES CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- 2>&1 | tee results/native.log
+          xcodebuild -project ZEUSNext.xcodeproj -scheme ZEUSNext -configuration Release -sdk iphonesimulator -destination "platform=iOS Simulator,id=$COMIC_SIMULATOR" -derivedDataPath "$RUNNER_TEMP/ZeusCorpus" -resultBundlePath results/corpus.xcresult -only-testing:ZEUSNextTests/NativeComicTranslationTests/testRealChapterCorpus -parallel-testing-enabled NO -test-timeouts-enabled YES -default-test-execution-time-allowance 3000 -maximum-test-execution-time-allowance 3300 test ONLY_ACTIVE_ARCH=YES ARCHS=arm64 ENABLE_TESTABILITY=YES CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- 2>&1 | tee results/native.log
       - name: Export native image and reading evidence
         if: always()
         run: |
