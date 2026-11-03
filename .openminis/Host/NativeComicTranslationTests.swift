@@ -141,6 +141,33 @@ import UIKit
             XCTAssertTrue(stride(from:0,to:pixels.count,by:4).contains{Int(pixels[$0+2])>Int(pixels[$0])+25},"real comic crop must contain rendered Arabic")
         }
     }
+    func testBatchedNeuralRestorationReusesModelsAndPreservesBothCrops()async throws{
+        struct Line:Decodable{var x:Double;var y:Double;var width:Double;var height:Double;var glyphHeight:Double}
+        struct Fixture:Decodable{var lines:[Line];var image:String}
+        let(data,_)=try await URLSession.shared.data(from:URL(string:"http://127.0.0.1:8765/comic-quality-fixtures?name=neural-title.json")!)
+        let fixture=try JSONDecoder().decode(Fixture.self,from:data),source=try ComicPixels.decode(XCTUnwrap(Data(base64Encoded:fixture.image)))
+        let gap=64,step=source.width+gap,width=source.width*2+gap,height=source.height
+        let image=renderer(CGSize(width:width,height:height)).image{context in
+            UIColor.black.setFill();context.fill(CGRect(x:0,y:0,width:width,height:height))
+            UIImage(cgImage:source).draw(at:.zero);UIImage(cgImage:source).draw(at:CGPoint(x:step,y:0))
+        }.cgImage!
+        let speeches=(0..<2).map{column -> ComicSpeech in
+            let lines=fixture.lines.map{ComicLine(text:"TITLE",confidence:1,rect:CGRect(x:$0.x+Double(column*step),y:$0.y,width:$0.width,height:$0.height),glyphHeight:$0.glyphHeight)}
+            return ComicSpeech(id:String(column),text:"TITLE",lines:lines,rect:lines.reduce(CGRect.null){$0.union($1.rect)},vertical:false)
+        }
+        let before=await ComicRestoration.shared.sessionLoads,began=Date()
+        let result=try await ComicRestoration.shared.restore(image,speeches:speeches,requiredHeadroom:0)
+        let loads=await ComicRestoration.shared.sessionLoads-before
+        XCTAssertEqual(result.restored,["0","1"]);XCTAssertNil(result.notice)
+        XCTAssertEqual(loads,2,"Two real crops in one image should load CTD and LaMa once each")
+        let original=try XCTUnwrap(ComicPixels.rgba(image,width:width,height:height)),clean=try XCTUnwrap(ComicPixels.rgba(result.image,width:width,height:height))
+        var outside=0
+        let protected=speeches.flatMap(\.lines).map{$0.rect.insetBy(dx:-20,dy:-20)}
+        for y in 0..<height{for x in 0..<width{if !protected.contains(where:{$0.contains(CGPoint(x:x,y:y))}){let i=(y*width+x)*4;if (0..<4).contains(where:{original[i+$0] != clean[i+$0]}){outside+=1}}}}
+        XCTAssertEqual(outside,0,"Model reuse cannot change artwork outside the source masks")
+        let note=XCTAttachment(string:"real crops: 2\nmodels loaded: \(loads)\nseconds: \(Date().timeIntervalSince(began))");note.name="Batched restoration performance and memory discipline";note.lifetime = .keepAlways;add(note)
+        let attachment=XCTAttachment(image:UIImage(cgImage:result.image));attachment.name="Two real artwork crops restored with one model pair";attachment.lifetime = .keepAlways;add(attachment)
+    }
     func testPinnedNeuralRestorationRemovesLetteringOnRealArtwork()async throws{
         struct Line:Decodable{var x:Double;var y:Double;var width:Double;var height:Double;var glyphHeight:Double}
         struct Fixture:Decodable{var lines:[Line];var image:String;var translation:String}
@@ -337,10 +364,16 @@ import UIKit
         let size=CGSize(width:400,height:160),bg=UIColor(red:0.25,green:0.4,blue:0.6,alpha:1)
         func raster(text:Bool)->CGImage{renderer(size).image{context in
             bg.setFill();context.fill(CGRect(origin:.zero,size:size))
-            if text{("HELLO" as NSString).draw(at:CGPoint(x:40,y:45),withAttributes:[.font:UIFont.boldSystemFont(ofSize:50),.foregroundColor:UIColor.black,.strokeColor:UIColor.white,.strokeWidth:-12])}
+            if text{
+                let point=CGPoint(x:40,y:45),font=UIFont.boldSystemFont(ofSize:50)
+                ("HELLO" as NSString).draw(at:point,withAttributes:[.font:font,.foregroundColor:UIColor.black,.strokeColor:UIColor.white,.strokeWidth:12])
+                ("HELLO" as NSString).draw(at:point,withAttributes:[.font:font,.foregroundColor:UIColor.black])
+            }
         }.cgImage!}
         let source=raster(text:true),clean=raster(text:false),line=ComicLine(text:"HELLO",confidence:1,rect:CGRect(x:38,y:50,width:180,height:58),glyphHeight:40)
         let speech=ComicSpeech(id:"0",text:"HELLO",lines:[line],rect:CGRect(x:30,y:30,width:270,height:100),vertical:false,balloon:false)
+        let sourcePixels=try XCTUnwrap(ComicPixels.rgba(source,width:source.width,height:source.height))
+        XCTAssertGreaterThan(stride(from:0,to:sourcePixels.count,by:4).filter{sourcePixels[$0]<30&&sourcePixels[$0+1]<30&&sourcePixels[$0+2]<30}.count,100,"The source fixture must actually contain solid black letter cores")
         let sourceAttachment=XCTAttachment(image:UIImage(cgImage:source));sourceAttachment.name="Native UIKit outlined source used for appearance inference";sourceAttachment.lifetime = .keepAlways;add(sourceAttachment)
         let style=try XCTUnwrap(ComicPixels.appearance(source,speech:speech))
         let fillRGB=try XCTUnwrap(style.fill.converted(to:CGColorSpace(name:CGColorSpace.sRGB)!,intent:.defaultIntent,options:nil)?.components)
@@ -536,6 +569,7 @@ import UIKit
         let scene=try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap{$0 as? UIWindowScene}.first)
         let window=UIWindow(windowScene:scene);window.frame=scene.screen.bounds;window.rootViewController=UIViewController();view.frame=window.bounds;window.rootViewController?.view.addSubview(view);window.windowLevel = .normal+1;window.makeKeyAndVisible()
         defer{tab.dispose();window.isHidden=true;try? FileManager.default.removeItem(at:root)}
+        view.load(URLRequest(url:URL(string:tab.url)!))
         var deadline=Date().addingTimeInterval(20)
         while Date()<deadline{
             if (try? await view.callAsyncJavaScript("return !!globalThis.zeusComic && document.images.length===1 && document.images[0].complete",arguments:[:],in:nil,contentWorld:ComicTranslation.world))as? Bool==true{break}
@@ -611,6 +645,7 @@ import UIKit
         imageURL.percentEncodedQuery=imageURL.percentEncodedQuery?.replacingOccurrences(of:"+",with:"%2B")
         let sourceURL=crossOrigin ? imageURL.url!.absoluteString : "data:image/png;base64,"+encoded
         view.loadHTMLString("<html><body><p id='text'>Original page text stays unchanged.</p><img id='comic' referrerpolicy='no-referrer' style='width:100%;height:auto' src='\(sourceURL)'></body></html>",baseURL:URL(string:tab.url))
+        view.load(URLRequest(url:URL(string:tab.url)!))
         var deadline=Date().addingTimeInterval(20)
         while Date()<deadline{if (try? await view.callAsyncJavaScript("return !!globalThis.zeusComic && document.images[0]?.complete",arguments:[:],in:nil,contentWorld:ComicTranslation.world))as? Bool==true{break};try await Task.sleep(for:.milliseconds(100))}
         if crossOrigin {

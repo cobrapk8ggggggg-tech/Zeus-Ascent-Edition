@@ -10,6 +10,8 @@ actor ComicRestoration {
     struct Result { var image: CGImage; var restored: Set<String>; var notice: String? }
     private let environment = try! ORTEnv(loggingLevel: .error)
     private var current: ORTSession?
+    private var currentName:String?
+    private(set) var sessionLoads=0
     private var busy=false
     private var waiting:[UUID:CheckedContinuation<Void,Error>]=[:]
     private var minimumHeadroom:UInt64=1_200_000_000
@@ -27,7 +29,7 @@ actor ComicRestoration {
         try Task.checkCancellation();busy=true
     }
     private func release(){busy=false;let pending=Array(waiting.values);waiting.removeAll();for task in pending{task.resume()}}
-    func purge() { current = nil }
+    func purge() { current = nil;currentName=nil }
     func prepare() async throws {
         for file in ["ctd.onnx", "lama.onnx"] {
             _ = try await ComicModelStore.shared.file(file, download: true)
@@ -35,14 +37,15 @@ actor ComicRestoration {
         }
     }
     private func session(_ name: String) async throws -> ORTSession {
-        current = nil
+        if currentName==name,let current{return current}
+        current = nil;currentName=nil
         if zeus_comic_available_memory()<(name=="lama.onnx" ? minimumHeadroom:minimumHeadroom/2){throw ComicFailure.message("لم تتوفر ذاكرة كافية لترميم الخلفية؛ بقي الأصل.")}
         let url = try await ComicModelStore.shared.file(name, download: false)
         let options = try ORTSessionOptions()
         try options.setIntraOpNumThreads(2)
         try options.setGraphOptimizationLevel(.all)
         let value = try ORTSession(env: environment, modelPath: url.path, sessionOptions: options)
-        current = value
+        current = value;currentName=name;sessionLoads+=1
         return value
     }
     private func tensor(_ floats: [Float], shape: [NSNumber]) throws -> ORTValue {
@@ -117,31 +120,55 @@ actor ComicRestoration {
         } }
         return result
     }
+    private struct MaskedCrop{var id:String;var pixels:[UInt8];var mask:[UInt8];var bounds:CGRect;var width:Int;var height:Int}
+    private func paint(_ jobs:[MaskedCrop],into result:inout [UInt8],imageWidth:Int)async throws->Set<String>{
+        var ids=Set<String>()
+        for job in jobs{
+            try Task.checkCancellation()
+            do{
+                let restored=try await inpaint(job.pixels,mask:job.mask,width:job.width,height:job.height)
+                try Task.checkCancellation()
+                for y in 0..<job.height{for x in 0..<job.width where job.mask[y*job.width+x]>0{
+                    let source=(y*job.width+x)*4,destination=((y+Int(job.bounds.minY))*imageWidth+x+Int(job.bounds.minX))*4
+                    for c in 0..<4{result[destination+c]=restored[source+c]}
+                }}
+                ids.insert(job.id)
+            }catch is CancellationError{throw CancellationError()}catch{/* Keep the original for this crop and continue with the remaining dialogues. */}
+        }
+        return ids
+    }
     func restore(_ image: CGImage, speeches: [ComicSpeech], requiredHeadroom:UInt64=1_200_000_000, onPreparing: (@Sendable (Bool) async -> Void)? = nil) async throws -> Result {
         try await acquire();defer{release()};try Task.checkCancellation();minimumHeadroom=requiredHeadroom
         guard let original = ComicPixels.rgba(image, width: image.width, height: image.height) else { throw ComicFailure.message("تعذّر تجهيز ترميم الخلفية.") }
         let candidates = speeches.filter { !ComicPixels.canClean(original, width: image.width, height: image.height, speech: $0) }
         if candidates.isEmpty { return Result(image: image, restored: [], notice: nil) }
-        await ComicOCR.shared.purge(); await ComicPaddle.shared.purge(); await ComicLocalTranslator.shared.unload(); current = nil
+        await ComicOCR.shared.purge(); await ComicPaddle.shared.purge(); await ComicLocalTranslator.shared.unload(); current = nil;currentName=nil
         guard zeus_comic_available_memory() >= requiredHeadroom else {
             return Result(image: image, restored: [], notice: "لم تتوفر ذاكرة كافية لترميم بعض الخلفيات؛ احتُفظ بأصلها.")
         }
         await onPreparing?(true)
         do { try await prepare() } catch { await onPreparing?(false); throw error }
         await onPreparing?(false)
-        defer { current = nil }
-        var result = original, ids = Set<String>()
+        defer { current = nil;currentName=nil }
+        var result = original, ids = Set<String>(),jobs:[MaskedCrop]=[],pendingPixels=0
         for speech in candidates {
             try Task.checkCancellation()
             let sourceBounds=speech.balloon ? speech.rect:speech.lines.reduce(CGRect.null) { $0.union($1.rect) }
             let bounds = sourceBounds.insetBy(dx: -48, dy: -48).integral.intersection(CGRect(x:0,y:0,width:image.width,height:image.height))
+            // Sparse masks and source crops stay below 20 MB per chunk. Detect
+            // the whole chunk with CTD, then switch once to LaMa for its patches.
+            if pendingPixels+Int(bounds.width*bounds.height)>4_000_000 && !jobs.isEmpty{
+                ids.formUnion(try await paint(jobs,into:&result,imageWidth:image.width));jobs=[];pendingPixels=0
+            }
             guard bounds.width * bounds.height <= 1_000_000, let crop = image.cropping(to: bounds), let pixels = ComicPixels.rgba(crop,width:crop.width,height:crop.height) else { continue }
             var local = speech
             local.rect = speech.rect.offsetBy(dx: -bounds.minX, dy: -bounds.minY)
             local.flatCleanup=speech.flatCleanup?.offsetBy(dx:-Int(bounds.minX),dy:-Int(bounds.minY))
             local.balloonBounds=speech.balloonBounds?.offsetBy(dx:-bounds.minX,dy:-bounds.minY)
             local.lines = speech.lines.map { line in var line=line;line.rect=line.rect.offsetBy(dx:-bounds.minX,dy:-bounds.minY);line.words=line.words?.map{ComicWord(text:$0.text,rect:$0.rect.offsetBy(dx:-bounds.minX,dy:-bounds.minY))};return line }
-            let neural = try await hints(pixels, width: crop.width, height: crop.height)
+            let neural:[UInt8]
+            do{neural=try await hints(pixels,width:crop.width,height:crop.height)}
+            catch is CancellationError{throw CancellationError()}catch{continue}
             try Task.checkCancellation()
             guard ComicPixels.ownsText(pixels,width:crop.width,height:crop.height,speech:local,evidence:neural)else{continue}
             var mask = [UInt8](repeating:0,count:crop.width*crop.height)
@@ -157,14 +184,9 @@ actor ComicRestoration {
             }}}
             guard valid else{continue}
             try Task.checkCancellation()
-            let restored = try await inpaint(pixels,mask:mask,width:crop.width,height:crop.height)
-            try Task.checkCancellation()
-            for y in 0..<crop.height { for x in 0..<crop.width where mask[y*crop.width+x]>0 {
-                let source=(y*crop.width+x)*4, destination=((y+Int(bounds.minY))*image.width+x+Int(bounds.minX))*4
-                for c in 0..<4 { result[destination+c]=restored[source+c] }
-            } }
-            ids.insert(speech.id)
+            jobs.append(MaskedCrop(id:speech.id,pixels:pixels,mask:mask,bounds:bounds,width:crop.width,height:crop.height));pendingPixels+=crop.width*crop.height
         }
+        if !jobs.isEmpty{ids.formUnion(try await paint(jobs,into:&result,imageWidth:image.width))}
         return Result(image: try ComicPixels.fromRGBA(result,width:image.width,height:image.height), restored:ids, notice:ids.count<candidates.count ? "احتُفظ ببعض النصوص الأصلية لتعذّر ترميمها كاملًا.":nil)
     }
 }

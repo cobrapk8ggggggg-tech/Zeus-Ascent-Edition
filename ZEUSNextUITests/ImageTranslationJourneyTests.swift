@@ -69,7 +69,7 @@ final class ImageTranslationJourneyTests: XCTestCase {
         let search=app.textFields["homeSearchField"];XCTAssertTrue(search.waitForExistence(timeout:20));search.tap();search.typeText("http://127.0.0.1:8765/comic-violet/?page=1\n")
         XCTAssertTrue(app.webViews.staticTexts["Violet real chapter"].waitForExistence(timeout:30))
         openTools(app,layout:"dualBars");app.buttons["menu-translateImagesButton"].firstMatch.tap()
-        let translated=app.buttons["imageTranslationStatus"]
+        let translated=app.buttons.matching(NSPredicate(format:"label == %@","حالة ترجمة الصور وتفاصيلها")).firstMatch
         let ready=NSPredicate{_,_ in
             guard translated.exists else{return false}
             let values=(translated.value as? String ?? "").components(separatedBy:"·").last ?? ""
