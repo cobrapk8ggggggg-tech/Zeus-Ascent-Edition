@@ -43,6 +43,10 @@ import CryptoKit
         let painted=(try? await view.callAsyncJavaScript("const i=globalThis.__violetLiveTestPanel;return !!i&&(i.src.startsWith('blob:')||i.style.backgroundImage.includes('blob:'));",arguments:[:],in:nil,contentWorld:ComicTranslation.world))as? Bool
         let report:[String:String]=["source_url":pageURL,"image_url":imageURL,"source_sha256":digest,"restoration_enabled":"false","mode":"fastest","source_language":"auto","translation_engine":"Google actual service","source_load_seconds":String(began.timeIntervalSince(loaded)),"first_paint_seconds":firstPaint.map{String($0)} ?? "none","elapsed_seconds":String(Date().timeIntervalSince(began)),"detected":String(session.detectedTexts),"translated":String(session.translatedTexts),"applied_regions":String(session.completed),"painted":String(painted ?? false),"error":session.error ?? "none","notice":session.contextNotice ?? "none","physical_device_quality_proven":"false"]
         let note=XCTAttachment(data:try JSONSerialization.data(withJSONObject:report,options:[.prettyPrinted,.sortedKeys]),uniformTypeIdentifier:"public.json");note.name="live-violet-browser-report";note.lifetime = .keepAlways;add(note)
+        // The chapter starts with a tall, deliberately empty image area. Show
+        // its first actual dialogue in the screenshot, not only that background.
+        _=try await view.callAsyncJavaScript("const i=globalThis.__violetLiveTestPanel;const r=i.getBoundingClientRect();window.scrollTo(0,scrollY+r.top+1500*r.height/i.naturalHeight);return true;",arguments:[:],in:nil,contentWorld:ComicTranslation.world)
+        try await Task.sleep(for:.milliseconds(300))
         attach(try await view.takeSnapshot(configuration:nil),"Live Violet real site translated in the browser")
         XCTAssertGreaterThanOrEqual(session.detectedTexts,4);XCTAssertGreaterThanOrEqual(session.translatedTexts,4);XCTAssertGreaterThan(session.completed,0);XCTAssertEqual(painted,true)
     }

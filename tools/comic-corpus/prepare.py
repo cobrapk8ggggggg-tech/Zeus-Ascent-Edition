@@ -29,5 +29,5 @@ for chapter in corpus['chapters']:
    destination=a.output/page['path'];destination.parent.mkdir(parents=True,exist_ok=True)
    if not destination.exists():destination.symlink_to((a.reuse_data/page['path']).resolve())
 manifest=a.output/'shard.json';manifest.write_text(json.dumps(corpus,ensure_ascii=False,indent=2));restore(a.output,manifest)
-probe=dict(version=1,app_source_commit='16de30686bf08b71e98a58f3899eb08956e00440',probe_source_commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=REPO,text=True).strip(),quota=40,translation_engine='google',simulator_memory_guard_bypassed=True,chapters=corpus['chapters'])
+probe=dict(version=1,app_source_commit='9f104c90902714e646d7c7540528fc47a7ca1074',probe_source_commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=REPO,text=True).strip(),quota=40,translation_engine='google',simulator_memory_guard_bypassed=True,chapters=corpus['chapters'])
 (a.output/'native-manifest.json').write_text(json.dumps(probe,ensure_ascii=False,indent=2)+'\n');print('Native shard',a.language,'pages',sum(len(c['pages'])for c in corpus['chapters']))
