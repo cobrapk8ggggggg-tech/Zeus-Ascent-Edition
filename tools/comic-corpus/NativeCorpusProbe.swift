@@ -85,7 +85,9 @@ import CryptoKit
             let values=[TranslationSegment(id:speech.id,text:text)]
             var clean=image,rendered=image,route="original",note="layout or cleanup declined"
             let eligible=ComicPixels.restorableSpeeches([speech],translations:values,width:image.width,height:image.height,target:target,fontName:nil,fontScale:1)
-            if !eligible.isEmpty{
+            let providerAvailable=translationSource[candidate.id]?.hasPrefix("Google")==true
+            if !providerAvailable{note="provider unavailable; original pixels retained"}
+            if providerAvailable && !eligible.isEmpty{
                 let pixels=try XCTUnwrap(ComicPixels.rgba(image,width:image.width,height:image.height))
                 if ComicPixels.canClean(pixels,width:image.width,height:image.height,speech:speech){
                     var copy=pixels
