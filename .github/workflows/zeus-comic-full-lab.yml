@@ -1,0 +1,55 @@
+name: Complete real-chapter Linux quality counterpart
+on:
+  push:
+    branches: [fix/comic-translation-reliability]
+    paths: ['.github/workflows/zeus-comic-full-lab.yml', 'tools/comic-corpus/full_lab.py']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: zeus-full-comic-lab-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  APP_SOURCE: 5fcad8e3801ac5426688ff2ff74147b1d894f244
+jobs:
+  lab:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - name: Verify the exact application pipeline
+        run: git diff --exit-code "$APP_SOURCE" -- ZEUSNext Native/ComicRuntime
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Install pinned counterpart dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y g++ fonts-noto-core
+          python -m pip install -r .zeus-ci/comic/lab/requirements.txt
+      - name: Run independent geometry, ink, cleanup and gradient regressions
+        run: |
+          set -e
+          python .zeus-ci/comic/lab/test_masks.py
+          python .zeus-ci/comic/lab/test_flat_balloons.py
+          python .zeus-ci/comic/lab/test_balloons_and_ink.py
+          python .zeus-ci/comic/lab/test_cleanup_quality.py
+      - name: Acquire original pixels and run all 480 diagnostic proposals
+        run: |
+          set -o pipefail
+          mkdir -p results
+          python tools/comic-corpus/full_lab.py --root "$RUNNER_TEMP/zeus-comic-full" 2>&1 | tee results/full-lab.log
+      - name: Preserve exact provenance
+        if: always()
+        run: |
+          mkdir -p results
+          git rev-parse HEAD > results/harness-source-commit.txt
+          printf '%s\n' "$APP_SOURCE" > results/app-source-commit.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: complete-comic-quality-review
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/zeus-comic-full/review
+            results
