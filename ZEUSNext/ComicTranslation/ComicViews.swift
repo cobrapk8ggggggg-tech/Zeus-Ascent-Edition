@@ -313,7 +313,7 @@ struct ComicTranslationCard: View {
                 }
                 Image(systemName:expanded ? "chevron.down":"chevron.up").font(.caption2).foregroundStyle(.secondary)
             }.frame(minHeight:44).contentShape(Rectangle())
-        }.buttonStyle(.plain).accessibilityLabel("حالة ترجمة الصور وتفاصيلها")
+        }.buttonStyle(.plain).accessibilityLabel("حالة ترجمة الصور وتفاصيلها").accessibilityValue("\(session.detectedTexts) نصوص مكتشفة · \(session.translatedTexts) مترجمة").accessibilityIdentifier("imageTranslationStatus")
     }
     private var controls: some View {
         HStack(spacing:2) {
