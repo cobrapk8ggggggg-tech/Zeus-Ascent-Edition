@@ -21,22 +21,8 @@ if __name__=='__main__':
   cx,cy,_,_=case['box']
   for line in case['lines']:
    x,y,r,b=line['box'];pad=8;cv2.rectangle(ownership,(max(0,x-cx-pad),max(0,y-cy-pad)),(min(rgb.shape[1]-1,r-cx+pad),min(rgb.shape[0]-1,b-cy+pad)),255,-1)
-  # Expand neural hints to whole foreground components. Raw segmentation is
-  # a coarse hint and leaves half-glyphs; never use it as the final erase mask.
-  gray=cv2.cvtColor(rgb,cv2.COLOR_RGB2GRAY);refined=np.zeros_like(mask)
-  for line in case['lines']:
-   x,y,r,b=line['box'];x=max(0,x-cx-5);y=max(0,y-cy-5);r=min(rgb.shape[1],r-cx+5);b=min(rgb.shape[0],b-cy+5)
-   patch=gray[y:b,x:r]
-   if not patch.size:continue
-   threshold,binary=cv2.threshold(patch,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-   border=np.concatenate([patch[0],patch[-1],patch[:,0],patch[:,-1]])
-   if np.median(border)>threshold:binary=255-binary
-   count,labels,stats,_=cv2.connectedComponentsWithStats(binary,8)
-   hints=predicted[y:b,x:r]>0
-   for label in range(1,count):
-    component=labels==label
-    if stats[label,4]>=3 and np.any(component&hints):refined[y:b,x:r][component]=255
-  bounded=cv2.bitwise_and(cv2.dilate(refined,np.ones((5,5),np.uint8)),ownership)
+  local_boxes=[[x-cx,y-cy,r-cx,b-cy]for x,y,r,b in [line['box']for line in case['lines']]]
+  bounded=engine.refine(rgb,predicted,local_boxes)
   Image.fromarray(bounded).save(dest/'refined-mask.png')
   restored=engine.lama(rgb,bounded);Image.fromarray(restored).save(dest/'ctd-lama.png')
   Image.fromarray(engine.lama(rgb,mask)).save(dest/'lama.png')

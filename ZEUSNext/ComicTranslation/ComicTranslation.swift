@@ -50,7 +50,7 @@ import CoreGraphics
     private var resolvedScripts:[String:(String,Int)]=[:]
     private var observer:NSObjectProtocol?
     var preferences:ComicPreferences{model?.data.settings.comicTranslation ?? ComicPreferences()}
-    init(model:BrowserModel,tab:BrowserTab){self.model=model;self.tab=tab;super.init();observer=NotificationCenter.default.addObserver(forName:UIApplication.didReceiveMemoryWarningNotification,object:nil,queue:.main){[weak self]_ in Task{@MainActor in self?.pause();await ComicOCR.shared.purge();await ComicPaddle.shared.purge();await ComicLocalTranslator.shared.unload()}}}
+    init(model:BrowserModel,tab:BrowserTab){self.model=model;self.tab=tab;super.init();observer=NotificationCenter.default.addObserver(forName:UIApplication.didReceiveMemoryWarningNotification,object:nil,queue:.main){[weak self]_ in Task{@MainActor in self?.pause();await ComicOCR.shared.purge();await ComicPaddle.shared.purge();await ComicRestoration.shared.purge();await ComicLocalTranslator.shared.unload()}}}
     deinit{if let observer{NotificationCenter.default.removeObserver(observer)}}
     func attach(to view:WKWebView,installScript:Bool=true){
         ComicMessageRouter.shared.pages.setObject(self,forKey:view)
@@ -190,7 +190,7 @@ import CoreGraphics
                     let window=try await Task.detached{try ComicWindow.join(center,before:before,after:after)}.value
                     let image=window.image,offset=window.offset
                     let imageHash=try await Task.detached{ComicIdentity.hash(try ComicPixels.png(image))}.value
-                    let readingKey=imageHash+"|ocr-v6|\(prefs.source)|\(prefs.mode.rawValue)"
+                    let readingKey=imageHash+"|ocr-v7|\(prefs.source)|\(prefs.mode.rawValue)"
                     phase = .recognizing
                     let reading:ComicReading
                     if let saved=readings[readingKey]{reading=saved}
@@ -222,13 +222,25 @@ import CoreGraphics
                     try valid(ticket);phase = .rendering
                     let renderedKey=translationKey+"|"+prefs.renderIdentity
                     let rendered:Data
+                    var renderingPartial=false
                     if persistent,let stored=await ComicMemory.shared.data(profile:owner,layer:.rendered,key:renderedKey){rendered=stored}
-                    else{rendered=try await Task.detached{let drawn=try ComicPixels.render(image,speeches:core,translations:translated.map{TranslationSegment(id:$0.id,text:prefs.letterCase.apply($0.text))},target:translation.target,fontName:prefs.fontName,fontScale:prefs.fontScale,textColor:prefs.textColor,ink:prefs.inkStyle,letterSpacing:prefs.letterSpacing ?? 0,requireCleanSource:true)
+                    else{
+                        let restored:ComicRestoration.Result
+                        if prefs.restorationEnabled ?? true{
+                            restored=try await ComicRestoration.shared.restore(image,speeches:core.filter{speech in translated.first(where:{$0.id==speech.id}).map{ComicPixels.needsLettering(speech.text,$0.text)} ?? false},onPreparing:{ [weak self] preparing in
+                                await MainActor.run{if self?.epoch==ticket{self?.phase=preparing ? .downloading:.rendering}}
+                            })
+                            try valid(ticket)
+                            if let notice=restored.notice{contextNotice=notice;sweepFailure=true;renderingPartial=true}
+                        }else{restored=ComicRestoration.Result(image:image,restored:[],notice:nil)}
+                        let result=try await Task.detached{let drawing=try ComicPixels.renderReport(restored.image,speeches:core,translations:translated.map{TranslationSegment(id:$0.id,text:prefs.letterCase.apply($0.text))},target:translation.target,fontName:prefs.fontName,fontScale:prefs.fontScale,textColor:prefs.textColor,ink:prefs.inkStyle,letterSpacing:prefs.letterSpacing ?? 0,requireCleanSource:true,precleanedIDs:restored.restored)
                         // Only this core is applied. Recognition context is retained above/below.
                         let rect=CGRect(x:0,y:region.coreTop+offset,width:region.width,height:region.coreBottom-region.coreTop)
-                        guard let crop=drawn.cropping(to:rect)else{throw ComicFailure.message("تعذّر قص منطقة الرسم.")};return try ComicPixels.png(crop)}.value
+                        guard let crop=drawing.image.cropping(to:rect)else{throw ComicFailure.message("تعذّر قص منطقة الرسم.")};return (try ComicPixels.png(crop),drawing.unresolved)}.value
+                        rendered=result.0
+                        if !result.1.isEmpty{renderingPartial=true;sweepFailure=true;contextNotice="احتُفظ ببعض النصوص الأصلية لعدم اكتمال تنظيفها أو ملاءمة خطها."}
                         try valid(ticket)
-                        if persistent{do{try await ComicMemory.shared.save(rendered,profile:owner,layer:.rendered,key:renderedKey)}catch{storageNotice="تعذّر حفظ الصورة المترجمة؛ النص المحفوظ يظل متاحًا."}}
+                        if persistent && !renderingPartial{do{try await ComicMemory.shared.save(rendered,profile:owner,layer:.rendered,key:renderedKey)}catch{storageNotice="تعذّر حفظ الصورة المترجمة؛ النص المحفوظ يظل متاحًا."}}
                     }
                     try valid(ticket);phase = .displaying
                     let outputRegion:[String:Int]=["x":0,"y":region.y+region.coreTop,"width":region.width,"height":region.coreBottom-region.coreTop]

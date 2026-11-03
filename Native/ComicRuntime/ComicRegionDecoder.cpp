@@ -69,8 +69,8 @@ extern "C" void zeus_comic_inpaint(unsigned char *pixels, int width, int height,
     comic_inpaint(pixels,width,height,left,top,right,bottom);
 }
 
-extern "C" void zeus_comic_text_mask(unsigned char *pixels, unsigned char *mask, int width, int height, int left, int top, int right, int bottom) {
-    comic_inpaint(pixels,width,height,left,top,right,bottom,mask,false);
+extern "C" void zeus_comic_text_mask(const unsigned char *pixels, unsigned char *mask, int width, int height, int left, int top, int right, int bottom) {
+    comic_inpaint(const_cast<unsigned char *>(pixels),width,height,left,top,right,bottom,mask,false);
 }
 
 extern "C" void zeus_comic_inpaint_from_source(const unsigned char *source, unsigned char *pixels, int width, int height, int left, int top, int right, int bottom) {
@@ -78,4 +78,21 @@ extern "C" void zeus_comic_inpaint_from_source(const unsigned char *source, unsi
 }
 extern "C" float zeus_comic_mask_coverage(const unsigned char *pixels,const unsigned char *mask,int width,int height,int left,int top,int right,int bottom){
     return comic_mask_coverage(pixels,mask,width,height,left,top,right,bottom);
+}
+extern "C" void zeus_comic_refine_text_mask(const unsigned char *pixels,const unsigned char *hints,unsigned char *mask,int width,int height,int left,int top,int right,int bottom){
+    comic_refine_text_mask(pixels,hints,mask,width,height,left,top,right,bottom);
+}
+extern "C" void zeus_comic_inpaint_mask(const unsigned char *source,unsigned char *pixels,const unsigned char *mask,int width,int height,int left,int top,int right,int bottom){
+    comic_inpaint(pixels,width,height,left,top,right,bottom,nullptr,true,source,mask);
+}
+extern "C" int zeus_comic_simple_background(const unsigned char *pixels,const unsigned char *mask,int width,int height,int left,int top,int right,int bottom){return comic_simple_background(pixels,mask,width,height,left,top,right,bottom)?1:0;}
+#ifdef __APPLE__
+#include <os/proc.h>
+#endif
+extern "C" unsigned long long zeus_comic_available_memory(){
+#ifdef __APPLE__
+    return os_proc_available_memory();
+#else
+    return 0;
+#endif
 }

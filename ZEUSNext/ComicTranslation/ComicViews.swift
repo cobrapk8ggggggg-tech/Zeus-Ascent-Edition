@@ -84,8 +84,11 @@ struct ComicSettingsSheet: View {
             Text(prefs.mode == .fastest ? "قراءة محلية سريعة. اختر المتوازن أو الدقيق للخطوط الصغيرة والفقاعات المعقدة." : "تُجهّز حزمة لغة الصورة تلقائيًا عند الحاجة. الوضع الدقيق يعيد فحص المناطق الصغيرة.")
                 .font(.footnote).foregroundStyle(.secondary)
             Toggle("ترجمة الصور تلقائيًا",isOn:binding(\.automatic))
+            Text("الوضع المتوازن موصى به. اختر دقيقًا للنصوص الصغيرة أو المزخرفة.").font(.caption).foregroundStyle(.secondary)
             Toggle("عرض الأصل أثناء التجهيز",isOn:binding(\.showUntranslated))
             Toggle("تجهيز الصور التالية أثناء القراءة",isOn:binding(\.readAhead))
+            Toggle("ترميم الخلفيات المعقدة",isOn:Binding(get:{prefs.restorationEnabled ?? true},set:{var p=prefs;p.restorationEnabled=$0;save(p)}))
+            Text("يعالج النص فوق الرسم على الجهاز عند توفر الذاكرة. ينزّل نموذجَي الترميم عند أول حاجة إليهما (نحو 303 م.ب). يمكنك إيقافه للاكتفاء بالتنظيف الخفيف.").font(.caption).foregroundStyle(.secondary)
         }
     }
     private var engineSettings: some View {
@@ -178,6 +181,7 @@ struct ComicSettingsSheet: View {
                     Button("إلغاء التنزيل",role:.cancel) { download?.cancel() }
                 } else {
                     Button("تجهيز حزمة اللغة مسبقًا",systemImage:"arrow.down.circle") { prepareModels() }.disabled(prefs.source == "auto")
+                    Button("تجهيز ترميم الخلفيات مسبقًا",systemImage:"wand.and.stars") { prepareRestoration() }
                 }
                 Text("تُفحص أحجام الملفات وبصماتها قبل اعتمادها. الملفات المكتملة تبقى متاحة دون إعادة تنزيل.").font(.footnote).foregroundStyle(.secondary)
             }
@@ -189,6 +193,18 @@ struct ComicSettingsSheet: View {
                     Task { do { try await ComicMemory.shared.clear(profile:id);message="مُسحت النتائج المحفوظة." } catch { message=error.localizedDescription } }
                 }
             }
+        }
+    }
+    private func prepareRestoration(){
+        downloading=true;downloadProgress=0
+        download=Task{
+            defer{downloading=false;download=nil}
+            do{
+                for (index,file) in ["ctd.onnx","lama.onnx"].enumerated(){
+                    try Task.checkCancellation();_ = try await ComicModelStore.shared.file(file,download:true);downloadProgress=Double(index+1)/2
+                }
+                message="نماذج ترميم الخلفية جاهزة."
+            }catch is CancellationError{message="أُلغي تجهيز الترميم."}catch{message=error.localizedDescription}
         }
     }
     private func prepareModels() {
@@ -292,7 +308,7 @@ struct ComicTranslationCard: View {
                 else { Image(systemName:session.error == nil ? "character.viewfinder":"exclamationmark.circle").foregroundStyle(session.error == nil ? Color.accentColor:Color.orange) }
                 VStack(alignment:.leading,spacing:3) {
                     Text(session.showingOriginal ? "عرض الأصل":session.phase.title).font(.subheadline.weight(.semibold))
-                    Text(session.completed == 0 && session.phase == .completed ? "لم يُعثر على نص في الصور المتاحة":"\(session.completed) منطقة مترجمة")
+                    Text(session.completed == 0 && session.phase == .completed ? "لم يُعثر على نص في الصور المتاحة":"\(session.completed) منطقة معالجة")
                         .font(.caption).foregroundStyle(.secondary).monospacedDigit()
                 }
                 Image(systemName:expanded ? "chevron.down":"chevron.up").font(.caption2).foregroundStyle(.secondary)

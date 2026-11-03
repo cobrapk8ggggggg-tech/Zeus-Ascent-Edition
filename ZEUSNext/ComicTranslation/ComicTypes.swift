@@ -35,7 +35,7 @@ enum ComicSessionPhase: String {
         case .waiting: return "بانتظار الصور"
         case .fetching: return "جلب الصورة"
         case .recognizing: return "قراءة الفقاعات"
-        case .downloading: return "تجهيز نموذج القراءة"
+        case .downloading: return "تجهيز النماذج"
         case .translating: return "ترجمة الحوار"
         case .rendering: return "رسم الترجمة"
         case .displaying: return "عرض الترجمة"
@@ -69,11 +69,12 @@ struct ComicHTTPFailure: LocalizedError {
 }
 struct ComicPreferences: Codable, Equatable {
     static let sourceLanguages=TranslationPreferences.languages+[("el","Ελληνικά"),("hi","हिन्दी"),("th","ไทย"),("ta","தமிழ்"),("te","తెలుగు"),("uk","Українська")]
-    var mode: ComicReadingMode = .fastest
+    var mode: ComicReadingMode = .balanced
     var source = "auto"
     var automatic = false
     var showUntranslated = false
     var readAhead = true
+    var restorationEnabled: Bool?
     var fontName: String?
     var localModel = false
     var fontScale: Double = 1
@@ -83,7 +84,7 @@ struct ComicPreferences: Codable, Equatable {
     var letterCaseRaw: String?
     var letterSpacing: Double?
     var letterCase: ComicLetterCase { ComicLetterCase(rawValue: letterCaseRaw ?? "") ?? .original }
-    var renderIdentity: String { "render-v4|\(fontName ?? "default")|\(fontScale)|\(textColor ?? "auto")|\(inkStyle.rawValue)|\(letterCase.rawValue)|\(letterSpacing ?? 0)" }
+    var renderIdentity: String { "render-v6|restoration:\(restorationEnabled ?? true)|\(fontName ?? "default")|\(fontScale)|\(textColor ?? "auto")|\(inkStyle.rawValue)|\(letterCase.rawValue)|\(letterSpacing ?? 0)" }
     var inkStyle: ComicInkStyle { get { ComicInkStyle(rawValue: inkStyleRaw ?? "") ?? .plain } set { inkStyleRaw = newValue.rawValue } }
     var engine: ComicOnlineEngine = .existing
     var translation: TranslationPreferences?
@@ -154,7 +155,7 @@ enum ComicIdentity {
         hash(segments.map{$0.id+"\0"+$0.text}.joined(separator:"\n"))
     }
     static func settings(_ preferences: ComicPreferences, translation: TranslationPreferences, provider: AIProviderConfiguration?) -> String {
-        hash("comic-v6|fallback:\(preferences.allowOnlineFallback ?? false)|\(preferences.mode.rawValue)|\(preferences.source)|\(translation.target)|" + TranslationMemory.namespace(page: "comic://content", preferences: translation, provider: provider))
+        hash("comic-v10|fallback:\(preferences.allowOnlineFallback ?? false)|\(preferences.mode.rawValue)|\(preferences.source)|\(translation.target)|" + TranslationMemory.namespace(page: "comic://content", preferences: translation, provider: provider))
     }
 }
 enum ComicGeometry {

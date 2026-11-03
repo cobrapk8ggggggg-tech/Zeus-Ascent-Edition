@@ -48,8 +48,12 @@ enum ComicBalloons {
     private static func overlap(_ a:CGRect,_ b:CGRect)->CGFloat{let intersection=a.intersection(b);guard !intersection.isNull else{return 0};return intersection.width*intersection.height/max(1,min(a.width*a.height,b.width*b.height))}
     static func interior(_ text:CGRect,pixels:[UInt8],width:Int,height:Int)->CGRect?{
         guard text.width>2,text.height>2,pixels.count>=width*height*4 else{return nil}
-        let margin=min(600,max(160,max(text.width*1.6,text.height*4)))
-        let roi=text.insetBy(dx:-margin,dy:-margin).integral.intersection(CGRect(x:0,y:0,width:width,height:height))
+        var margin=min(600,max(240,max(text.width*1.6,text.height*4)))
+        var roi=text.insetBy(dx:-margin,dy:-margin).integral.intersection(CGRect(x:0,y:0,width:width,height:height))
+        while roi.width*roi.height>1_000_000 && margin>16{
+            margin*=0.85
+            roi=text.insetBy(dx:-margin,dy:-margin).integral.intersection(CGRect(x:0,y:0,width:width,height:height))
+        }
         guard !roi.isNull,roi.width*roi.height<=1_000_000 else{return nil}
         let left=Int(roi.minX),top=Int(roi.minY),rw=Int(roi.width),rh=Int(roi.height)
         var bins:[Int:(Int,Int,Int,Int)]=[:],seeds:[Int]=[]
@@ -59,16 +63,16 @@ enum ComicBalloons {
         let red=background.0/background.3,green=background.1/background.3,blue=background.2/background.3
         func matches(_ index:Int)->Bool{let p=((index/rw+top)*width+index%rw+left)*4;return abs(Int(pixels[p])-red)+abs(Int(pixels[p+1])-green)+abs(Int(pixels[p+2])-blue)<75}
         var seen=[UInt8](repeating:0,count:rw*rh),best:CGRect?
-        let maximum=min(800_000,max(16384,Int(text.width*text.height*80)))
+        let maximum=min(800_000,Int(roi.width*roi.height))
         for seed in seeds where seed>=0&&seed<seen.count&&seen[seed]==0&&matches(seed){
-            var queue=[seed],head=0,minX=seed%rw,maxX=minX,minY=seed/rw,maxY=minY,touches=false
+            var queue=[seed],head=0,minX=seed%rw,maxX=minX,minY=seed/rw,maxY=minY
             seen[seed]=1
             while head<queue.count&&queue.count<=maximum{let current=queue[head];head+=1;let x=current%rw,y=current/rw
                 minX=min(minX,x);maxX=max(maxX,x);minY=min(minY,y);maxY=max(maxY,y)
-                if x==0||y==0||x==rw-1||y==rh-1{touches=true}
+                if x==0||y==0||x==rw-1||y==rh-1{return nil}
                 for(dx,dy)in [(-1,0),(1,0),(0,-1),(0,1)]{let nx=x+dx,ny=y+dy;if nx>=0&&nx<rw&&ny>=0&&ny<rh{let n=ny*rw+nx;if seen[n]==0&&matches(n){seen[n]=1;queue.append(n)}}}
             }
-            guard !touches,queue.count<=maximum,CGFloat(queue.count)>text.width*text.height*0.5 else{continue}
+            guard queue.count<=maximum,CGFloat(queue.count)>text.width*text.height*0.5 else{continue}
             let bounds=CGRect(x:left+minX,y:top+minY,width:maxX-minX+1,height:maxY-minY+1)
             if bounds.insetBy(dx:-2,dy:-2).contains(text),best==nil||bounds.width*bounds.height>best!.width*best!.height{best=bounds}
         }

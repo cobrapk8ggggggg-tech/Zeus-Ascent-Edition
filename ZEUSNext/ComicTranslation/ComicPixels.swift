@@ -22,14 +22,28 @@ enum ComicPixels {
         }
         let image=try decode(data);guard image.width==region.width,expectedHeight==nil||image.height==expectedHeight,let crop=image.cropping(to:region.rect)else{throw ComicFailure.message("تعذّر فك المنطقة المطلوبة.")};return crop
     }
+    static func fromRGBA(_ pixels:[UInt8],width:Int,height:Int)throws->CGImage{
+        guard pixels.count==width*height*4,let provider=CGDataProvider(data:Data(pixels) as CFData),let image=CGImage(width:width,height:height,bitsPerComponent:8,bitsPerPixel:32,bytesPerRow:width*4,space:CGColorSpace(name:CGColorSpace.sRGB)!,bitmapInfo:CGBitmapInfo(rawValue:CGImageAlphaInfo.premultipliedLast.rawValue|CGBitmapInfo.byteOrder32Big.rawValue),provider:provider,decode:nil,shouldInterpolate:false,intent:.defaultIntent)else{throw ComicFailure.message("تعذّر تجهيز بكسلات الترميم.")}
+        return image
+    }
     static func png(_ image:CGImage)throws->Data{let output=NSMutableData();guard let destination=CGImageDestinationCreateWithData(output,"public.png" as CFString,1,nil)else{throw ComicFailure.message("تعذّر ترميز الصورة.")};CGImageDestinationAddImage(destination,image,nil);guard CGImageDestinationFinalize(destination)else{throw ComicFailure.message("فشل ترميز الصورة.")};return output as Data}
-    static func render(_ image:CGImage,speeches:[ComicSpeech],translations:[TranslationSegment],target:String,fontName:String?,fontScale:Double,textColor:String? = nil,ink:ComicInkStyle = .plain,letterSpacing:Double = 0,requireCleanSource:Bool = false)throws->CGImage{
+    static func needsLettering(_ source:String,_ translated:String)->Bool{
+        func normal(_ text:String)->String{text.split(whereSeparator:{$0.isWhitespace}).joined(separator:" ").lowercased()}
+        return normal(source) != normal(translated)
+    }
+    static func render(_ image:CGImage,speeches:[ComicSpeech],translations:[TranslationSegment],target:String,fontName:String?,fontScale:Double,textColor:String? = nil,ink:ComicInkStyle = .plain,letterSpacing:Double = 0,requireCleanSource:Bool = false,precleanedIDs:Set<String> = [])throws->CGImage{
+        try renderReport(image,speeches:speeches,translations:translations,target:target,fontName:fontName,fontScale:fontScale,textColor:textColor,ink:ink,letterSpacing:letterSpacing,requireCleanSource:requireCleanSource,precleanedIDs:precleanedIDs).image
+    }
+    struct Rendering{var image:CGImage;var unresolved:[String]}
+    static func renderReport(_ image:CGImage,speeches:[ComicSpeech],translations:[TranslationSegment],target:String,fontName:String?,fontScale:Double,textColor:String? = nil,ink:ComicInkStyle = .plain,letterSpacing:Double = 0,requireCleanSource:Bool = false,precleanedIDs:Set<String> = [])throws->Rendering{
         guard let context=context(width:image.width,height:image.height),var pixels=rgba(image,width:image.width,height:image.height)else{throw ComicFailure.message("ذاكرة غير كافية للرسم.")}
         let original=pixels
         let translated=Dictionary(translations.map{($0.id,$0.text)},uniquingKeysWith:{$1})
         var prepared:[(CGRect,Placement,CGColor)]=[]
+        var resolved=Set<String>()
         for speech in speeches {
             guard let text=translated[speech.id],!text.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty else{continue}
+            if !needsLettering(speech.text,text){resolved.insert(speech.id);continue}
             let source=speech.lines.reduce(CGRect.null){$0.union($1.rect)}
             guard !source.isNull else{continue}
             let pad=max(3,min(source.width,source.height)*0.12)
@@ -42,19 +56,22 @@ enum ComicPixels {
             let sourceSize=heights[heights.count/2]*1.3
             guard let placed=place(text,area:area,imageHeight:image.height,target:target,fontName:fontName,fontScale:fontScale,theta:CGFloat(speech.angle ?? 0),letterSpacing:letterSpacing,maximumSize:sourceSize)else{continue}
             if requireCleanSource && placed.layout.size<sourceSize*CGFloat(min(1.5,max(0.5,fontScale)))*0.55{continue}
-            if requireCleanSource && !canClean(original,width:image.width,height:image.height,speech:speech){continue}
-            clean(&pixels,width:image.width,height:image.height,speech:speech)
+            if !precleanedIDs.contains(speech.id){
+                let mask=sourceMask(original,width:image.width,height:image.height,speech:speech)
+                if requireCleanSource && (!completeMask(original,mask:mask,width:image.width,height:image.height,speech:speech) || !simpleBackground(original,mask:mask,width:image.width,height:image.height,speech:speech)){continue}
+                clean(&pixels,width:image.width,height:image.height,speech:speech,source:original,approvedMask:mask)
+            }
             let automatic=background.0*0.2126+background.1*0.7152+background.2*0.0722>0.5 ? CGColor(gray:0.04,alpha:1):CGColor(gray:0.98,alpha:1)
-            prepared.append((area,placed,textColor.flatMap(Self.color) ?? automatic))
+            prepared.append((area,placed,textColor.flatMap(Self.color) ?? automatic));resolved.insert(speech.id)
         }
         // Finish every source mask before lettering. A later cleanup pass must
         // never erase an earlier Arabic glyph where source boxes touch.
-        if requireCleanSource && prepared.isEmpty{throw ComicFailure.message("لم يُعتمد تنظيف النص كاملًا؛ بقيت الصورة الأصلية دون كتابة ترجمة فوقها.")}
+        if requireCleanSource && prepared.isEmpty && resolved.isEmpty{throw ComicFailure.message("لم يُعتمد تنظيف النص كاملًا؛ بقيت الصورة الأصلية دون كتابة ترجمة فوقها.")}
         let data=Data(pixels)
         guard let provider=CGDataProvider(data:data as CFData),let cleaned=CGImage(width:image.width,height:image.height,bitsPerComponent:8,bitsPerPixel:32,bytesPerRow:image.width*4,space:CGColorSpace(name:CGColorSpace.sRGB)!,bitmapInfo:CGBitmapInfo(rawValue:CGImageAlphaInfo.premultipliedLast.rawValue|CGBitmapInfo.byteOrder32Big.rawValue),provider:provider,decode:nil,shouldInterpolate:false,intent:.defaultIntent)else{throw ComicFailure.message("فشل تجهيز الصورة النظيفة.")}
         context.draw(cleaned,in:CGRect(x:0,y:0,width:image.width,height:image.height))
         for (area,placed,color) in prepared{letter(context,image:image,area:area,placed:placed,color:color,ink:ink)}
-        guard let result=context.makeImage()else{throw ComicFailure.message("فشل رسم النص.")};return result
+        guard let result=context.makeImage()else{throw ComicFailure.message("فشل رسم النص.")};return Rendering(image:result,unresolved:speeches.filter{translated[$0.id] != nil && !resolved.contains($0.id)}.map(\.id))
     }
     struct Placement{var layout:TextLayout;var box:CGRect;var theta:CGFloat}
     // Fit the translation inside the speech area. Non-zero theta (diagonal tails,
@@ -109,7 +126,7 @@ enum ComicPixels {
         // GeezaPro is iOS's native Arabic face: ArialMT defeats Arabic shaping inside
         // narrow balloons, so Arabic targets fall back to it unless a font is chosen.
         let resolved=fontName ?? (target.hasPrefix("ar") ? "GeezaPro":"ArialMT")
-        var low:CGFloat=4,high=min(96,rect.height,maximumSize*CGFloat(min(1.5,max(0.5,fontScale)))) ,best:TextLayout?
+        var low:CGFloat=4,high=min(512,rect.height,maximumSize*CGFloat(min(1.5,max(0.5,fontScale)))) ,best:TextLayout?
         for _ in 0..<9{let size=(low+high)/2,font=CTFontCreateWithName(resolved as CFString,size,nil)
             let value=NSAttributedString(string:text,attributes:[NSAttributedString.Key(kCTFontAttributeName as String):font,.paragraphStyle:style,.kern:min(4,max(-1,letterSpacing))])
             let setter=CTFramesetterCreateWithAttributedString(value);var fit=CFRange();let measured=CTFramesetterSuggestFrameSizeWithConstraints(setter,CFRange(),nil,CGSize(width:rect.width,height:CGFloat.greatestFiniteMagnitude),&fit)
@@ -127,19 +144,35 @@ enum ComicPixels {
         return(CGFloat(value.0)/CGFloat(value.3*255),CGFloat(value.1)/CGFloat(value.3*255),CGFloat(value.2)/CGFloat(value.3*255))
     }
     static func canClean(_ pixels:[UInt8],width:Int,height:Int,speech:ComicSpeech)->Bool{
-        var source=pixels,mask=[UInt8](repeating:0,count:width*height)
-        source.withUnsafeMutableBufferPointer{buffer in
-            mask.withUnsafeMutableBufferPointer{m in
-                for box in cleanupBoxes(width:width,height:height,speech:speech){
-                    zeus_comic_text_mask(buffer.baseAddress,m.baseAddress,Int32(width),Int32(height),Int32(box.minX),Int32(box.minY),Int32(box.maxX),Int32(box.maxY))
-                }
-            }
-        }
-        return pixels.withUnsafeBufferPointer{buffer in mask.withUnsafeBufferPointer{m in
+        let mask=sourceMask(pixels,width:width,height:height,speech:speech)
+        return completeMask(pixels,mask:mask,width:width,height:height,speech:speech) && simpleBackground(pixels,mask:mask,width:width,height:height,speech:speech)
+    }
+    private static func simpleBackground(_ pixels:[UInt8],mask:[UInt8],width:Int,height:Int,speech:ComicSpeech)->Bool{
+        pixels.withUnsafeBufferPointer{p in mask.withUnsafeBufferPointer{m in
+            cleanupBoxes(width:width,height:height,speech:speech).allSatisfy{b in zeus_comic_simple_background(p.baseAddress,m.baseAddress,Int32(width),Int32(height),Int32(b.minX),Int32(b.minY),Int32(b.maxX),Int32(b.maxY)) != 0}
+        }}
+    }
+    static func completeMask(_ pixels:[UInt8],mask:[UInt8],width:Int,height:Int,speech:ComicSpeech)->Bool{
+        pixels.withUnsafeBufferPointer{buffer in mask.withUnsafeBufferPointer{m in
             speech.lines.allSatisfy{line in let b=line.rect.integral
                 return zeus_comic_mask_coverage(buffer.baseAddress,m.baseAddress,Int32(width),Int32(height),Int32(b.minX),Int32(b.minY),Int32(b.maxX),Int32(b.maxY))>=0.95
             }
         }}
+    }
+    private static func sourceMask(_ pixels:[UInt8],width:Int,height:Int,speech:ComicSpeech)->[UInt8]{
+        let boxes=cleanupBoxes(width:width,height:height,speech:speech)
+        var mask=[UInt8](repeating:0,count:width*height)
+        pixels.withUnsafeBufferPointer{buffer in mask.withUnsafeMutableBufferPointer{m in
+            for box in boxes{zeus_comic_text_mask(buffer.baseAddress,m.baseAddress,Int32(width),Int32(height),Int32(box.minX),Int32(box.minY),Int32(box.maxX),Int32(box.maxY))}
+        }}
+        if completeMask(pixels,mask:mask,width:width,height:height,speech:speech){return mask}
+        // A colour-field mask can join lettering to background artwork. Recover
+        // complete OCR-owned glyph components, including holes and soft outlines.
+        var refined=[UInt8](repeating:0,count:width*height)
+        pixels.withUnsafeBufferPointer{buffer in refined.withUnsafeMutableBufferPointer{m in
+            for box in boxes{zeus_comic_refine_text_mask(buffer.baseAddress,nil,m.baseAddress,Int32(width),Int32(height),Int32(box.minX),Int32(box.minY),Int32(box.maxX),Int32(box.maxY))}
+        }}
+        return completeMask(pixels,mask:refined,width:width,height:height,speech:speech) ? refined:mask
     }
     private static func cleanupBoxes(width:Int,height:Int,speech:ComicSpeech)->[CGRect]{
         let bounds=CGRect(x:1,y:1,width:max(0,width-2),height:max(0,height-2))
@@ -157,13 +190,13 @@ enum ComicPixels {
         }
         return boxes
     }
-    static func clean(_ pixels:inout [UInt8],width:Int,height:Int,speech:ComicSpeech){
+    static func clean(_ pixels:inout [UInt8],width:Int,height:Int,speech:ComicSpeech,source:[UInt8]? = nil,approvedMask:[UInt8]? = nil){
         let boxes=cleanupBoxes(width:width,height:height,speech:speech)
-        let source=pixels
-        source.withUnsafeBufferPointer{original in
+        let original=source ?? pixels,mask=approvedMask ?? sourceMask(source ?? pixels,width:width,height:height,speech:speech)
+        original.withUnsafeBufferPointer{s in mask.withUnsafeBufferPointer{m in
             pixels.withUnsafeMutableBufferPointer{buffer in
-                for box in boxes{zeus_comic_inpaint_from_source(original.baseAddress,buffer.baseAddress,Int32(width),Int32(height),Int32(box.minX),Int32(box.minY),Int32(box.maxX),Int32(box.maxY))}
+                for box in boxes{zeus_comic_inpaint_mask(s.baseAddress,buffer.baseAddress,m.baseAddress,Int32(width),Int32(height),Int32(box.minX),Int32(box.minY),Int32(box.maxX),Int32(box.maxY))}
             }
-        }
+        }}
     }
 }

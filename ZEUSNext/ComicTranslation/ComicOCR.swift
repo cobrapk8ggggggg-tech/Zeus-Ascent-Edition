@@ -52,7 +52,11 @@ actor ComicOCR {
                 await onPreparing?(false)
             }
             let accurate=try await ComicPaddle.shared.read(image,source:detected,careful:mode == .careful)
+            #if targetEnvironment(simulator)
+            runtime=fastSupported ? "Apple Vision+Paddle/ONNX (simulator)":"Paddle/ONNX"
+            #else
             runtime=fastSupported ? "MLKit+Paddle/ONNX":"Paddle/ONNX"
+            #endif
             if mode == .careful{lines=accurate}else{
                 for line in accurate where !lines.contains(where:{$0.rect.intersection(line.rect).area/min(max(1,$0.rect.area),max(1,line.rect.area))>0.5}){lines.append(line)}
                 // A low-confidence fast line is replaced only by a stronger overlapping reading.

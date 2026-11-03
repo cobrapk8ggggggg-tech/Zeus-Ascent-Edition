@@ -8,7 +8,7 @@ class Engine:
         library=HERE/'output'/'mask.so';library.parent.mkdir(exist_ok=True)
         subprocess.run(['g++','-O2','-std=c++17','-shared','-fPIC',str(HERE/'native.cpp'),'-o',str(library)],check=True)
         self.lib=ctypes.CDLL(str(library));p=np.ctypeslib.ndpointer(dtype=np.uint8,flags='C_CONTIGUOUS')
-        self.lib.clean.argtypes=[p]+[ctypes.c_int]*6;self.lib.text_mask.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.clean_source.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.coverage.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.coverage.restype=ctypes.c_float
+        self.lib.clean.argtypes=[p]+[ctypes.c_int]*6;self.lib.text_mask.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.clean_source.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.coverage.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.coverage.restype=ctypes.c_float;self.lib.refine.argtypes=[p,p,p]+[ctypes.c_int]*6;self.lib.refine_ocr.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.clean_mask.argtypes=[p,p,p]+[ctypes.c_int]*6;self.lib.simple_background.argtypes=[p,p]+[ctypes.c_int]*6
     def session(self,name):
         if name not in self.sessions:
             options=ort.SessionOptions();options.intra_op_num_threads=2;options.inter_op_num_threads=1;options.log_severity_level=3
@@ -57,12 +57,25 @@ class Engine:
             merged.append(box)
         # Masks are computed against the untouched source, then cleaned separately.
         for box in merged:self.lib.text_mask(rgba,mask,w,h,*map(int,box))
+        if not self.safe_to_letter(rgb,mask,boxes):
+            refined=np.zeros_like(mask)
+            for box in merged:self.lib.refine_ocr(rgba,refined,w,h,*map(int,box))
+            if self.safe_to_letter(rgb,refined,boxes):mask=refined
         out=rgba.copy()
-        for box in merged:self.lib.clean_source(rgba,out,w,h,*map(int,box))
+        for box in merged:self.lib.clean_mask(rgba,out,mask,w,h,*map(int,box))
         return out[:,:,:3],mask
+    def refine(self,rgb,hints,boxes):
+        rgba=np.ascontiguousarray(cv2.cvtColor(rgb,cv2.COLOR_RGB2RGBA));mask=np.zeros(rgb.shape[:2],np.uint8);h,w=mask.shape
+        for x,y,r,b in boxes:
+            pad=max(3,(b-y)*.18);box=[max(1,int(x-pad)),max(1,int(y-pad)),min(w-1,int(r+pad)),min(h-1,int(b+pad))]
+            self.lib.refine(rgba,hints,mask,w,h,*box)
+        return mask
     def safe_to_letter(self,rgb,mask,boxes):
         rgba=np.ascontiguousarray(cv2.cvtColor(rgb,cv2.COLOR_RGB2RGBA));h,w=mask.shape
         return all(self.lib.coverage(rgba,mask,w,h,*map(int,box))>=.95 for box in boxes)
+    def simple_background(self,rgb,mask,boxes):
+        rgba=np.ascontiguousarray(cv2.cvtColor(rgb,cv2.COLOR_RGB2RGBA));h,w=mask.shape
+        return all(self.lib.simple_background(rgba,mask,w,h,*map(int,box)) for box in boxes)
     def lama(self,rgb,mask):
         ys,xs=np.where(mask>0)
         if not len(xs):return rgb.copy()

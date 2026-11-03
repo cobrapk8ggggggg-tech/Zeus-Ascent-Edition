@@ -127,7 +127,7 @@ import UIKit
         let base="http://127.0.0.1:8765/comic-quality-fixtures"
         let (data,_)=try await URLSession.shared.data(from:URL(string:base)!)
         let names=try JSONDecoder().decode([String].self,from:data);XCTAssertGreaterThanOrEqual(names.count,6)
-        for name in names{
+        for name in names where !name.hasPrefix("neural-"){
             let (data,_)=try await URLSession.shared.data(from:URL(string:base+"?name="+name)!)
             let fixture=try JSONDecoder().decode(Fixture.self,from:data)
             let image=try ComicPixels.decode(XCTUnwrap(Data(base64Encoded:fixture.image)))
@@ -140,6 +140,33 @@ import UIKit
             let pixels=try XCTUnwrap(ComicPixels.rgba(output,width:output.width,height:output.height))
             XCTAssertTrue(stride(from:0,to:pixels.count,by:4).contains{Int(pixels[$0+2])>Int(pixels[$0])+25},"real comic crop must contain rendered Arabic")
         }
+    }
+    func testPinnedNeuralRestorationRemovesLetteringOnRealArtwork()async throws{
+        struct Line:Decodable{var x:Double;var y:Double;var width:Double;var height:Double;var glyphHeight:Double}
+        struct Fixture:Decodable{var lines:[Line];var image:String;var translation:String}
+        let url=URL(string:"http://127.0.0.1:8765/comic-quality-fixtures?name=neural-title.json")!
+        let(data,_)=try await URLSession.shared.data(from:url),fixture=try JSONDecoder().decode(Fixture.self,from:data)
+        let image=try ComicPixels.decode(XCTUnwrap(Data(base64Encoded:fixture.image)))
+        let lines=fixture.lines.map{ComicLine(text:"SOURCE",confidence:1,rect:CGRect(x:$0.x,y:$0.y,width:$0.width,height:$0.height),glyphHeight:$0.glyphHeight)}
+        let bounds=lines.reduce(CGRect.null){$0.union($1.rect)}
+        let speech=ComicSpeech(id:"cover",text:"TITLE",lines:lines,rect:bounds,vertical:false)
+        let original=try XCTUnwrap(ComicPixels.rgba(image,width:image.width,height:image.height))
+        XCTAssertFalse(ComicPixels.canClean(original,width:image.width,height:image.height,speech:speech),"Artwork must use the neural route instead of harmonic smearing")
+        // The simulator test exercises inference independently of its jetsam stub;
+        // production callers always retain the 1.2GB available-memory guard.
+        let restored=try await ComicRestoration.shared.restore(image,speeches:[speech],requiredHeadroom:0)
+        XCTAssertTrue(restored.restored.contains("cover"))
+        let pixels=try XCTUnwrap(ComicPixels.rgba(restored.image,width:image.width,height:image.height))
+        var before=0,after=0,outside=0
+        for y in 0..<image.height{for x in 0..<image.width{let i=(y*image.width+x)*4
+            if original[i]>235 && original[i+1]>235 && original[i+2]>235{before+=1}
+            if pixels[i]>235 && pixels[i+1]>235 && pixels[i+2]>235{after+=1}
+            if !lines.contains(where:{$0.rect.insetBy(dx:-20,dy:-20).contains(CGPoint(x:x,y:y))}) && (0..<4).contains(where:{original[i+$0] != pixels[i+$0]}){outside+=1}
+        }}
+        XCTAssertGreaterThan(before,1000);XCTAssertLessThan(after,Int(Double(before)*0.1),"The source white title ink must disappear")
+        XCTAssertEqual(outside,0,"Restoration must preserve artwork beyond the owned text regions")
+        let drawn=try ComicPixels.render(restored.image,speeches:[speech],translations:[TranslationSegment(id:"cover",text:fixture.translation)],target:"ar",fontName:nil,fontScale:1,requireCleanSource:true,precleanedIDs:restored.restored)
+        for (name,output)in [("Neural original artwork",image),("Neural cleaned artwork",restored.image),("Neural Arabic artwork",drawn)]{let attachment=XCTAttachment(image:UIImage(cgImage:output));attachment.name=name;attachment.lifetime = .keepAlways;add(attachment)}
     }
     func testIncompleteCleanupDoesNotPaintOverOriginal()throws{
         let image=renderer(CGSize(width:200,height:100)).image{context in
@@ -157,6 +184,19 @@ import UIKit
         let line=ComicLine(text:"HELLO",confidence:1,rect:CGRect(x:40,y:35,width:110,height:30))
         let speech=ComicSpeech(id:"0",text:line.text,lines:[line],rect:line.rect,vertical:false)
         XCTAssertThrowsError(try ComicPixels.render(image,speeches:[speech],translations:[TranslationSegment(id:"0",text:String(repeating:"هل يمكنكم مساعدتنا؟ ",count:20))],target:"ar",fontName:nil,fontScale:1,requireCleanSource:true))
+    }
+    func testLargeSourceLetteringIsNotCappedAtBodyTextSize()throws{
+        let value=try XCTUnwrap(ComicPixels.layout("استيقظ",rect:CGRect(x:0,y:0,width:500,height:240),target:"ar",fontName:nil,fontScale:1,maximumSize:180))
+        XCTAssertGreaterThan(value.size,110,"large source SFX must retain its scale")
+    }
+    func testUnchangedBrandTextPreservesOriginalPixels()throws{
+        let image=renderer(CGSize(width:240,height:100)).image{context in
+            UIColor.red.setFill();context.fill(CGRect(x:0,y:0,width:240,height:100))
+            ("ELFTOON.COM" as NSString).draw(at:CGPoint(x:20,y:35),withAttributes:[.font:UIFont.boldSystemFont(ofSize:24),.foregroundColor:UIColor.white])
+        }.cgImage!
+        let line=ComicLine(text:"ELFTOON.COM",confidence:1,rect:CGRect(x:20,y:35,width:190,height:30)),speech=ComicSpeech(id:"0",text:"ELFTOON.COM",lines:[line],rect:line.rect,vertical:false)
+        let output=try ComicPixels.render(image,speeches:[speech],translations:[TranslationSegment(id:"0",text:"ELFTOON.COM")],target:"ar",fontName:nil,fontScale:1,requireCleanSource:true)
+        XCTAssertEqual(ComicPixels.rgba(image,width:240,height:100),ComicPixels.rgba(output,width:240,height:100))
     }
     func testSourceFontCapPreventsOneWordFillingHugeBalloon()throws{
         let short=try XCTUnwrap(ComicPixels.layout("سجن",rect:CGRect(x:0,y:0,width:450,height:350),target:"ar",fontName:nil,fontScale:1,maximumSize:26))
@@ -258,7 +298,7 @@ import UIKit
         var comic=ComicPreferences();var image=TranslationPreferences();image.target="ar";comic.translation=image;data.settings.comicTranslation=comic
         let decoded=try JSONDecoder().decode(ProfileData.self,from:JSONEncoder().encode(data))
         XCTAssertEqual(decoded.settings.translation?.target,"fr");XCTAssertEqual(decoded.settings.comicTranslation?.translation?.target,"ar")
-        XCTAssertEqual(ComicPreferences().mode,.fastest)
+        XCTAssertEqual(ComicPreferences().mode,.balanced)
     }
     func testActualWebKitSwapRestoreAndStaleResults()async throws{
         let image=renderer(CGSize(width:200,height:100)).image{c in UIColor.white.setFill();c.fill(CGRect(x:0,y:0,width:200,height:100));("ORIGINAL" as NSString).draw(at:CGPoint(x:20,y:30),withAttributes:[.foregroundColor:UIColor.black,.font:UIFont.systemFont(ofSize:20)])}
