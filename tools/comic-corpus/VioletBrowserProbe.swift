@@ -80,6 +80,10 @@ import CryptoKit
             pageReports.append(["image":url,"loaded":"true","painted":String(pagePainted),"seconds":String(Date().timeIntervalSince(pageBegan)),"detected_delta":String(session.detectedTexts-detectedBefore),"translated_delta":String(session.translatedTexts-translatedBefore),"error":session.error ?? "none","notice":session.contextNotice ?? "none"])
             print("VIOLET LIVE PAGE \(index) painted=\(pagePainted) detected=\(session.detectedTexts) translated=\(session.translatedTexts)")
             if normalDialoguePages.contains(index){XCTAssertTrue(pagePainted,"A page with ordinary readable dialogue must paint: "+url)}
+            if pagePainted{
+                let bytes=try await view.callAsyncJavaScript("const i=globalThis.__violetChapterPanels[index];if(!i.src.startsWith('blob:'))return null;const b=await fetch(i.src).then(r=>r.blob());return await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result.split(',')[1]);r.onerror=reject;r.readAsDataURL(b);});",arguments:["index":index],in:nil,contentWorld:ComicTranslation.world)as? String
+                if let bytes,let data=Data(base64Encoded:bytes),let image=UIImage(data:data){attach(image,"Live Violet applied pixels page \(index)")}
+            }
             if [0,5,12,18,20].contains(index){attach(try await view.takeSnapshot(configuration:nil),"Live Violet chapter page \(index)")}
         }
         session.pause()
