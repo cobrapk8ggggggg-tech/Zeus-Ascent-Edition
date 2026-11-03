@@ -8,6 +8,10 @@ for test in manifest:
  images=[]
  for attachment in test.get('attachments',[]):
   name=attachment.get('exportedFileName','')
+  if name.lower().endswith('.txt') and 'diagnostic' in attachment.get('suggestedHumanReadableName','').lower():
+   shutil.copy2(artifact/'screenshots'/name,out/name)
+   images.append('<pre>'+html.escape((out/name).read_text())+'</pre>')
+   continue
   if not name.lower().endswith('.png'):continue
   shutil.copy2(artifact/'screenshots'/name,out/name)
   label=attachment.get('suggestedHumanReadableName',name).split('_0_')[0]

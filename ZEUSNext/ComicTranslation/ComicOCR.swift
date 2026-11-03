@@ -23,7 +23,10 @@ actor ComicOCR {
     }
     func read(_ image:CGImage,source:String,mode:ComicReadingMode,languageRegion:CGRect? = nil,onPreparing:(@Sendable (Bool) async -> Void)? = nil)async throws->ComicReading{
         try Task.checkCancellation()
-        let probe:(String,[ComicLine])=source == "auto" ? try await Self.scriptProbe(image,region:languageRegion):(source,[])
+        let probe:(String,[ComicLine])
+        if source=="auto"{probe=try await Self.scriptProbe(image,region:languageRegion)}
+        else if ComicModelStore.recognizer(source)=="arabic"{probe=(source,try Self.vision(image,languages:["ar-SA"],accurate:true))}
+        else{probe=(source,[])}
         var detected=probe.0
         var fastSupported=ComicModelStore.recognizer(detected)=="latin" || ["ja","zh","ko"].contains(where:detected.hasPrefix)
         var fast=fastSupported ? try await self.fast(image,source:detected):[]
@@ -64,11 +67,13 @@ actor ComicOCR {
                 lines=lines.map{line in accurate.filter{$0.rect.intersection(line.rect).area/max(1,line.rect.area)>0.5&&$0.confidence>line.confidence}.max(by:{$0.confidence<$1.confidence}) ?? line}
             }
         }
-        // Keep strong secondary-script readings from the same local Vision
+        // Keep script-consistent readings from the same local Vision
         // probe. Covers mixed-language panels without poisoning the whole page's
         // recognizer choice or downloading every language model up front.
-        if source=="auto"{
+        if source=="auto" || ComicModelStore.recognizer(detected)=="arabic"{
             let primary=ComicModelStore.recognizer(detected)
+            // Vision reports 0.5 even for accurate Arabic lines. Use its existing
+            // geometry confidence floor; Paddle's 0.65 has a different scale.
             for sample in probe.1 where sample.confidence >= (Self.lineScript(sample.text)=="arabic" ? 0.3:0.65){
                 let script=Self.lineScript(sample.text)
                 let overlaps=lines.indices.filter{lines[$0].rect.intersection(sample.rect).area/min(max(1,lines[$0].rect.area),max(1,sample.rect.area))>0.6}

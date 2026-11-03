@@ -7,7 +7,14 @@ FONT='/usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf'
 LATIN_FONT='/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf'
 
 
-def lettering(rgb,box,text,size,color,direction="rtl"):
+def lettering(rgb,box,text,size,color,direction="rtl",vertical=False):
+    if vertical:
+        x,y,r,b=[int(round(v))for v in box];x=max(0,x);y=max(0,y);r=min(rgb.shape[1],r);b=min(rgb.shape[0],b)
+        if r-x<3 or b-y<3:return rgb,False
+        cut=np.ascontiguousarray(np.rot90(rgb[y:b,x:r]));drawn,fit=lettering(cut,[0,0,cut.shape[1],cut.shape[0]],text,size,color,direction)
+        result=rgb.copy()
+        if fit:result[y:b,x:r]=np.rot90(drawn,-1)
+        return result,fit
     image=Image.fromarray(rgb);draw=ImageDraw.Draw(image);x,y,r,b=box
     minimum=max(5,int(size*.55))
     for size in range(max(5,int(size)),minimum-1,-1):
@@ -43,8 +50,8 @@ def run(args):
         for page in pages:
             if count>=limit:break
             rgb=np.asarray(Image.open(root/page['path']).convert('RGB'));start=time.perf_counter();lines=engine.detect(rgb)
-            groups=paragraphs(rgb,lines);random.Random(0).shuffle(groups)
-            for paragraph,area in groups[:per_page]:
+            groups=paragraphs(rgb,lines,include_layout=True);random.Random(0).shuffle(groups)
+            for paragraph,area,closed in groups[:per_page]:
                 if count>=limit:break
                 boxes=[l['box'] for l in paragraph];x=min(b[0]for b in boxes);y=min(b[1]for b in boxes);r=max(b[2]for b in boxes);b=max(b[3]for b in boxes)
                 if r-x<15 or b-y<10 or (r-x)*(b-y)>750000:continue
@@ -57,8 +64,9 @@ def run(args):
                 readable=all(t.strip() and c>=.65 for t,c in zip(recognized,confidence))if args.ocr else True
                 text=('This is a translated paragraph.' if len(paragraph)>1 else 'Translation') if chapter['language']=='ar' else ('هذه ترجمة عربية تجريبية داخل الفقاعة' if len(paragraph)>1 else 'ترجمة تجريبية')
                 fg=(12,12,12) if np.median(crop)>128 else (248,248,248)
+                vertical=not closed and all(q[3]-q[1]>(q[2]-q[0])*1.5 for q in local)
                 area_local=[area[0]-cx,area[1]-cy,area[2]-cx,area[3]-cy]
-                _,fit=lettering(crop,area_local,text,np.median([l['glyph_height']for l in paragraph])*1.3,fg,direction='ltr' if chapter['language']=='ar' else 'rtl')
+                _,fit=lettering(crop,area_local,text,np.median([l['glyph_height']for l in paragraph])*1.3,fg,direction='ltr' if chapter['language']=='ar' else 'rtl',vertical=vertical)
                 accepted=False;route='original';clean=crop.copy();mask=np.zeros(crop.shape[:2],np.uint8)
                 if fit and readable:
                     clean,mask=engine.clean(crop,local);accepted=engine.can_letter_light(crop,mask,local)
@@ -68,11 +76,11 @@ def run(args):
                         if accepted:route='neural'
                 if not accepted:clean=crop.copy()
                 rendered=clean
-                if accepted:rendered,_=lettering(clean,area_local,text,np.median([l['glyph_height']for l in paragraph])*1.3,fg,direction='ltr' if chapter['language']=='ar' else 'rtl')
+                if accepted:rendered,_=lettering(clean,area_local,text,np.median([l['glyph_height']for l in paragraph])*1.3,fg,direction='ltr' if chapter['language']=='ar' else 'rtl',vertical=vertical)
                 outside=int(np.count_nonzero(np.any(clean!=crop,axis=2)&(mask==0)))
                 cid=f'{chapter["language"]}-{chapter["id"][:8]}-{chapter["split"]}-{count:03d}';dest=out/cid;dest.mkdir(exist_ok=True)
                 for name,a in [('original',crop),('mask',mask),('clean',clean),('rendered',rendered)]:Image.fromarray(a).save(dest/(name+'.png'))
-                case=dict(id=cid,language=chapter['language'],split=chapter['split'],chapter=chapter['id'],source=page['path'],source_sha256=page['sha256'],box=[cx,cy,cr,cb],layout_box=[area[0]-cx,area[1]-cy,area[2]-cx,area[3]-cy],lines=paragraph,ocr=recognized,ocr_confidence=confidence,source_readable=readable,outside_mask_changes=outside,fit=fit,restoration_route=route,cleanup_accepted=accepted,annotation_status='unreviewed',translation='fixed Arabic layout probe',seconds=time.perf_counter()-start)
+                case=dict(id=cid,language=chapter['language'],split=chapter['split'],chapter=chapter['id'],source=page['path'],source_sha256=page['sha256'],box=[cx,cy,cr,cb],layout_box=[area[0]-cx,area[1]-cy,area[2]-cx,area[3]-cy],lines=paragraph,balloon=closed,vertical_caption=vertical,ocr=recognized,ocr_confidence=confidence,source_readable=readable,outside_mask_changes=outside,fit=fit,restoration_route=route,cleanup_accepted=accepted,annotation_status='unreviewed',translation='fixed Arabic layout probe',seconds=time.perf_counter()-start)
                 cases.append(case);count+=1;start=time.perf_counter()
                 if args.lama and count<=args.lama:
                     restored=engine.lama(crop,mask);Image.fromarray(restored).save(dest/'lama.png')
@@ -80,7 +88,7 @@ def run(args):
             print(chapter['language'],chapter['split'],page['path'],'regions',count,flush=True)
         (out/'cases.json').write_text(json.dumps(cases,ensure_ascii=False,indent=2))
     gallery(out,cases)
-    report=dict(chapters=len(corpus['chapters']),pages=sum(len(c['pages'])for c in corpus['chapters']),regions=len(cases),languages=sorted(set(c['language']for c in cases)),outside_mask_changes=sum(c['outside_mask_changes']for c in cases),layout_probe_fits=sum(c['fit']for c in cases),neural_restored=sum(c['restoration_route']=='neural'for c in cases),light_restored=sum(c['restoration_route']=='light'for c in cases),cleanup_gate_accepted=sum(c['cleanup_accepted']for c in cases),cleanup_gate_abstained=sum(not c['cleanup_accepted']for c in cases),manually_reviewed=0,quality_acceptance_proven=False,native_kernel_sha256=engine.native_sha,protocol='adaptive-v2: owned glyphs; CCW OCR; layout preflight; .65 source OCR gate',peak_rss_kib=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
+    report=dict(chapters=len(corpus['chapters']),pages=sum(len(c['pages'])for c in corpus['chapters']),regions=len(cases),languages=sorted(set(c['language']for c in cases)),outside_mask_changes=sum(c['outside_mask_changes']for c in cases),layout_probe_fits=sum(c['fit']for c in cases),neural_restored=sum(c['restoration_route']=='neural'for c in cases),light_restored=sum(c['restoration_route']=='light'for c in cases),cleanup_gate_accepted=sum(c['cleanup_accepted']for c in cases),cleanup_gate_abstained=sum(not c['cleanup_accepted']for c in cases),manually_reviewed=0,quality_acceptance_proven=False,native_kernel_sha256=engine.native_sha,protocol='adaptive-v3: native rectangle grouping; individual plate probes; vertical captions; OCR and layout preflight',peak_rss_kib=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
     (out/'report.json').write_text(json.dumps(report,indent=2));print(json.dumps(report),flush=True)
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--corpus',required=True);p.add_argument('--models',required=True);p.add_argument('--output',required=True);p.add_argument('--regions',type=int,default=400);p.add_argument('--ocr',action='store_true');p.add_argument('--lama',type=int,default=0);p.add_argument('--neural',action='store_true');run(p.parse_args())

@@ -1,0 +1,350 @@
+{
+  "protocol": "adaptive-v2",
+  "reviewer": "Codex visual inspection",
+  "regions": 57,
+  "gold": false,
+  "checks": [
+    {
+      "id": "en-comix-14-calibration-008",
+      "previous": "clean crop",
+      "current": "rendered; thumbnail review is not gold acceptance",
+      "restoration_route": "light"
+    },
+    {
+      "id": "en-0aaf8b27-calibration-017",
+      "previous": "layout failure erased source; fixed by preflight",
+      "current": "fixed in lab: failed layout now preserves original source",
+      "restoration_route": "original"
+    },
+    {
+      "id": "en-0aaf8b27-calibration-036",
+      "previous": "narrow multi-line grouping needs review",
+      "current": "rendered; thumbnail review is not gold acceptance",
+      "restoration_route": "neural"
+    },
+    {
+      "id": "en-0aaf8b27-calibration-035",
+      "previous": "clean crop",
+      "current": "declined; original preserved",
+      "restoration_route": "original"
+    },
+    {
+      "id": "en-0aaf8b27-calibration-022",
+      "previous": "abstained: retained source",
+      "current": "declined; original preserved",
+      "restoration_route": "original"
+    },
+    {
+      "id": "en-comix-14-calibration-018",
+      "previous": "abstained: stylized multilingual sign",
+      "current": "declined; original preserved",
+      "restoration_route": "original"
+    },
+    {
+      "id": "en-d186aaeb-holdout-026",
+      "previous": "clean crop",
+      "current": "rendered; thumbnail review is not gold acceptance",
+      "restoration_route": "light"
+    },
+    {
+      "id": "en-d186aaeb-holdout-019",
+      "previous": "clean crop",
+      "current": "rendered; thumbnail review is not gold acceptance",
+      "restoration_route": "light"
+    },
+    {
+      "id": "en-d186aaeb-holdout-039",
+      "previous": "caption fit too small",
+      "current": "rendered; thumbnail review is not gold acceptance",
+      "restoration_route": "neural"
+    },
+    {
+      "id": "en-d186aaeb-holdout-028",
+      "previous": "false text detection on face",
+      "current": "fixed in lab: false OCR on facial artwork is declined",
+      "restoration_route": "original"
+    },
+    {
+      "id": "en-d186aaeb-holdout-029",
+      "previous": "abstained: retained source",
+      "current": "declined; original preserved",
+      "restoration_route": "original"
+    },
+    {
+      "id": "en-d186aaeb-holdout-013",
+      "previous": "abstained: retained source",
+      "current": "declined; original preserved",
+      "restoration_route": "original"
+    },
+    {
+      "id": "ja-ad6defe1-calibration-000",
+      "previous": "clean crop",
+      "current": "rendered; thumbnail review is not gold acceptance",
+      "restoration_route": "light"
+    },
+    {
+      "id": "ja-ad6defe1-calibration-010",
+      "previous": "cleaning plate reaches surrounding art",
+      "current": "rendered; thumbnail review is not gold acceptance",
+      "restoration_route": "light"
+    },
+    {
+      "id": "ja-ad6defe1-calibration-037",
+      "previous": "partial source text remains",
+      "current": "unresolved: partial Japanese text remains around the translated subset; lab grouping differs from native",
+      "restoration_route": "neural"
+    },
+    {
+      "id": "ja-ad6defe1-calibration-033",
+      "previous": "partial source text remains and overlaps Arabic",
+      "current": "declined; original preserved",
+      "restoration_route": "original"
+    },
+    {
+      "id": "ja-ad6defe1-calibration-039",
+      "previous": "abstained: retained source",
+      "current": "declined; original preserved",
+      "restoration_route": "original"
+    },
+    {
+      "id": "ja-ad6defe1-calibration-022",
+      "previous": "abstained: stylized SFX",
+      "current": "declined; original preserved",
+      "restoration_route": "original"
+    },
+    {
+      "id": "ja-9708bf5a-holdout-025",
+      "previous": "clean crop",
+      "current": "rendered; thumbnail review is not gold acceptance",
+      "restoration_route": "light"
+    },
+    {
+      "id": "ja-9708bf5a-holdout-023",
+      "previous": "clean crop",
+      "current": "rendered; thumbnail review is not gold acceptance",
+      "restoration_route": "light"
+    },
+    {
+      "id": "ja-9708bf5a-holdout-010",
+      "previous": "clean crop",
+      "current": "rendered; thumbnail review is not gold acceptance",
+      "restoration_route": "neural"
+    },
+    {
+      "id": "ja-9708bf5a-holdout-021",
+      "previous": "clean crop",
+      "current": "declined; original preserved",
+      "restoration_route": "original"
+    },
+    {
+      "id": "ja-9708bf5a-holdout-039",
+      "previous": "abstained: retained source",
+      "current": "declined; original preserved",
+      "restoration_route": "original"
+    },
+    {
+      "id": "ja-9708bf5a-holdout-030",
+      "previous": "abstained: retained source",
+      "current": "declined; original preserved",
+      "restoration_route": "original"
+    },
+    {
+      "id": "ko-7d0c0550-calibration-031",
+      "previous": "clean crop",
+      "current": "declined; original preserved",
+      "restoration_route": "original"
+    },
+    {
+      "id": "ko-7d0c0550-calibration-032",
+      "previous": "clean crop",
+      "current": "rendered; thumbnail review is not gold acceptance",
+      "restoration_route": "light"
+    },
+    {
+      "id": "ko-7d0c0550-calibration-018",
+      "previous": "clean crop",
+      "current": "rendered; thumbnail review is not gold acceptance",
+      "restoration_route": "neural"
+    },
+    {
+      "id": "ko-7d0c0550-calibration-025",
+      "previous": "clean crop",
+      "current": "declined; original preserved",
+      "restoration_route": "original"
+    },
+    {
+      "id": "ko-7d0c0550-calibration-037",
+      "previous": "abstained: retained source",
+      "current": "declined; original preserved",
+      "restoration_route": "original"
+    },
+    {
+      "id": "ko-7d0c0550-calibration-023",
+      "previous": "abstained: retained source",
+      "current": "declined; original preserved",
+      "restoration_route": "original"
+    },
+    {
+      "id": "ko-82c68de5-holdout-029",
+      "previous": "clean crop",
+      "current": "declined; original preserved",
+      "restoration_route": "original"
+    },
+    {
+      "id": "ko-82c68de5-holdout-025",
+      "previous": "clean crop",
+      "current": "rendered; thumbnail review is not gold acceptance",
+      "restoration_route": "neural"
+    },
+    {
+      "id": "ko-82c68de5-holdout-030",
+      "previous": "abstained: false detection on eye",
+      "current": "declined; original preserved",
+      "restoration_route": "original"
+    },
+    {
+      "id": "ko-82c68de5-holdout-013",
+      "previous": "abstained: stylized SFX",
+      "current": "declined; original preserved",
+      "restoration_route": "original"
+    },
+    {
+      "id": "zh-496bd311-calibration-016",
+      "previous": "clean crop",
+      "current": "rendered; thumbnail review is not gold acceptance",
+      "restoration_route": "light"
+    },
+    {
+      "id": "zh-496bd311-calibration-026",
+      "previous": "clean crop",
+      "current": "rendered; thumbnail review is not gold acceptance",
+      "restoration_route": "light"
+    },
+    {
+      "id": "zh-496bd311-calibration-002",
+      "previous": "layout failed after erasure; fixed by preflight",
+      "current": "fixed in lab: failed layout now preserves original source",
+      "restoration_route": "original"
+    },
+    {
+      "id": "zh-496bd311-calibration-033",
+      "previous": "clean crop",
+      "current": "rendered; thumbnail review is not gold acceptance",
+      "restoration_route": "neural"
+    },
+    {
+      "id": "zh-496bd311-calibration-027",
+      "previous": "abstained: retained source",
+      "current": "declined; original preserved",
+      "restoration_route": "original"
+    },
+    {
+      "id": "zh-496bd311-calibration-017",
+      "previous": "abstained: stylized lettering",
+      "current": "declined; original preserved",
+      "restoration_route": "original"
+    },
+    {
+      "id": "zh-22bc4eb8-holdout-018",
+      "previous": "clean crop",
+      "current": "rendered; thumbnail review is not gold acceptance",
+      "restoration_route": "light"
+    },
+    {
+      "id": "zh-22bc4eb8-holdout-031",
+      "previous": "clean crop",
+      "current": "rendered; thumbnail review is not gold acceptance",
+      "restoration_route": "light"
+    },
+    {
+      "id": "zh-22bc4eb8-holdout-028",
+      "previous": "layout failed after erasure; fixed by preflight",
+      "current": "fixed in lab: failed layout now preserves original source",
+      "restoration_route": "original"
+    },
+    {
+      "id": "zh-22bc4eb8-holdout-035",
+      "previous": "clean crop",
+      "current": "rendered; thumbnail review is not gold acceptance",
+      "restoration_route": "neural"
+    },
+    {
+      "id": "zh-22bc4eb8-holdout-034",
+      "previous": "abstained: stylized SFX",
+      "current": "declined; original preserved",
+      "restoration_route": "original"
+    },
+    {
+      "id": "zh-22bc4eb8-holdout-030",
+      "previous": "abstained: retained source",
+      "current": "declined; original preserved",
+      "restoration_route": "original"
+    },
+    {
+      "id": "ar-e11b2b83-calibration-011",
+      "previous": "layout failed after erasure; fixed by preflight",
+      "current": "fixed in lab: failed layout now preserves original source",
+      "restoration_route": "original"
+    },
+    {
+      "id": "ar-e11b2b83-calibration-037",
+      "previous": "Linux Latin font missing; fixed",
+      "current": "fixed in lab: Latin glyphs render with Noto Sans instead of missing-glyph boxes",
+      "restoration_route": "neural"
+    },
+    {
+      "id": "ar-e11b2b83-calibration-038",
+      "previous": "Linux Latin font missing; fixed",
+      "current": "fixed in lab: Latin glyphs render with Noto Sans instead of missing-glyph boxes",
+      "restoration_route": "neural"
+    },
+    {
+      "id": "ar-e11b2b83-calibration-005",
+      "previous": "abstained: false detection on face",
+      "current": "declined; original preserved",
+      "restoration_route": "original"
+    },
+    {
+      "id": "ar-e11b2b83-calibration-027",
+      "previous": "abstained: retained source",
+      "current": "declined; original preserved",
+      "restoration_route": "original"
+    },
+    {
+      "id": "ar-81355b0b-holdout-012",
+      "previous": "Linux Latin font missing; fixed",
+      "current": "fixed in lab: Latin glyphs render with Noto Sans instead of missing-glyph boxes",
+      "restoration_route": "light"
+    },
+    {
+      "id": "ar-81355b0b-holdout-010",
+      "previous": "layout failed after erasure; fixed by preflight",
+      "current": "fixed in lab: failed layout now preserves original source",
+      "restoration_route": "original"
+    },
+    {
+      "id": "ar-81355b0b-holdout-018",
+      "previous": "Linux Latin font missing; fixed",
+      "current": "fixed in lab: Latin glyphs render with Noto Sans instead of missing-glyph boxes",
+      "restoration_route": "neural"
+    },
+    {
+      "id": "ar-81355b0b-holdout-022",
+      "previous": "layout failed after erasure; fixed by preflight",
+      "current": "fixed in lab: failed layout now preserves original source",
+      "restoration_route": "original"
+    },
+    {
+      "id": "ar-81355b0b-holdout-031",
+      "previous": "abstained: product photo",
+      "current": "declined; original preserved",
+      "restoration_route": "original"
+    },
+    {
+      "id": "ar-81355b0b-holdout-007",
+      "previous": "abstained: retained source",
+      "current": "declined; original preserved",
+      "restoration_route": "original"
+    }
+  ]
+}

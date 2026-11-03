@@ -312,6 +312,10 @@ import UIKit
         let evidence=XCTAttachment(string:details);evidence.name="Arabic OCR diagnostic";evidence.lifetime = .keepAlways;add(evidence)
         let reading=try await ComicOCR.shared.read(image,source:"auto",mode:.balanced)
         XCTAssertEqual(reading.language,"ar","Arabic must not be overwritten by a Latin fallback recognizer")
+        XCTAssertTrue(reading.lines.map(\.text).joined(separator:" ").contains("العالم"),"Arabic must retain a complete source word")
+        let explicit=try await ComicOCR.shared.read(image,source:"ar",mode:.balanced)
+        XCTAssertTrue(explicit.lines.map(\.text).joined().unicodeScalars.contains{(0x0600...0x06FF).contains($0.value)},"Explicit Arabic: \(explicit.lines.map(\.text)); \(details)")
+        XCTAssertTrue(explicit.lines.map(\.text).joined(separator:" ").contains("العالم"))
         XCTAssertTrue(reading.lines.map(\.text).joined().unicodeScalars.contains{(0x0600...0x06FF).contains($0.value)},"Arabic reading: \(reading.lines.map{($0.text,$0.confidence)}); \(details)")
     }
     func testVerticalJapanesePaddleReadsTopToBottom()async throws{
@@ -335,7 +339,7 @@ import UIKit
         let details="probe \(probe.0): \(probe.1.map{($0.text,$0.confidence)})"
         let evidence=XCTAttachment(string:details);evidence.name="Mixed OCR diagnostic";evidence.lifetime = .keepAlways;add(evidence)
         let reading=try await ComicOCR.shared.read(image,source:"auto",mode:.balanced),text=reading.lines.map(\.text).joined(separator:" ")
-        XCTAssertTrue(text.uppercased().contains("HELLO"),"Mixed Latin: \(text)");XCTAssertTrue(text.unicodeScalars.contains{(0x0600...0x06FF).contains($0.value)},"Mixed Arabic: \(text); \(details)")
+        XCTAssertTrue(text.contains("العالم"),"Mixed source word: \(text)");XCTAssertTrue(text.uppercased().contains("HELLO"),"Mixed Latin: \(text)");XCTAssertTrue(text.unicodeScalars.contains{(0x0600...0x06FF).contains($0.value)},"Mixed Arabic: \(text); \(details)")
     }
     func testLanguageVoteUsesOwnedPanelInsteadOfNeighbourContext()async throws{
         let image=renderer(CGSize(width:800,height:500)).image{context in

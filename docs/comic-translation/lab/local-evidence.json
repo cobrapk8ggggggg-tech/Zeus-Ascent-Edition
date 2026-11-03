@@ -32,23 +32,13 @@
   "contact_sheet_triaged": 57,
   "triage_file": "visual-triage.json",
   "native_confirmed": {
-    "source_commit": "3479bfda08fdc21653034b4eb4db625368d65240",
-    "native_tests": 33,
+    "source_commit": "c692a835980f79e3b8262d565b7ee9423fb7abd3",
+    "native_tests": 40,
     "ui_tests": 6,
     "failures": 0,
     "device_build": true,
     "physical_device": false,
-    "run_id": 41585256165
-  },
-  "next_candidate": {
-    "source_commit": "7424efe54b33d7778a72a096ec1b0051ff294a21",
-    "native_tests": 39,
-    "failures": 2,
-    "failed_tests": [
-      "testAutomaticArabicScriptUsesTheArabicRecognizer",
-      "testAutomaticReadingRetainsMixedArabicAndEnglishLines"
-    ],
-    "status": "repair pending validation"
+    "run_id": 41626998339
   },
   "local_adaptive_v1": {
     "chapters": 11,
@@ -71,5 +61,49 @@
     "quality_acceptance_proven": false,
     "peak_rss_kib": 1258144
   },
-  "local_adaptive_v2_status": "running with layout preflight and OCR confidence gating"
+  "local_adaptive_v2": {
+    "chapters": 11,
+    "pages": 251,
+    "regions": 440,
+    "languages": [
+      "ar",
+      "en",
+      "ja",
+      "ko",
+      "zh"
+    ],
+    "outside_mask_changes": 0,
+    "layout_probe_fits": 322,
+    "neural_restored": 85,
+    "light_restored": 76,
+    "cleanup_gate_accepted": 161,
+    "cleanup_gate_abstained": 279,
+    "manually_reviewed": 0,
+    "quality_acceptance_proven": false,
+    "peak_rss_kib": 1379360,
+    "mask_refresh_seconds": 954.9953186380008,
+    "unreadable_source_proposals": 178,
+    "native_kernel_sha256": "77688109e29d650ad9523da7b25e9e8c5d0ac4df33509fb523291ac6807f8f68",
+    "protocol": "adaptive-v2: owned glyphs; CCW OCR; layout preflight; .65 source OCR gate",
+    "dependency_versions": {
+      "onnxruntime": "1.23.2",
+      "opencv-python-headless": "4.12.0.88",
+      "numpy": "2.2.6",
+      "Pillow": "11.3.0",
+      "PyYAML": "6.0.3"
+    },
+    "visual_triage_count": 57,
+    "gold_annotated_regions": 0,
+    "source_translation_accuracy_evaluated": false,
+    "native_ios_evidence_revision": "3479bfda08fdc21653034b4eb4db625368d65240"
+  },
+  "visual_recheck_file": "visual-recheck.json",
+  "harness_snapshot": {
+    "Native/ComicRuntime/ComicInpaint.h": "db30afbceaac7632fca6c48f8deddf3a45f3ff79df6741eea1750af4c26b68aa",
+    ".zeus-ci/comic/lab/engine.py": "19abd594ebb1b0a18c51a89c1ba0bcc1088a3d1622b81668d8415c519098722f",
+    ".zeus-ci/comic/lab/run.py": "5902e034e13c7efd352c6a4e450d5ede30f22aaf436252e20a6bb020c64584cf",
+    ".zeus-ci/comic/lab/refresh.py": "40010af62fe56520e73912f16e19b73d43de23cf85ecc83ddc938dcbe39f5dd7"
+  },
+  "local_adaptive_v3_status": "running; native rectangle grouping and vertical caption parity",
+  "vision_arabic_observed_confidence": 0.5
 }
