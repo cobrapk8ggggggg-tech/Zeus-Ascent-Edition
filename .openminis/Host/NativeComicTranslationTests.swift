@@ -381,6 +381,25 @@ import UIKit
         XCTAssertEqual(reading.speeches.count,2)
         XCTAssertTrue(reading.speeches.first?.text.contains("HERE")==true);XCTAssertTrue(reading.speeches.last?.text.contains("THERE")==true)
     }
+    func testJapaneseRecognizedColumnsStayInOneCompleteParagraph()async throws{
+        struct Line:Decodable{var text:String;var x:Double;var y:Double;var width:Double;var height:Double;var glyphHeight:Double}
+        struct Fixture:Decodable{var image:String;var lines:[Line]}
+        let(data,_)=try await URLSession.shared.data(from:URL(string:"http://127.0.0.1:8765/comic-quality-fixtures?name=neural-staggered-columns.json")!)
+        let f=try JSONDecoder().decode(Fixture.self,from:data),image=try ComicPixels.decode(XCTUnwrap(Data(base64Encoded:f.image)))
+        let lines=f.lines.map{ComicLine(text:$0.text,confidence:1,rect:CGRect(x:$0.x,y:$0.y,width:$0.width,height:$0.height),glyphHeight:$0.glyphHeight)}
+        for input in [lines,Array(lines.reversed())]{
+            let groups=ComicGeometry.group(input,source:"ja")
+            XCTAssertEqual(groups.count,1);XCTAssertEqual(groups.first?.lines.count,4)
+            XCTAssertEqual(groups.first?.text,"よく考えてみたら…アイツの行きそうな場所は")
+        }
+        let speeches=ComicBalloons.speeches(lines,image:image,source:"ja")
+        XCTAssertEqual(speeches.count,1);XCTAssertEqual(speeches.first?.lines.count,4)
+        let restored=try await ComicRestoration.shared.restore(image,speeches:speeches,requiredHeadroom:0)
+        let values=speeches.map{TranslationSegment(id:$0.id,text:"إذا فكرت في الأمر، إلى أين يمكن أن يذهب؟")}
+        let output=try ComicPixels.renderReport(restored.image,speeches:speeches,translations:values,target:"ar",fontName:nil,fontScale:1,requireCleanSource:true,precleanedIDs:restored.restored,styleSource:image)
+        XCTAssertTrue(output.unresolved.isEmpty,"All four recognized columns must be erased and lettered together")
+        let attachment=XCTAttachment(image:UIImage(cgImage:output.image));attachment.name="All four original Japanese columns translated together";attachment.lifetime = .keepAlways;add(attachment)
+    }
     func testStaggeredConnectedBalloonsKeepSeparateProviderTexts()async throws{
         struct Line:Decodable{var text:String;var x:Double;var y:Double;var width:Double;var height:Double;var glyphHeight:Double}
         struct Fixture:Decodable{var image:String;var lines:[Line]}

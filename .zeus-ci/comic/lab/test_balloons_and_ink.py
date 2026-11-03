@@ -67,4 +67,12 @@ class BalloonsAndInk(unittest.TestCase):
   self.assertEqual([len(g[0])for g in groups],[5,5])
   self.assertTrue(all(g[2]for g in groups))
   self.assertLessEqual(groups[0][1][3],groups[1][1][1])
+ def test_japanese_column_order_cannot_drop_a_recognized_column(self):
+  from run_geometry import group
+  f=json.loads((pathlib.Path(__file__).parent/'fixtures/neural-staggered-columns.json').read_text())
+  lines=[dict(text=l['text'],confidence=1,box=[l['x'],l['y'],l['x']+l['width'],l['y']+l['height']])for l in f['lines']]
+  for order in [lines,list(reversed(lines)),lines[2:]+lines[:2]]:
+   groups=group(order);self.assertEqual(len(groups),1);self.assertEqual(len(groups[0]),4)
+  separate=[dict(text='separate',confidence=1,box=[390,60,440,280])]
+  self.assertEqual(len(group(lines+separate)),2)
 if __name__=='__main__':unittest.main()

@@ -11,7 +11,7 @@ def group(lines):
         for g in groups:
             a,c,d,e=g[-1]['box'];lh=b-y;previous=e-c
             if lh>(r-x)*1.5 and previous>(d-a)*1.5:
-                compatible=max(x-d,a-r)<max(r-x,d-a)*1.1 and min(b,e)-max(y,c)>min(lh,previous)*.6
+                compatible=any((q['box'][3]-q['box'][1])>(q['box'][2]-q['box'][0])*1.5 and max(x-q['box'][2],q['box'][0]-r)<max(r-x,q['box'][2]-q['box'][0])*1.1 and min(b,q['box'][3])-max(y,q['box'][1])>min(lh,q['box'][3]-q['box'][1])*.6 for q in g)
             else:
                 same_row=min(b,e)-max(y,c)>min(lh,previous)*.6 and max(x-d,a-r)<max(lh,previous)*1.2
                 next_row=-min(lh,previous)*.5<=y-e<max(lh,previous)*1.2 and min(r,d)-max(x,a)>min(r-x,d-a)*.3

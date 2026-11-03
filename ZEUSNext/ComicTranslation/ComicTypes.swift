@@ -84,7 +84,7 @@ struct ComicPreferences: Codable, Equatable {
     var letterCaseRaw: String?
     var letterSpacing: Double?
     var letterCase: ComicLetterCase { ComicLetterCase(rawValue: letterCaseRaw ?? "") ?? .original }
-    var renderIdentity: String { "render-v14|restoration:\(restorationEnabled ?? true)|\(fontName ?? "default")|\(fontScale)|\(textColor ?? "auto")|\(inkStyle.rawValue)|\(letterCase.rawValue)|\(letterSpacing ?? 0)" }
+    var renderIdentity: String { "render-v15|restoration:\(restorationEnabled ?? true)|\(fontName ?? "default")|\(fontScale)|\(textColor ?? "auto")|\(inkStyle.rawValue)|\(letterCase.rawValue)|\(letterSpacing ?? 0)" }
     var inkStyle: ComicInkStyle { get { ComicInkStyle(rawValue: inkStyleRaw ?? "") ?? .automatic } set { inkStyleRaw = newValue.rawValue } }
     var engine: ComicOnlineEngine = .existing
     var translation: TranslationPreferences?
@@ -170,7 +170,7 @@ enum ComicIdentity {
         hash(segments.map{$0.id+"\0"+$0.text}.joined(separator:"\n"))
     }
     static func settings(_ preferences: ComicPreferences, translation: TranslationPreferences, provider: AIProviderConfiguration?) -> String {
-        hash("comic-v24|fallback:\(preferences.allowOnlineFallback ?? false)|\(preferences.mode.rawValue)|\(preferences.source)|\(translation.target)|" + TranslationMemory.namespace(page: "comic://content", preferences: translation, provider: provider))
+        hash("comic-v25|fallback:\(preferences.allowOnlineFallback ?? false)|\(preferences.mode.rawValue)|\(preferences.source)|\(translation.target)|" + TranslationMemory.namespace(page: "comic://content", preferences: translation, provider: provider))
     }
 }
 enum ComicGeometry {
@@ -239,9 +239,16 @@ enum ComicGeometry {
                 let overlap=min(line.rect.maxX,last.rect.maxX)-max(line.rect.minX,last.rect.minX)
                 let vertical=line.rect.height>line.rect.width*1.5 && last.rect.height>last.rect.width*1.5
                 if vertical{
-                    let columnGap=max(line.rect.minX-last.rect.maxX,last.rect.minX-line.rect.maxX)
-                    let verticalOverlap=min(line.rect.maxY,last.rect.maxY)-max(line.rect.minY,last.rect.minY)
-                    return columnGap<max(line.rect.width,last.rect.width)*1.1 && verticalOverlap>min(line.rect.height,last.rect.height)*0.6
+                    // Columns have slightly different top coordinates. The
+                    // last appended column need not be the spatial neighbour;
+                    // compare every existing column so a complete OCR paragraph
+                    // cannot lose its first/rightmost column.
+                    return groups[i].contains{column in
+                        guard column.rect.height>column.rect.width*1.5 else{return false}
+                        let columnGap=max(line.rect.minX-column.rect.maxX,column.rect.minX-line.rect.maxX)
+                        let verticalOverlap=min(line.rect.maxY,column.rect.maxY)-max(line.rect.minY,column.rect.minY)
+                        return columnGap<max(line.rect.width,column.rect.width)*1.1 && verticalOverlap>min(line.rect.height,column.rect.height)*0.6
+                    }
                 }
                 let rowOverlap=min(line.rect.maxY,last.rect.maxY)-max(line.rect.minY,last.rect.minY)
                 let horizontalGap=max(line.rect.minX-last.rect.maxX,last.rect.minX-line.rect.maxX)
