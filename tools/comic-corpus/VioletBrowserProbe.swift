@@ -17,6 +17,7 @@ import CryptoKit
         let scene=try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap{$0 as? UIWindowScene}.first)
         let window=UIWindow(windowScene:scene);window.frame=scene.screen.bounds;window.rootViewController=UIViewController();view.frame=window.bounds;window.rootViewController?.view.addSubview(view);window.windowLevel = .normal+1;window.makeKeyAndVisible()
         defer{tab.dispose();window.isHidden=true;try? FileManager.default.removeItem(at:root)}
+        view.load(URLRequest(url:URL(string:pageURL)!))
         let loaded=Date();var deadline=Date().addingTimeInterval(60),found=false
         while Date()<deadline{
             let result=try? await view.callAsyncJavaScript("const i=[...document.images].find(e=>e.currentSrc===expected&&e.complete&&e.naturalWidth===720);if(!i||!globalThis.zeusComic)return false;globalThis.__violetLiveTestPanel=i;window.scrollTo(0,i.getBoundingClientRect().top+scrollY+2);return true;",arguments:["expected":imageURL],in:nil,contentWorld:ComicTranslation.world)
