@@ -47,17 +47,20 @@ def run(args):
                 if r-x<15 or b-y<10 or (r-x)*(b-y)>750000:continue
                 pad=24;cx=max(0,x-pad);cy=max(0,y-pad);cr=min(rgb.shape[1],r+pad);cb=min(rgb.shape[0],b+pad)
                 crop=np.ascontiguousarray(rgb[cy:cb,cx:cr]);local=[[a-cx,c-cy,d-cx,e-cy] for a,c,d,e in boxes]
-                clean,mask=engine.clean(crop,local);outside=int(np.count_nonzero(np.any(clean!=crop,axis=2)&(mask==0)))
+                clean,mask=engine.clean(crop,local);accepted=engine.safe_to_letter(crop,mask,local)
+                if not accepted:clean=crop.copy()
+                outside=int(np.count_nonzero(np.any(clean!=crop,axis=2)&(mask==0)))
                 cid=f'{chapter["language"]}-{chapter["id"][:8]}-{chapter["split"]}-{count:03d}';dest=out/cid;dest.mkdir(exist_ok=True)
                 for name,a in [('original',crop),('mask',mask),('clean',clean)]:Image.fromarray(a).save(dest/(name+'.png'))
                 text=('This is a translated paragraph.' if len(paragraph)>1 else 'Translation') if chapter['language']=='ar' else ('هذه ترجمة عربية تجريبية داخل الفقاعة' if len(paragraph)>1 else 'ترجمة تجريبية')
                 fg=(12,12,12) if np.median(crop)>128 else (248,248,248)
                 rendered,fit=lettering(clean,[x-cx,y-cy,r-cx,b-cy],text,np.median([l['glyph_height']for l in paragraph])*1.3,fg,direction='ltr' if chapter['language']=='ar' else 'rtl')
+                if not accepted:rendered=crop.copy()
                 Image.fromarray(rendered).save(dest/'rendered.png')
                 recognized=[]
                 if args.ocr:
                     for line in paragraph:recognized.append(engine.recognize(rgb,line['box'],chapter['language']))
-                case=dict(id=cid,language=chapter['language'],split=chapter['split'],chapter=chapter['id'],source=page['path'],source_sha256=page['sha256'],box=[cx,cy,cr,cb],lines=paragraph,ocr=recognized,outside_mask_changes=outside,fit=fit,annotation_status='unreviewed',translation='fixed Arabic layout probe',seconds=time.perf_counter()-start)
+                case=dict(id=cid,language=chapter['language'],split=chapter['split'],chapter=chapter['id'],source=page['path'],source_sha256=page['sha256'],box=[cx,cy,cr,cb],lines=paragraph,ocr=recognized,outside_mask_changes=outside,fit=fit,cleanup_accepted=accepted,annotation_status='unreviewed',translation='fixed Arabic layout probe',seconds=time.perf_counter()-start)
                 cases.append(case);count+=1;start=time.perf_counter()
                 if args.lama and count<=args.lama:
                     restored=engine.lama(crop,mask);Image.fromarray(restored).save(dest/'lama.png')
@@ -70,7 +73,7 @@ def run(args):
         rows.append(f'<article id="{c["id"]}"><h2>{c["id"]}</h2><p>{html.escape(" / ".join(c["ocr"]))}</p><div class="stages">{images}</div><label>Review <select data-id="{c["id"]}"><option>unreviewed</option><option>pass</option><option>mask failure</option><option>cleanup failure</option><option>layout failure</option><option>missed text</option></select></label><input data-note="{c["id"]}" placeholder="review notes"></article>')
     review='''<script>function save(){const reviews=[...document.querySelectorAll('select')].map(e=>({id:e.dataset.id,verdict:e.value,note:document.querySelector('[data-note="'+e.dataset.id+'"]').value}));const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(reviews,null,2)],{type:'application/json'}));a.download='reviews.json';a.click();}</script>'''
     (out/'index.html').write_text('<meta charset="utf-8"><title>Zeus comic quality lab</title><style>body{background:#181a20;color:#eee;font:16px sans-serif}article{padding:16px;border-bottom:1px solid #777}.stages{display:flex;flex-wrap:wrap;gap:10px}figure{margin:0}img{max-width:420px;max-height:440px;object-fit:contain;image-rendering:auto}select,input,button{font:inherit;padding:10px}</style><h1>Real comic quality lab</h1><p>Fixed Arabic text tests layout only. Unreviewed proposals are not ground truth.</p><button onclick="save()">Export reviews</button>'+''.join(rows)+review)
-    report=dict(chapters=len(corpus['chapters']),pages=sum(len(c['pages'])for c in corpus['chapters']),regions=len(cases),languages=sorted(set(c['language']for c in cases)),outside_mask_changes=sum(c['outside_mask_changes']for c in cases),layout_probe_fits=sum(c['fit']for c in cases),manually_reviewed=0,quality_acceptance_proven=False,peak_rss_kib=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
+    report=dict(chapters=len(corpus['chapters']),pages=sum(len(c['pages'])for c in corpus['chapters']),regions=len(cases),languages=sorted(set(c['language']for c in cases)),outside_mask_changes=sum(c['outside_mask_changes']for c in cases),layout_probe_fits=sum(c['fit']for c in cases),cleanup_gate_accepted=sum(c['cleanup_accepted']for c in cases),cleanup_gate_abstained=sum(not c['cleanup_accepted']for c in cases),manually_reviewed=0,quality_acceptance_proven=False,peak_rss_kib=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
     (out/'report.json').write_text(json.dumps(report,indent=2));print(json.dumps(report),flush=True)
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--corpus',required=True);p.add_argument('--models',required=True);p.add_argument('--output',required=True);p.add_argument('--regions',type=int,default=400);p.add_argument('--ocr',action='store_true');p.add_argument('--lama',type=int,default=0);run(p.parse_args())

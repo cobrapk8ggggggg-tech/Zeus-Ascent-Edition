@@ -8,7 +8,7 @@ class Engine:
         library=HERE/'output'/'mask.so';library.parent.mkdir(exist_ok=True)
         subprocess.run(['g++','-O2','-std=c++17','-shared','-fPIC',str(HERE/'native.cpp'),'-o',str(library)],check=True)
         self.lib=ctypes.CDLL(str(library));p=np.ctypeslib.ndpointer(dtype=np.uint8,flags='C_CONTIGUOUS')
-        self.lib.clean.argtypes=[p]+[ctypes.c_int]*6;self.lib.text_mask.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.clean_source.argtypes=[p,p]+[ctypes.c_int]*6
+        self.lib.clean.argtypes=[p]+[ctypes.c_int]*6;self.lib.text_mask.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.clean_source.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.coverage.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.coverage.restype=ctypes.c_float
     def session(self,name):
         if name not in self.sessions:
             options=ort.SessionOptions();options.intra_op_num_threads=2;options.inter_op_num_threads=1;options.log_severity_level=3
@@ -60,6 +60,9 @@ class Engine:
         out=rgba.copy()
         for box in merged:self.lib.clean_source(rgba,out,w,h,*map(int,box))
         return out[:,:,:3],mask
+    def safe_to_letter(self,rgb,mask,boxes):
+        rgba=np.ascontiguousarray(cv2.cvtColor(rgb,cv2.COLOR_RGB2RGBA));h,w=mask.shape
+        return all(self.lib.coverage(rgba,mask,w,h,*map(int,box))>=.95 for box in boxes)
     def lama(self,rgb,mask):
         ys,xs=np.where(mask>0)
         if not len(xs):return rgb.copy()
@@ -72,6 +75,6 @@ class Engine:
         s=self.session('lama.onnx');out=s.run(None,{'image':image.astype(np.float32).transpose(2,0,1)[None]/255,'mask':binary[None,None]})[0]
         if out.shape[1]==3:out=out[0].transpose(1,2,0)
         else:out=out[0]
-        restored=cv2.resize((out[:ch,:cw]*255).clip(0,255).astype(np.uint8),(r-x,b-y))
+        restored=cv2.resize(out[:ch,:cw].clip(0,255).astype(np.uint8),(r-x,b-y))
         result=rgb.copy();target=result[y:b,x:r];target[m>0]=restored[m>0]
         return result

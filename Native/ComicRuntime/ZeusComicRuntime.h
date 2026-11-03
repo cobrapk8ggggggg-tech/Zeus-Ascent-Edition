@@ -4,6 +4,7 @@
 extern "C" {
 #endif
 unsigned char *zeus_comic_decode_region(const unsigned char *bytes, unsigned long size, int x, int y, int width, int height);
+float zeus_comic_mask_coverage(const unsigned char *pixels, const unsigned char *mask, int width, int height, int left, int top, int right, int bottom);
 void zeus_comic_text_mask(unsigned char *pixels, unsigned char *mask, int width, int height, int left, int top, int right, int bottom);
 void zeus_comic_inpaint_from_source(const unsigned char *source, unsigned char *pixels, int width, int height, int left, int top, int right, int bottom);
 void zeus_comic_inpaint(unsigned char *pixels, int width, int height, int left, int top, int right, int bottom);

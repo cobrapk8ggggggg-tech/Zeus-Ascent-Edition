@@ -16,12 +16,24 @@ class Masks(unittest.TestCase):
     draw.text((40,40),'EXCUSE ME',font=font,fill=(245,)*3 if dark else (10,)*3,stroke_width=2,stroke_fill=(5,)*3 if dark else (250,)*3)
     source=np.asarray(image);box=draw.textbbox((40,40),'EXCUSE ME',font=font,stroke_width=2)
     restored,mask=self.engine.clean(source,[box]);difference=np.abs(restored.astype(float)-clean.astype(float))
+    self.assertTrue(self.engine.safe_to_letter(source,mask,[box]),'known complete text mask must permit lettering')
     changed=np.any(source!=restored,axis=2)
     self.assertEqual(int(np.count_nonzero(changed&(mask==0))),0)
     self.assertEqual(int(np.count_nonzero((source!=clean).any(axis=2)&(mask==0))),0,'mask must cover all source ink and outlines')
     error=float(difference.max());errors.append(error);self.assertLess(error,8,'no visible source remnants on known clean background')
   print('independent known-background maximum errors:',errors)
+ def test_colored_balloons_have_no_source_ink_residue(self):
+  font=ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',28)
+  for color in [(20,40,85),(225,200,100),(25,10,35),(210,35,30)]:
+   clean=np.zeros((120,360,3),np.uint8);clean[:]=color;image=Image.fromarray(clean);draw=ImageDraw.Draw(image)
+   light=sum(color)/3<128
+   draw.text((40,40),'HELLO WORLD',font=font,fill=(245,)*3 if light else(8,)*3,stroke_width=2,stroke_fill=(5,)*3 if light else(250,)*3)
+   source=np.asarray(image);box=draw.textbbox((40,40),'HELLO WORLD',font=font,stroke_width=2)
+   output,mask=self.engine.clean(source,[box])
+   self.assertLess(int(np.abs(output.astype(int)-clean.astype(int)).max()),4)
+   self.assertTrue(self.engine.safe_to_letter(source,mask,[box]))
  def test_empty_mask_is_identity(self):
   image=np.full((100,240,3),180,np.uint8);output,mask=self.engine.clean(image,[[30,30,190,60]])
   self.assertTrue(np.array_equal(image,output));self.assertEqual(int(mask.sum()),0)
+  self.assertFalse(self.engine.safe_to_letter(image,mask,[[30,30,190,60]]))
 if __name__=='__main__':unittest.main()

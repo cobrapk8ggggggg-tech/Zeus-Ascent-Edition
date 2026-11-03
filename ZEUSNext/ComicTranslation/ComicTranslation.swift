@@ -223,7 +223,7 @@ import CoreGraphics
                     let renderedKey=translationKey+"|"+prefs.renderIdentity
                     let rendered:Data
                     if persistent,let stored=await ComicMemory.shared.data(profile:owner,layer:.rendered,key:renderedKey){rendered=stored}
-                    else{rendered=try await Task.detached{let drawn=try ComicPixels.render(image,speeches:core,translations:translated.map{TranslationSegment(id:$0.id,text:prefs.letterCase.apply($0.text))},target:translation.target,fontName:prefs.fontName,fontScale:prefs.fontScale,textColor:prefs.textColor,ink:prefs.inkStyle,letterSpacing:prefs.letterSpacing ?? 0)
+                    else{rendered=try await Task.detached{let drawn=try ComicPixels.render(image,speeches:core,translations:translated.map{TranslationSegment(id:$0.id,text:prefs.letterCase.apply($0.text))},target:translation.target,fontName:prefs.fontName,fontScale:prefs.fontScale,textColor:prefs.textColor,ink:prefs.inkStyle,letterSpacing:prefs.letterSpacing ?? 0,requireCleanSource:true)
                         // Only this core is applied. Recognition context is retained above/below.
                         let rect=CGRect(x:0,y:region.coreTop+offset,width:region.width,height:region.coreBottom-region.coreTop)
                         guard let crop=drawn.cropping(to:rect)else{throw ComicFailure.message("تعذّر قص منطقة الرسم.")};return try ComicPixels.png(crop)}.value

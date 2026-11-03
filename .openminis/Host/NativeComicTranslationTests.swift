@@ -141,6 +141,14 @@ import UIKit
             XCTAssertTrue(stride(from:0,to:pixels.count,by:4).contains{Int(pixels[$0+2])>Int(pixels[$0])+25},"real comic crop must contain rendered Arabic")
         }
     }
+    func testIncompleteCleanupDoesNotPaintOverOriginal()throws{
+        let image=renderer(CGSize(width:200,height:100)).image{context in
+            UIColor.white.setFill();context.fill(CGRect(x:0,y:0,width:200,height:100))
+        }.cgImage!
+        let line=ComicLine(text:"FALSE POSITIVE",confidence:0.8,rect:CGRect(x:30,y:30,width:140,height:30))
+        let speech=ComicSpeech(id:"0",text:line.text,lines:[line],rect:line.rect,vertical:false)
+        XCTAssertThrowsError(try ComicPixels.render(image,speeches:[speech],translations:[TranslationSegment(id:"0",text:"ترجمة")],target:"ar",fontName:nil,fontScale:1,requireCleanSource:true))
+    }
     func testSourceFontCapPreventsOneWordFillingHugeBalloon()throws{
         let short=try XCTUnwrap(ComicPixels.layout("سجن",rect:CGRect(x:0,y:0,width:450,height:350),target:"ar",fontName:nil,fontScale:1,maximumSize:26))
         let long=try XCTUnwrap(ComicPixels.layout("عذرًا، لكن هل يمكنكم مساعدتنا؟",rect:CGRect(x:0,y:0,width:450,height:350),target:"ar",fontName:nil,fontScale:1,maximumSize:26))

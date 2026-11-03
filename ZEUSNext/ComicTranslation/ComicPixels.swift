@@ -23,7 +23,7 @@ enum ComicPixels {
         let image=try decode(data);guard image.width==region.width,expectedHeight==nil||image.height==expectedHeight,let crop=image.cropping(to:region.rect)else{throw ComicFailure.message("تعذّر فك المنطقة المطلوبة.")};return crop
     }
     static func png(_ image:CGImage)throws->Data{let output=NSMutableData();guard let destination=CGImageDestinationCreateWithData(output,"public.png" as CFString,1,nil)else{throw ComicFailure.message("تعذّر ترميز الصورة.")};CGImageDestinationAddImage(destination,image,nil);guard CGImageDestinationFinalize(destination)else{throw ComicFailure.message("فشل ترميز الصورة.")};return output as Data}
-    static func render(_ image:CGImage,speeches:[ComicSpeech],translations:[TranslationSegment],target:String,fontName:String?,fontScale:Double,textColor:String? = nil,ink:ComicInkStyle = .plain,letterSpacing:Double = 0)throws->CGImage{
+    static func render(_ image:CGImage,speeches:[ComicSpeech],translations:[TranslationSegment],target:String,fontName:String?,fontScale:Double,textColor:String? = nil,ink:ComicInkStyle = .plain,letterSpacing:Double = 0,requireCleanSource:Bool = false)throws->CGImage{
         guard let context=context(width:image.width,height:image.height),var pixels=rgba(image,width:image.width,height:image.height)else{throw ComicFailure.message("ذاكرة غير كافية للرسم.")}
         let original=pixels
         let translated=Dictionary(translations.map{($0.id,$0.text)},uniquingKeysWith:{$1})
@@ -41,12 +41,14 @@ enum ComicPixels {
             let heights=speech.lines.map{CGFloat($0.glyphHeight ?? Double(min($0.rect.height,$0.rect.width)))}.sorted()
             let sourceSize=heights[heights.count/2]*1.3
             guard let placed=place(text,area:area,imageHeight:image.height,target:target,fontName:fontName,fontScale:fontScale,theta:CGFloat(speech.angle ?? 0),letterSpacing:letterSpacing,maximumSize:sourceSize)else{continue}
+            if requireCleanSource && !canClean(original,width:image.width,height:image.height,speech:speech){continue}
             clean(&pixels,width:image.width,height:image.height,speech:speech)
             let automatic=background.0*0.2126+background.1*0.7152+background.2*0.0722>0.5 ? CGColor(gray:0.04,alpha:1):CGColor(gray:0.98,alpha:1)
             prepared.append((area,placed,textColor.flatMap(Self.color) ?? automatic))
         }
         // Finish every source mask before lettering. A later cleanup pass must
         // never erase an earlier Arabic glyph where source boxes touch.
+        if requireCleanSource && prepared.isEmpty{throw ComicFailure.message("لم يُعتمد تنظيف النص كاملًا؛ بقيت الصورة الأصلية دون كتابة ترجمة فوقها.")}
         let data=Data(pixels)
         guard let provider=CGDataProvider(data:data as CFData),let cleaned=CGImage(width:image.width,height:image.height,bitsPerComponent:8,bitsPerPixel:32,bytesPerRow:image.width*4,space:CGColorSpace(name:CGColorSpace.sRGB)!,bitmapInfo:CGBitmapInfo(rawValue:CGImageAlphaInfo.premultipliedLast.rawValue|CGBitmapInfo.byteOrder32Big.rawValue),provider:provider,decode:nil,shouldInterpolate:false,intent:.defaultIntent)else{throw ComicFailure.message("فشل تجهيز الصورة النظيفة.")}
         context.draw(cleaned,in:CGRect(x:0,y:0,width:image.width,height:image.height))
@@ -123,7 +125,22 @@ enum ComicPixels {
         guard let value=bins.values.max(by:{$0.3<$1.3}),value.3>0 else{return(1,1,1)}
         return(CGFloat(value.0)/CGFloat(value.3*255),CGFloat(value.1)/CGFloat(value.3*255),CGFloat(value.2)/CGFloat(value.3*255))
     }
-    static func clean(_ pixels:inout [UInt8],width:Int,height:Int,speech:ComicSpeech){
+    static func canClean(_ pixels:[UInt8],width:Int,height:Int,speech:ComicSpeech)->Bool{
+        var source=pixels,mask=[UInt8](repeating:0,count:width*height)
+        source.withUnsafeMutableBufferPointer{buffer in
+            mask.withUnsafeMutableBufferPointer{m in
+                for box in cleanupBoxes(width:width,height:height,speech:speech){
+                    zeus_comic_text_mask(buffer.baseAddress,m.baseAddress,Int32(width),Int32(height),Int32(box.minX),Int32(box.minY),Int32(box.maxX),Int32(box.maxY))
+                }
+            }
+        }
+        return pixels.withUnsafeBufferPointer{buffer in mask.withUnsafeBufferPointer{m in
+            speech.lines.allSatisfy{line in let b=line.rect.integral
+                return zeus_comic_mask_coverage(buffer.baseAddress,m.baseAddress,Int32(width),Int32(height),Int32(b.minX),Int32(b.minY),Int32(b.maxX),Int32(b.maxY))>=0.95
+            }
+        }}
+    }
+    private static func cleanupBoxes(width:Int,height:Int,speech:ComicSpeech)->[CGRect]{
         let bounds=CGRect(x:1,y:1,width:max(0,width-2),height:max(0,height-2))
         let protected=speech.balloon ? speech.rect:bounds
         var boxes:[CGRect]=[]
@@ -137,6 +154,10 @@ enum ComicPixels {
             }
             boxes.append(box)
         }
+        return boxes
+    }
+    static func clean(_ pixels:inout [UInt8],width:Int,height:Int,speech:ComicSpeech){
+        let boxes=cleanupBoxes(width:width,height:height,speech:speech)
         let source=pixels
         source.withUnsafeBufferPointer{original in
             pixels.withUnsafeMutableBufferPointer{buffer in

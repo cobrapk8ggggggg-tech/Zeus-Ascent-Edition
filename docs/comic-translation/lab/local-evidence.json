@@ -1,0 +1,34 @@
+{
+  "chapters": 11,
+  "pages": 251,
+  "regions": 440,
+  "languages": [
+    "ar",
+    "en",
+    "ja",
+    "ko",
+    "zh"
+  ],
+  "outside_mask_changes": 0,
+  "layout_probe_fits": 415,
+  "manually_reviewed": 0,
+  "quality_acceptance_proven": false,
+  "peak_rss_kib": 749368,
+  "mask_refresh_seconds": 18.950681800999973,
+  "cleanup_gate_accepted": 184,
+  "cleanup_gate_abstained": 256,
+  "contact_sheet_triaged": 40,
+  "accepted_gold_regions": 0,
+  "missing_acceptance": [
+    "400 hand-labelled gold regions including full-page missed-text annotations",
+    "95% annotated recall measurement",
+    "95% blind visual acceptance on held-out chapters",
+    "actual Android output comparison",
+    "approved deep restoration on textured or decorative text"
+  ],
+  "known_background_scenarios": 10,
+  "known_background_maximum_channel_error": 3,
+  "standalone_lama_peak_rss_kib": 773772,
+  "ctd_lama_ocr_comparison_peak_rss_kib": 1996620,
+  "neural_models_shipped_in_app": false
+}

@@ -40,7 +40,7 @@ python .zeus-ci/comic/lab/compare_models.py --models .zeus-ci/comic/lab/models -
 ```
 
 LaMa inputs are RGB float32 [0,1] plus a binary mask, letterboxed to 512x512;
-output is RGB float32 [0,1]. Composite only the original-resolution mask pixels.
+output is RGB float32 [0,255]. Composite only the original-resolution mask pixels.
 CTD segmentation is intersected with text ownership, not applied to an entire page.
 The lock file records exact revisions, sizes and digests. These are experimental
 comparators: no new deep restoration model is enabled in the shipped app merely
