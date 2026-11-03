@@ -161,12 +161,21 @@ actor ComicOCR {
             value.string.enumerateSubstrings(in:value.string.startIndex..<value.string.endIndex,options:[.byWords,.substringNotRequired]){_,range,_,_ in
                 if let observation=try? value.boundingBox(for:range){words.append(ComicWord(text:String(value.string[range]),rect:pixels(observation.boundingBox)))}
             }
+            if !value.string.contains(where:{$0.isWhitespace}),value.string.unicodeScalars.contains(where:{(0x3040...0x30ff).contains($0.value)||(0x4e00...0x9fff).contains($0.value)}){
+                words=[]
+                var start=value.string.startIndex
+                while start<value.string.endIndex{
+                    let end=value.string.index(after:start)
+                    if let box=try? value.boundingBox(for:start..<end){words.append(ComicWord(text:String(value.string[start..<end]),rect:pixels(box.boundingBox)))}
+                    start=end
+                }
+            }
             // Keep punctuation attached and the original line text intact. Word
             // ranges are used only when one OCR line spans different lobes.
             if words.count>1{
                 let parts=value.string.split(whereSeparator:{$0.isWhitespace}).map(String.init)
                 if parts.count==words.count{for i in words.indices{words[i].text=parts[i]}}
-                else{words=[]}
+                else if value.string.contains(where:{$0.isWhitespace}){words=[]}
             }
             return ComicLine(text:value.string,confidence:value.confidence,rect:pixels(r.boundingBox),angle:atan2(Double((r.topLeft.y-r.topRight.y)*CGFloat(image.height)),Double((r.topRight.x-r.topLeft.x)*CGFloat(image.width))),words:words.isEmpty ? nil:words)
         }

@@ -192,7 +192,7 @@ enum ComicGeometry {
         return median
     }
     static func orderedLines(_ lines:[ComicLine],vertical:Bool)->[ComicLine]{
-        if vertical{return lines.sorted{$0.rect.midX>$1.rect.midX}}
+        if vertical{return lines.sorted{abs($0.rect.midX-$1.rect.midX)<min($0.rect.width,$1.rect.width)*0.5 ? $0.rect.midY<$1.rect.midY:$0.rect.midX>$1.rect.midX}}
         var rows:[[ComicLine]]=[]
         for line in lines.sorted(by:{$0.rect.midY<$1.rect.midY}){
             if let index=rows.firstIndex(where:{row in abs(row[0].rect.midY-line.rect.midY)<min(row[0].rect.height,line.rect.height)*0.5}){rows[index].append(line)}else{rows.append([line])}

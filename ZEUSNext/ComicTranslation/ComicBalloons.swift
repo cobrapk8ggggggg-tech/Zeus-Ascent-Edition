@@ -66,7 +66,18 @@ enum ComicBalloons {
         for line in lines{
             let size=max(1,line.words?.count ?? 0),assigned=Set(owners[cursor..<cursor+size])
             if assigned.count==1,let owner=assigned.first{groups[Int(owner)].append(line)}
-            else{for i in cursor..<cursor+size{groups[Int(owners[i])].append(atoms[i])}}
+            else{
+                for owner in assigned{
+                    let fragments=(cursor..<cursor+size).filter{owners[$0]==owner}.map{atoms[$0]}
+                    let vertical=line.rect.height>line.rect.width*1.5
+                    let ordered=ComicGeometry.orderedLines(fragments,vertical:vertical)
+                    var fragment=line
+                    fragment.text=ordered.map(\.text).joined(separator:line.text.contains(where:{$0.isWhitespace}) ? " ":"")
+                    fragment.rect=fragments.reduce(CGRect.null){$0.union($1.rect)}
+                    fragment.words=ordered.map{ComicWord(text:$0.text,rect:$0.rect)}
+                    groups[Int(owner)].append(fragment)
+                }
+            }
             cursor+=size
         }
         return groups.indices.compactMap{i in

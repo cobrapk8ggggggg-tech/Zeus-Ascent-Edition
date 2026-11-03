@@ -39,6 +39,12 @@ class BalloonsAndInk(unittest.TestCase):
    for fill,stroke in [((0,0,0),(255,255,255)),((255,255,255),(0,0,0)),((210,20,40),(255,255,255)),((240,200,30),(0,0,0))]:
     im=Image.new('RGB',(500,150),(75,110,150));draw=ImageDraw.Draw(im);sw=max(1,round(size*.06));box=draw.textbbox((30,30),'HELLO',font=font,stroke_width=sw);draw.text((30,30),'HELLO',font=font,fill=fill,stroke_fill=stroke,stroke_width=sw)
     style=self.engine.ink_style(np.array(im),[box]);self.assertIsNotNone(style['stroke'],(size,fill,style));self.assertLess(max(abs(a-b)for a,b in zip(style['fill'],fill)),12);self.assertLess(max(abs(a-b)for a,b in zip(style['stroke'],stroke)),12)
+ def test_real_ink_ignores_antialias_ramp_but_keeps_halftone_halo(self):
+  for filename,outlined in [('neural-connected.json',False),('neural-halftone-style.json',True)]:
+   f=json.loads((pathlib.Path(__file__).parent/'fixtures'/filename).read_text());rgb=np.array(Image.open(io.BytesIO(base64.b64decode(f['image']))).convert('RGB'));boxes=[[l['x'],l['y'],l['x']+l['width'],l['y']+l['height']]for l in f['lines']]
+   style=self.engine.ink_style(rgb,boxes);self.assertGreater(style['confidence'],.65);self.assertLess(max(style['fill']),20)
+   if outlined:self.assertIsNotNone(style['stroke']);self.assertGreater(min(style['stroke']),235)
+   else:self.assertIsNone(style['stroke'],'grey raster antialiasing must not become an outline')
  def test_plain_ink_does_not_acquire_an_outline(self):
   font=ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',40)
   for bg,fill in [((255,)*3,(0,)*3),((0,)*3,(255,)*3),((90,120,170),(210,20,40))]:

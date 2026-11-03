@@ -115,7 +115,15 @@ actor ComicPaddle {
             if token.0.allSatisfy({$0.isWhitespace}){append()}
             else{if text.isEmpty{begin=token.1};text+=token.0;end=token.2}
         }
-        append();return words.count>1 ? words:nil
+        append()
+        if words.count<2,tokens.contains(where:{$0.0.unicodeScalars.contains{(0x3040...0x30ff).contains($0.value)||(0x4e00...0x9fff).contains($0.value)}}){
+            words=tokens.filter{!$0.0.allSatisfy{$0.isWhitespace}}.map{token in
+                let a=max(0,CGFloat(token.1)-0.5)/CGFloat(steps),b=min(CGFloat(steps),CGFloat(token.2)+0.5)/CGFloat(steps)
+                let box=rect.height>rect.width*1.5 ? CGRect(x:rect.minX,y:rect.minY+rect.height*a,width:rect.width,height:rect.height*(b-a)):CGRect(x:rect.minX+rect.width*a,y:rect.minY,width:rect.width*(b-a),height:rect.height)
+                return ComicWord(text:token.0,rect:box)
+            }
+        }
+        return words.count>1 ? words:nil
     }
     static func boxes(_ map:[Float],width:Int,height:Int)->[CGRect]{
         guard width>0,height>0,map.count>=width*height else{return []}

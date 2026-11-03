@@ -285,6 +285,29 @@ import UIKit
             if speeches.count==2{XCTAssertTrue(speeches[0].rect.intersection(speeches[1].rect).isNull)}
         }
     }
+    func testCTCWordSpansRetainTheirMeasuredPositions()throws{
+        let sequence=[0,1,1,0,2,0,3,0,4,4,0],classes=5
+        var logits=[Float](repeating:0,count:sequence.count*classes)
+        for (t,c) in sequence.enumerated(){logits[t*classes+c]=1}
+        let rect=CGRect(x:30,y:40,width:330,height:30)
+        let words=try XCTUnwrap(ComicPaddle.words(logits,steps:sequence.count,classes:classes,dictionary:["","A"," ","B","C"],rect:rect,arabic:false))
+        XCTAssertEqual(words.map(\.text),["A","BC"])
+        XCTAssertLessThan(words[0].rect.maxX,words[1].rect.minX)
+        XCTAssertTrue(words.allSatisfy{rect.contains($0.rect)})
+        let han=try XCTUnwrap(ComicPaddle.words(logits,steps:sequence.count,classes:classes,dictionary:["","你","好","世","界"],rect:rect,arabic:false))
+        XCTAssertEqual(han.map(\.text),["你","好","世","界"])
+    }
+    func testRealHalftoneInkKeepsWhiteHalo()async throws{
+        struct Line:Decodable{var x:Double;var y:Double;var width:Double;var height:Double}
+        struct Fixture:Decodable{var image:String;var lines:[Line]}
+        let(data,_)=try await URLSession.shared.data(from:URL(string:"http://127.0.0.1:8765/comic-quality-fixtures?name=neural-halftone-style.json")!)
+        let fixture=try JSONDecoder().decode(Fixture.self,from:data),image=try ComicPixels.decode(XCTUnwrap(Data(base64Encoded:fixture.image)))
+        let lines=fixture.lines.map{ComicLine(text:"SOURCE",confidence:1,rect:CGRect(x:$0.x,y:$0.y,width:$0.width,height:$0.height))}
+        let speech=ComicSpeech(id:"0",text:"SOURCE",lines:lines,rect:lines.reduce(CGRect.null){$0.union($1.rect)},vertical:false)
+        let style=try XCTUnwrap(ComicPixels.appearance(image,speech:speech)),stroke=try XCTUnwrap(style.stroke)
+        let rgb=try XCTUnwrap(stroke.converted(to:CGColorSpace(name:CGColorSpace.sRGB)!,intent:.defaultIntent,options:nil)?.components)
+        XCTAssertGreaterThan(rgb[0],0.9);XCTAssertGreaterThan(style.strokePercent,2)
+    }
     func testRealDiagonalConnectedBalloonsKeepTheirOwnDialogues()async throws{
         struct Line:Decodable{var text:String;var confidence:Float;var x:Double;var y:Double;var width:Double;var height:Double;var glyphHeight:Double}
         struct Fixture:Decodable{var image:String;var lines:[Line]}

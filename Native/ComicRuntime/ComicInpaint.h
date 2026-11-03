@@ -356,7 +356,15 @@ static inline float comic_ink_style(const unsigned char *rgba,int w,int h,const 
     if(palette.empty())return 0;
     std::sort(heights.begin(),heights.end());float glyph=std::max(4,heights[heights.size()/2]);
     int fill=palette[0],stroke=-1;float best=0,strokePercent=0;
+    auto energy=[&](int k){return double(hist[k])*delta(k,bg)*delta(k,bg);};
+    for(int k:palette)if(energy(k)>energy(fill))fill=k;
     for(int a:palette)for(int b:palette)if(a!=b&&delta(a,b)>=160&&hist[b]<hist[a]*4){
+        // A colour lying inside the fill-to-paper antialias ramp is not a
+        // separate outline. Its apparent band changes with JPEG/raster sampling.
+        float dot=0,length=0;for(int c=0;c<3;c++){float u=center(bg,c)-center(a,c),v=center(b,c)-center(a,c);dot+=u*v;length+=u*u;}
+        float fraction=dot/std::max(1.f,length),rampError=0;
+        for(int c=0;c<3;c++){float v=center(b,c)-center(a,c)-fraction*(center(bg,c)-center(a,c));rampError+=v*v;}
+        if(fraction>.05f&&fraction<.95f&&rampError<2500)continue;
         int ab=0,otherA=0,otherB=0,cores=0;
         auto classify=[&](int p){
             int winner=bg,bestDistance=1000000;
@@ -384,9 +392,35 @@ static inline float comic_ink_style(const unsigned char *rgba,int w,int h,const 
         float score=enclosure+outer*.25f;
         if(score>best){best=score;fill=a;stroke=b;strokePercent=std::clamp(160.f*thickness/glyph,2.f,20.f);}
     }
-    // A weak dominant non-background colour on a photograph is not a confident
-    // lettering style. Leave the renderer's contrast fallback available.
-    int mass=0;for(int k:palette)mass+=hist[k];if(hist[fill]<std::max(12,int(mass*.18f)))return 0;
-    for(int c=0;c<3;c++){output[c]=float(sums[fill][c])/hist[fill];output[c+3]=stroke<0?0:float(sums[stroke][c])/hist[stroke];}
+    if(stroke<0&&delta(fill,bg)>=300){
+        // White/black halos over halftone can share the dominant paper colour.
+        // Large glyph components have a uniform near ring followed by texture;
+        // plain lettering on flat paper has the same paper at every distance.
+        std::vector<unsigned char> ink(w*h,0),seen(w*h,0);std::vector<int> queue;
+        for(int p=0;p<w*h;p++)if(roi[p]&&key(p)==fill&&!seen[p]){
+            queue.assign(1,p);seen[p]=1;
+            for(size_t i=0;i<queue.size();i++){int q=queue[i],x=q%w,y=q/w;
+                auto visit=[&](int r){if(roi[r]&&!seen[r]&&key(r)==fill){seen[r]=1;queue.push_back(r);}};
+                if(x)visit(q-1);if(x+1<w)visit(q+1);if(y)visit(q-w);if(y+1<h)visit(q+w);
+            }
+            if(queue.size()>=std::max(5,int(glyph*glyph*.008f)))for(int q:queue)ink[q]=1;
+        }
+        int limit=std::clamp(int(glyph*.2f),4,12);std::vector<int> dist(w*h,limit+5);
+        for(int p=0;p<w*h;p++)if(ink[p])dist[p]=0;
+        for(int y=0;y<h;y++)for(int x=0;x<w;x++){int p=y*w+x;dist[p]=std::min({dist[p],x?dist[p-1]+1:limit+5,y?dist[p-w]+1:limit+5});}
+        for(int y=h-1;y>=0;y--)for(int x=w-1;x>=0;x--){int p=y*w+x;dist[p]=std::min({dist[p],x+1<w?dist[p+1]+1:limit+5,y+1<h?dist[p+w]+1:limit+5});}
+        std::vector<int> paper(limit+5,0),total(limit+5,0);
+        for(int p=0;p<w*h;p++)if(dist[p]>0&&dist[p]<limit+5){int d=dist[p];total[d]++;if(delta(key(p),bg)<=96)paper[d]++;}
+        float strongest=0;int radius=0;
+        for(int r=1;r<=limit;r++){
+            int near=0,nt=0,far=0,ft=0;for(int d=1;d<=r;d++){near+=paper[d];nt+=total[d];}for(int d=r+1;d<=r+3;d++){far+=paper[d];ft+=total[d];}
+            float inner=float(near)/std::max(1,nt),outer=float(far)/std::max(1,ft),drop=inner-outer;
+            if(nt>=20&&ft>=20&&inner>.65f&&drop>.2f&&drop>strongest){strongest=drop;radius=r;}
+        }
+        if(radius){stroke=bg;strokePercent=std::clamp(160.f*radius/glyph,2.f,20.f);}
+    }
+    double mass=0;for(int k:palette)mass+=energy(k);
+    if(energy(fill)<mass*.18||hist[fill]<12)return 0;
+    for(int c=0;c<3;c++){output[c]=float(sums[fill][c])/hist[fill];output[c+3]=stroke<0?0:hist[stroke] ? float(sums[stroke][c])/hist[stroke]:std::min(255,center(stroke,c));}
     output[6]=strokePercent;return stroke>=0?.95f:.7f;
 }
