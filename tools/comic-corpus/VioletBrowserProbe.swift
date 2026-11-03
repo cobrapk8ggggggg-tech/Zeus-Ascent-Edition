@@ -20,7 +20,7 @@ import CryptoKit
         view.load(URLRequest(url:URL(string:pageURL)!))
         let loaded=Date();var deadline=Date().addingTimeInterval(60),found=false
         while Date()<deadline{
-            let result=try? await view.callAsyncJavaScript("const i=[...document.images].find(e=>e.currentSrc===expected&&e.complete&&e.naturalWidth===720);if(!i||!globalThis.zeusComic)return false;globalThis.__violetLiveTestPanel=i;globalThis.__violetOriginalPanels={};for(const e of document.images){for(const u of [e.currentSrc,e.src,e.getAttribute('data-src'),e.getAttribute('data-lazy-src')]){if(u)globalThis.__violetOriginalPanels[u]=e;}}window.scrollTo(0,i.getBoundingClientRect().top+scrollY+2);return true;",arguments:["expected":imageURL],in:nil,contentWorld:ComicTranslation.world)
+            let result=try? await view.callAsyncJavaScript("document.querySelector('#tcbp-overlay.is-visible .tcbp-close')?.click();const i=[...document.images].find(e=>e.currentSrc===expected&&e.complete&&e.naturalWidth===720);if(!i||!globalThis.zeusComic)return false;globalThis.__violetLiveTestPanel=i;globalThis.__violetOriginalPanels={};for(const e of document.images){for(const u of [e.currentSrc,e.src,e.getAttribute('data-src'),e.getAttribute('data-lazy-src')]){if(u)globalThis.__violetOriginalPanels[u]=e;}}window.scrollTo({top:i.getBoundingClientRect().top+scrollY+2,behavior:'instant'});return true;",arguments:["expected":imageURL],in:nil,contentWorld:ComicTranslation.world)
             if result as? Bool==true{found=true;break}
             try await Task.sleep(for:.milliseconds(250))
         }
@@ -45,7 +45,7 @@ import CryptoKit
         let note=XCTAttachment(data:try JSONSerialization.data(withJSONObject:report,options:[.prettyPrinted,.sortedKeys]),uniformTypeIdentifier:"public.json");note.name="live-violet-browser-report";note.lifetime = .keepAlways;add(note)
         // The chapter starts with a tall, deliberately empty image area. Show
         // its first actual dialogue in the screenshot, not only that background.
-        _=try await view.callAsyncJavaScript("const i=globalThis.__violetLiveTestPanel;const r=i.getBoundingClientRect();window.scrollTo(0,scrollY+r.top+1500*r.height/i.naturalHeight);return true;",arguments:[:],in:nil,contentWorld:ComicTranslation.world)
+        _=try await view.callAsyncJavaScript("const i=globalThis.__violetLiveTestPanel;const r=i.getBoundingClientRect();document.querySelector('#tcbp-overlay.is-visible .tcbp-close')?.click();window.scrollTo({top:scrollY+r.top+1500*r.height/i.naturalHeight,behavior:'instant'});return true;",arguments:[:],in:nil,contentWorld:ComicTranslation.world)
         try await Task.sleep(for:.milliseconds(300))
         attach(try await view.takeSnapshot(configuration:nil),"Live Violet real site translated in the browser")
         let applied=try await view.callAsyncJavaScript("const i=globalThis.__violetLiveTestPanel;const b=await fetch(i.src).then(r=>r.blob());return await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result.split(',')[1]);r.onerror=reject;r.readAsDataURL(b);});",arguments:[:],in:nil,contentWorld:ComicTranslation.world)as? String
@@ -63,22 +63,23 @@ import CryptoKit
             let pageBegan=Date();var available=false
             deadline=Date().addingTimeInterval(25)
             while Date()<deadline{
-                let value=try? await view.callAsyncJavaScript("globalThis.__violetChapterPanels ??= {};let i=globalThis.__violetChapterPanels[index];if(!i){i=globalThis.__violetOriginalPanels[expected]||[...document.images].find(e=>[e.currentSrc,e.src,e.getAttribute('data-src'),e.getAttribute('data-lazy-src')].includes(expected));if(i)globalThis.__violetChapterPanels[index]=i;}if(!i)return false;const r=i.getBoundingClientRect();window.scrollTo(0,r.top+scrollY+Math.min(1500,i.naturalHeight/2)*r.height/Math.max(1,i.naturalHeight));return i.complete&&i.naturalWidth===720;",arguments:["expected":url,"index":index],in:nil,contentWorld:ComicTranslation.world)
+                let value=try? await view.callAsyncJavaScript("document.querySelector('#tcbp-overlay.is-visible .tcbp-close')?.click();globalThis.__violetChapterPanels ??= {};let i=globalThis.__violetChapterPanels[index];if(!i?.isConnected){const original=globalThis.__violetOriginalPanels[expected];i=original?.isConnected?original:[...document.images].find(e=>[e.currentSrc,e.src,e.getAttribute('data-src'),e.getAttribute('data-lazy-src')].includes(expected));if(i)globalThis.__violetChapterPanels[index]=i;}if(!i)return false;const r=i.getBoundingClientRect();window.scrollTo({top:r.top+scrollY+Math.min(1500,i.naturalHeight/2)*r.height/Math.max(1,i.naturalHeight),behavior:'instant'});await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));const b=i.getBoundingClientRect();return i.isConnected&&i.complete&&i.naturalWidth===720&&b.height>0&&b.bottom>0&&b.top<innerHeight;",arguments:["expected":url,"index":index],in:nil,contentWorld:ComicTranslation.world)
                 if value as? Bool==true{available=true;break}
                 try await Task.sleep(for:.milliseconds(200))
             }
             if !available{pageReports.append(["image":url,"loaded":"false","painted":"false"]);XCTFail("The live chapter image did not load: "+url);continue}
-            let detectedBefore=session.detectedTexts,translatedBefore=session.translatedTexts
-            session.start();deadline=Date().addingTimeInterval(45);var pagePainted=false
+            let geometry=try await view.callAsyncJavaScript("const i=globalThis.__violetChapterPanels[index],r=i.getBoundingClientRect(),s=zeusComic.scan(false);return JSON.stringify({connected:i.isConnected,top:r.top,bottom:r.bottom,scroll:s.scroll,viewport:s.viewport,candidates:s.items.map(c=>({id:c.id,image:c.source.includes('/the-broken-ring-this-marriage-will-fail-anyway/1/')?c.source.split('/').pop():'other',top:c.y-s.scroll,height:c.h,pending:c.pending}))});",arguments:["index":index],in:nil,contentWorld:ComicTranslation.world)as? String ?? "unavailable"
+            let detectedBefore=session.detectedTexts,translatedBefore=session.translatedTexts,ocrBefore=session.ocrRuns
+            session.start();deadline=Date().addingTimeInterval(45);var pagePainted=false;var idleSince:Date?
             while Date()<deadline{
                 let value=try? await view.callAsyncJavaScript("const i=globalThis.__violetChapterPanels[index];return !!i&&(i.src.startsWith('blob:')||i.style.backgroundImage.includes('blob:'));",arguments:["index":index],in:nil,contentWorld:ComicTranslation.world)
                 pagePainted=value as? Bool==true
                 if pagePainted{break}
-                if !session.running && Date().timeIntervalSince(pageBegan)>2{break}
+                if session.running{idleSince=nil}else if let idleSince,Date().timeIntervalSince(idleSince)>1.5{break}else if idleSince==nil{idleSince=Date()}
                 try await Task.sleep(for:.milliseconds(200))
             }
-            pageReports.append(["image":url,"loaded":"true","painted":String(pagePainted),"seconds":String(Date().timeIntervalSince(pageBegan)),"detected_delta":String(session.detectedTexts-detectedBefore),"translated_delta":String(session.translatedTexts-translatedBefore),"error":session.error ?? "none","notice":session.contextNotice ?? "none"])
-            print("VIOLET LIVE PAGE \(index) painted=\(pagePainted) detected=\(session.detectedTexts) translated=\(session.translatedTexts)")
+            pageReports.append(["image":url,"loaded":"true","painted":String(pagePainted),"seconds":String(Date().timeIntervalSince(pageBegan)),"ocr_runs_delta":String(session.ocrRuns-ocrBefore),"viewport_before":geometry,"detected_delta":String(session.detectedTexts-detectedBefore),"translated_delta":String(session.translatedTexts-translatedBefore),"error":session.error ?? "none","notice":session.contextNotice ?? "none"])
+            print("VIOLET LIVE PAGE \(index) painted=\(pagePainted) detected=\(session.detectedTexts) translated=\(session.translatedTexts) OCR=\(session.ocrRuns-ocrBefore) geometry=\(geometry)")
             if normalDialoguePages.contains(index){XCTAssertTrue(pagePainted,"A page with ordinary readable dialogue must paint: "+url)}
             if pagePainted{
                 let bytes=try await view.callAsyncJavaScript("const i=globalThis.__violetChapterPanels[index];if(!i.src.startsWith('blob:'))return null;const b=await fetch(i.src).then(r=>r.blob());return await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result.split(',')[1]);r.onerror=reject;r.readAsDataURL(b);});",arguments:["index":index],in:nil,contentWorld:ComicTranslation.world)as? String

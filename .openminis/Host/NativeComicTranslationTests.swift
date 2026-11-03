@@ -426,7 +426,11 @@ import UIKit
         let lines=fixture.lines.map{ComicLine(text:$0.text,confidence:$0.confidence,rect:CGRect(x:$0.x,y:$0.y,width:$0.width,height:$0.height),glyphHeight:$0.glyphHeight)}
         let speeches=ComicBalloons.speeches(lines,image:image,source:"en")
         XCTAssertEqual(speeches.map(\.text),["…I guess so.","It would be gross for me to be a girl."])
-        for speech in speeches{XCTAssertTrue(speech.lines.allSatisfy{speech.rect.insetBy(dx:-1,dy:-1).contains($0.rect)})}
+        for speech in speeches{
+            let physical=try XCTUnwrap(speech.balloonBounds)
+            XCTAssertTrue(speech.lines.allSatisfy{physical.insetBy(dx:-1,dy:-1).contains($0.rect)},"Cleanup ownership must retain every original glyph")
+            XCTAssertTrue(speech.lines.allSatisfy{speech.rect.contains(CGPoint(x:$0.rect.midX,y:$0.rect.midY))},"The inscribed lettering area must belong to this dialogue")
+        }
         let result=try ComicPixels.render(image,speeches:speeches,translations:[TranslationSegment(id:"0",text:"أظن ذلك."),TranslationSegment(id:"1",text:"سيكون الأمر محرجًا لو كنت فتاة.")],target:"ar",fontName:nil,fontScale:1)
         let attachment=XCTAttachment(image:UIImage(cgImage:result));attachment.name="Connected real balloons - separate Arabic paragraphs";attachment.lifetime = .keepAlways;add(attachment)
     }
