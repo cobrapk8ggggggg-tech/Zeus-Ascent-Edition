@@ -20,6 +20,7 @@ jobs:
         language: [en, ja, ko, zh, ar]
     steps:
       - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
       - uses: maxim-lobanov/setup-xcode@v1
         with: {xcode-version: '26.3'}
       - uses: actions/setup-python@v5
