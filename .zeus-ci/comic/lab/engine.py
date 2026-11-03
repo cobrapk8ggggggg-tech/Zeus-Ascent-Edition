@@ -14,6 +14,10 @@ class Engine:
             os.replace(temporary,library)
         self.lib=ctypes.CDLL(str(library));p=np.ctypeslib.ndpointer(dtype=np.uint8,flags='C_CONTIGUOUS')
         self.lib.clean.argtypes=[p]+[ctypes.c_int]*6;self.lib.text_mask.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.clean_source.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.coverage.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.coverage.restype=ctypes.c_float;self.lib.refine.argtypes=[p,p,p]+[ctypes.c_int]*6;self.lib.refine_ocr.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.clean_mask.argtypes=[p,p,p]+[ctypes.c_int]*6;self.lib.simple_background.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.neural_valid.argtypes=[p,p,p]+[ctypes.c_int]*6;self.lib.mask_owned.argtypes=[p]+[ctypes.c_int]*6+[np.ctypeslib.ndpointer(dtype=np.int32,flags='C_CONTIGUOUS'),ctypes.c_int]
+    def plate_color(self,rgb,paper,origin):
+        u8=np.ctypeslib.ndpointer(dtype=np.uint8,flags='C_CONTIGUOUS');self.lib.plate_color.argtypes=[u8,ctypes.c_int,ctypes.c_int,u8]+[ctypes.c_int]*4+[u8]
+        rgba=np.ascontiguousarray(cv2.cvtColor(rgb,cv2.COLOR_RGB2RGBA));ih,iw=rgb.shape[:2];h,w=paper.shape;color=np.zeros(3,np.uint8)
+        uniform=bool(self.lib.plate_color(rgba,iw,ih,paper,w,h,*map(int,origin),color));return color,uniform
     def plate_has_edge(self,rgb,paper,origin,boxes):
         u8=np.ctypeslib.ndpointer(dtype=np.uint8,flags='C_CONTIGUOUS');i32=np.ctypeslib.ndpointer(dtype=np.int32,flags='C_CONTIGUOUS')
         self.lib.plate_has_edge.argtypes=[u8,ctypes.c_int,ctypes.c_int,u8]+[ctypes.c_int]*4+[i32,ctypes.c_int]

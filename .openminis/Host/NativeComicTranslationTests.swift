@@ -615,6 +615,7 @@ import UIKit
         let(data,_)=try await URLSession.shared.data(from:URL(string:"http://127.0.0.1:8765/comic-violet/image/001.jpeg")!)
         let image=try ComicPixels.decode(data),began=Date()
         let reading=try await ComicOCR.shared.read(image,source:"auto",mode:.fastest)
+        let geometry=XCTAttachment(data:try JSONEncoder().encode(reading),uniformTypeIdentifier:"public.json");geometry.name="Violet native OCR geometry and flat masks";geometry.lifetime = .keepAlways;add(geometry)
         let flat=reading.speeches.filter{$0.flatCleanup?.complete==true && $0.flatCleanup?.uniform==true}
         XCTAssertGreaterThanOrEqual(flat.count,4,"The exact reported chapter must discover and clean ordinary dialogues without LaMa")
         XCTAssertTrue(reading.speeches.contains{$0.text.localizedCaseInsensitiveContains("PARDON")},"The first dialogue must be recognized in the original language")

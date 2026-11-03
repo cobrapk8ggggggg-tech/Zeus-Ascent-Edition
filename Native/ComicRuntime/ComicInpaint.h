@@ -483,6 +483,25 @@ static inline bool comic_flat_balloon_mask(const unsigned char *paper,unsigned c
 }
 
 
+// JPEG ringing belongs to text/frame edges, not the paper colour field.
+// Sample beyond that narrow fringe, then use a robust channel median. A real
+// gradient still fails the same strict colour spread test inside the paper.
+static inline bool comic_plate_color(const unsigned char *rgba,int iw,int ih,const unsigned char *paper,int w,int h,int ox,int oy,unsigned char *color){
+    if(!rgba||!paper||!color||w<3||h<3||int64_t(w)*h>1000000)return false;
+    std::vector<int> distance(w*h,0);
+    for(int p=0;p<w*h;p++)distance[p]=paper[p]?w+h:0;
+    for(int y=0;y<h;y++)for(int x=0;x<w;x++){int p=y*w+x;if(paper[p])distance[p]=std::min({distance[p],x?distance[p-1]+1:1,y?distance[p-w]+1:1});}
+    for(int y=h-1;y>=0;y--)for(int x=w-1;x>=0;x--){int p=y*w+x;if(paper[p])distance[p]=std::min({distance[p],x+1<w?distance[p+1]+1:1,y+1<h?distance[p+w]+1:1});}
+    int core=0;for(int p=0;p<w*h;p++)core+=distance[p]>=5;int minimum=core>=32?5:1;
+    int histogram[3][256]={},total=0;
+    for(int y=0;y<h;y++)for(int x=0;x<w;x++)if(distance[y*w+x]>=minimum&&x+ox>=0&&x+ox<iw&&y+oy>=0&&y+oy<ih){int p=((y+oy)*iw+x+ox)*4;for(int c=0;c<3;c++)histogram[c][rgba[p+c]]++;total++;}
+    if(!total)return false;
+    for(int c=0;c<3;c++){int sum=0;for(int v=0;v<256;v++){sum+=histogram[c][v];if(sum*2>=total){color[c]=v;break;}}}
+    int matching=0;
+    for(int y=0;y<h;y++)for(int x=0;x<w;x++)if(distance[y*w+x]>=minimum&&x+ox>=0&&x+ox<iw&&y+oy>=0&&y+oy<ih){int p=((y+oy)*iw+x+ox)*4,d=0;for(int c=0;c<3;c++)d+=std::abs(int(rgba[p+c])-int(color[c]));matching+=d<=6;}
+    return matching>=total*.95f;
+}
+
 // A colour contour inside a gradient is not a balloon border. Filled interiors
 // must meet an actual contrast edge in every outward direction, excluding glyph
 // holes from the boundary vote.

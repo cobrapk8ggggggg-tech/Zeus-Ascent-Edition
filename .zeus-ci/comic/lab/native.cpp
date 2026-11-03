@@ -20,3 +20,5 @@ extern "C" int flat_balloon_mask(const unsigned char*p,unsigned char*m,int w,int
 extern "C" int plate_has_edge(const unsigned char*p,int iw,int ih,const unsigned char*m,int w,int h,int x,int y,const int*b,int n){return comic_plate_has_edge(p,iw,ih,m,w,h,x,y,b,n);}
 extern "C" void grow_text_mask(unsigned char*m,int w,int h,int l,int t,int r,int b,int radius){comic_grow_text_mask(m,w,h,l,t,r,b,radius);}
 extern "C" float ink_residue(const unsigned char*s,const unsigned char*c,const unsigned char*m,int w,int h,int l,int t,int r,int b){return comic_ink_residue(s,c,m,w,h,l,t,r,b);}
+
+extern "C" int plate_color(const unsigned char*p,int iw,int ih,const unsigned char*m,int w,int h,int x,int y,unsigned char*c){return comic_plate_color(p,iw,ih,m,w,h,x,y,c);}

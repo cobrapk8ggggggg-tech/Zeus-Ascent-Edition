@@ -1,8 +1,9 @@
 """Flat balloon cleanup has independent pixel truth and never crosses borders."""
-import pathlib,unittest
+import pathlib,unittest,json,io,base64
 import cv2,numpy as np
 from PIL import Image,ImageDraw,ImageFont
 from engine import Engine
+from balloons import paragraphs
 class FlatBalloons(unittest.TestCase):
  @classmethod
  def setUpClass(cls):cls.engine=Engine(pathlib.Path(__file__).parent/'models')
@@ -24,6 +25,8 @@ class FlatBalloons(unittest.TestCase):
   for color in [(255,255,255),(235,205,140),(25,10,40)]:
    for rectangular in [False,True]:
     clean,original,result,mask,complete=self.sample(color,rectangular)
+    match=(np.abs(original.astype(int)-color).sum(2)<75).astype(np.uint8);_,labels,_,_=cv2.connectedComponentsWithStats(match,4);paper=(labels==labels[45,190]).astype(np.uint8)*255
+    measured,uniform=self.engine.plate_color(original,paper,[0,0]);self.assertTrue(uniform);self.assertLessEqual(int(np.abs(measured.astype(int)-color).max()),3)
     self.assertTrue(complete);self.assertLessEqual(int(np.abs(result.astype(int)-clean.astype(int)).max()),3)
     self.assertEqual(int(np.count_nonzero(np.any(original!=result,axis=2)&(mask==0))),0)
     self.assertTrue(np.array_equal(result[20,:],clean[20,:]),'balloon border must remain exact')
@@ -34,6 +37,7 @@ class FlatBalloons(unittest.TestCase):
   source=image.copy();draw=ImageDraw.Draw(source);font=ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',27);boxes=[]
   for y,text in [(75,'HELLO'),(120,'SECOND LINE'),(165,'GOODBYE')]:boxes.append(draw.textbbox((85,y),text,font=font));draw.text((85,y),text,font=font,fill='black')
   rgb=np.array(source);match=(np.abs(rgb.astype(int)-235).sum(2)<75).astype(np.uint8);_,labels,_,_=cv2.connectedComponentsWithStats(match,4);paper=(labels==labels[45,190]).astype(np.uint8)*255
+  _,uniform=self.engine.plate_color(rgb,paper,[0,0]);self.assertFalse(uniform,'Eroding the edge fringe must not flatten a real enclosed gradient')
   owned=[[l-8,t-8,r+8,b+8]for l,t,r,b in boxes];mask,complete=self.engine.flat_balloon_mask(paper,owned);self.assertTrue(complete)
   flat=dict(mask=mask,complete=complete,color=np.array([235]*3),uniform=False,origin=[0,0],boxes=boxes)
   result,mask,accepted=self.engine.apply_flat_cleanup(rgb,[0,0],flat);self.assertTrue(accepted)
@@ -50,4 +54,12 @@ class FlatBalloons(unittest.TestCase):
  def test_missing_source_line_blocks_erasure_and_leaves_identity(self):
   clean,original,result,mask,complete=self.sample((255,255,255),missing=True)
   self.assertFalse(complete);self.assertFalse(mask.any());self.assertTrue(np.array_equal(original,result))
+ def test_reported_violet_jpeg_paper_is_flat_despite_compression_ringing(self):
+  f=json.loads((pathlib.Path(__file__).parent/'fixtures/neural-violet-flat-jpeg.json').read_text());rgb=np.array(Image.open(io.BytesIO(base64.b64decode(f['image']))).convert('RGB'))
+  lines=[dict(text=l['text'],confidence=1,box=[l['x'],l['y'],l['x']+l['width'],l['y']+l['height']])for l in f['lines']]
+  groups=paragraphs(rgb,lines,True,self.engine,True);self.assertEqual(len(groups),1)
+  rows,area,closed,flat=groups[0];self.assertTrue(closed);self.assertIsNotNone(flat);self.assertTrue(flat['uniform']);self.assertTrue(flat['complete'])
+  clean,mask,accepted=self.engine.apply_flat_cleanup(rgb,[0,0],flat);self.assertTrue(accepted)
+  self.assertLessEqual(self.engine.ink_residue(rgb,clean,mask,[l['box']for l in rows]),.08)
+  self.assertEqual(np.count_nonzero(np.any(rgb!=clean,axis=2)&(mask==0)),0)
 if __name__=='__main__':unittest.main()

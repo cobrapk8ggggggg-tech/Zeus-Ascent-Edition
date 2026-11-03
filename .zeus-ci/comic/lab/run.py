@@ -1,4 +1,4 @@
-import argparse, html, json, pathlib, time, resource, random, math
+import argparse, html, json, pathlib, time, resource, random, math, hashlib
 from functools import lru_cache
 import cv2,numpy as np
 from PIL import Image,ImageDraw,ImageFont
@@ -62,7 +62,20 @@ def gallery(out,cases):
 def run(args):
     root=pathlib.Path(args.corpus);out=pathlib.Path(args.output);out.mkdir(parents=True,exist_ok=True)
     engine=Engine(args.models);corpus=json.loads((root/'corpus.json').read_text());cases=[];stages=[]
+    files=[pathlib.Path(__file__),pathlib.Path(__file__).with_name('engine.py'),pathlib.Path(__file__).with_name('balloons.py'),pathlib.Path(__file__).with_name('run_geometry.py')]
+    identity=dict(pipeline_sha256=hashlib.sha256(b''.join(p.read_bytes()for p in files)+engine.native_sha.encode()).hexdigest(),corpus_sha256=hashlib.sha256((root/'corpus.json').read_bytes()).hexdigest(),settings=dict(regions=args.regions,ocr=args.ocr,neural=args.neural,lama=args.lama))
+    progress=out/'quality-run.json';completed=[]
+    if args.resume and progress.exists():
+        previous=json.loads(progress.read_text())
+        if any(previous.get(k)!=v for k,v in identity.items()):raise ValueError('Resume source, corpus or settings changed; use a new output directory')
+        completed=previous.get('completed_chapters',[])
+        if(out/'cases.json').exists():cases=[c for c in json.loads((out/'cases.json').read_text())if c['chapter']in completed]
+    def checkpoint():
+        temporary=out/'cases.json.tmp';temporary.write_text(json.dumps(cases,ensure_ascii=False,indent=2));temporary.replace(out/'cases.json')
+        temporary=out/'quality-run.json.tmp';temporary.write_text(json.dumps(dict(identity,completed_chapters=completed),indent=2));temporary.replace(progress)
+    checkpoint()
     for chapter in corpus['chapters']:
+        if chapter['id']in completed:print('Resuming after completed chapter',chapter['id'],flush=True);continue
         limit=args.regions//len(corpus['chapters']);count=0
         pages=list(chapter['pages']);random.Random(0).shuffle(pages)
         per_page=math.ceil(limit/len(pages))+2
@@ -108,9 +121,9 @@ def run(args):
                     restored=engine.lama(crop,mask);Image.fromarray(restored).save(dest/'lama.png')
                     case['lama_outside_mask_changes']=int(np.count_nonzero(np.any(restored!=crop,axis=2)&(mask==0)))
             print(chapter['language'],chapter['split'],page['path'],'regions',count,flush=True)
-        (out/'cases.json').write_text(json.dumps(cases,ensure_ascii=False,indent=2))
+        completed.append(chapter['id']);checkpoint()
     gallery(out,cases)
     report=dict(chapters=len(corpus['chapters']),pages=sum(len(c['pages'])for c in corpus['chapters']),regions=len(cases),languages=sorted(set(c['language']for c in cases)),outside_mask_changes=sum(c['outside_mask_changes']for c in cases),layout_probe_fits=sum(c['fit']for c in cases),neural_restored=sum(c['restoration_route']=='neural'for c in cases),light_restored=sum(c['restoration_route']in['flat','light']for c in cases),flat_restored=sum(c['restoration_route']=='flat'for c in cases),cleanup_gate_accepted=sum(c['cleanup_accepted']for c in cases),cleanup_gate_abstained=sum(not c['cleanup_accepted']for c in cases),manually_reviewed=0,quality_acceptance_proven=False,native_kernel_sha256=engine.native_sha,protocol='adaptive-v5: connected-lobe ownership; source fill and outline; whole-balloon gate; layout preflight',peak_rss_kib=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
     (out/'report.json').write_text(json.dumps(report,indent=2));print(json.dumps(report),flush=True)
 if __name__=='__main__':
-    p=argparse.ArgumentParser();p.add_argument('--corpus',required=True);p.add_argument('--models',required=True);p.add_argument('--output',required=True);p.add_argument('--regions',type=int,default=400);p.add_argument('--ocr',action='store_true');p.add_argument('--lama',type=int,default=0);p.add_argument('--neural',action='store_true');run(p.parse_args())
+    p=argparse.ArgumentParser();p.add_argument('--corpus',required=True);p.add_argument('--models',required=True);p.add_argument('--output',required=True);p.add_argument('--regions',type=int,default=400);p.add_argument('--ocr',action='store_true');p.add_argument('--lama',type=int,default=0);p.add_argument('--neural',action='store_true');p.add_argument('--resume',action='store_true');run(p.parse_args())

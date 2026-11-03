@@ -152,10 +152,8 @@ enum ComicBalloons {
                 let exclusions:[Int32]=(textBounds.isEmpty ? [text]:textBounds).flatMap{r in [Int32(floor(r.minX)-4),Int32(floor(r.minY)-4),Int32(ceil(r.maxX)+4),Int32(ceil(r.maxY)+4)]}
                 let edge=pixels.withUnsafeBufferPointer{p in mask.withUnsafeBufferPointer{m in exclusions.withUnsafeBufferPointer{b in zeus_comic_plate_has_edge(p.baseAddress,Int32(width),Int32(height),m.baseAddress,Int32(mw),Int32(mh),Int32(bounds.minX)-1,Int32(bounds.minY)-1,b.baseAddress,Int32(exclusions.count/4)) != 0}}}
                 guard edge else{continue}
-                var sums=[Int](repeating:0,count:3)
-                for p in queue{let i=((p/rw+top)*width+p%rw+left)*4;for c in 0..<3{sums[c]+=Int(pixels[i+c])}}
-                let color=sums.map{UInt8($0/queue.count)}
-                let uniform=queue.reduce(0){count,p in let i=((p/rw+top)*width+p%rw+left)*4;return count+(abs(Int(pixels[i])-Int(color[0]))+abs(Int(pixels[i+1])-Int(color[1]))+abs(Int(pixels[i+2])-Int(color[2]))<=6 ? 1:0)}>=queue.count*95/100
+                var color=[UInt8](repeating:0,count:3)
+                let uniform=pixels.withUnsafeBufferPointer{p in mask.withUnsafeBufferPointer{m in color.withUnsafeMutableBufferPointer{c in zeus_comic_plate_color(p.baseAddress,Int32(width),Int32(height),m.baseAddress,Int32(mw),Int32(mh),Int32(bounds.minX)-1,Int32(bounds.minY)-1,c.baseAddress) != 0}}}
                 best=Plate(rect:bounds,mask:mask,width:mw,height:mh,color:color,uniform:uniform)
             }
         }

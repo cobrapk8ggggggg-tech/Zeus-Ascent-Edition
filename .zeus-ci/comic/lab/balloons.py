@@ -25,7 +25,7 @@ def paragraphs(rgb,lines,include_layout=False,engine=None,include_cleanup=False)
   exclusions=[[l['box'][0]-4,l['box'][1]-4,l['box'][2]+4,l['box'][3]+4]for l in lines]
   if engine is not None and not engine.plate_has_edge(rgb,shapes[tuple(result)],[xx-1,yy-1],exclusions):return None
   region=rgb[yy:bb,xx:rr][shapes[tuple(result)][1:-1,1:-1]>0]
-  field=region.mean(axis=0);colors[tuple(result)]=(np.round(field).astype(np.uint8),float((np.abs(region.astype(int)-field).sum(1)<=6).mean())>=.95)
+  field=region.mean(axis=0);colors[tuple(result)]=engine.plate_color(rgb,shapes[tuple(result)],[xx-1,yy-1])if engine is not None else(np.round(field).astype(np.uint8),float((np.abs(region.astype(int)-field).sum(1)<=6).mean())>=.95)
   return result
  initial=group(lines)
  for g in initial+[[line]for line in lines]:
