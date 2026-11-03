@@ -5,7 +5,7 @@ def download(destination,comparison=False):
  artifacts=json.loads((ROOT/'ZEUSNext/Resources/comic-models.json').read_text())['models']
  if comparison:artifacts+=json.loads((pathlib.Path(__file__).parent/'comparison-models.json').read_text())
  for a in artifacts:
-  if not comparison and a['name'].split('.')[0] not in ['det','latin','han','korean','arabic']:continue
+  if not comparison and a['name'].split('.')[0] not in ['det','latin','han','korean','arabic','ctd','lama']:continue
   p=destination/a['name']
   if not p.exists():
    part=p.with_suffix(p.suffix+'.part');urllib.request.urlretrieve(a['url'],part);part.replace(p)

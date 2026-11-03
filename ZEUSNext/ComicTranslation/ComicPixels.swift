@@ -54,7 +54,12 @@ enum ComicPixels {
             // A one-word translation must never grow to fill an entire balloon.
             let heights=speech.lines.map{CGFloat($0.glyphHeight ?? Double(min($0.rect.height,$0.rect.width)))}.sorted()
             let sourceSize=heights[heights.count/2]*1.3
-            guard let placed=place(text,area:area,imageHeight:image.height,target:target,fontName:fontName,fontScale:fontScale,theta:CGFloat(speech.angle ?? 0),letterSpacing:letterSpacing,maximumSize:sourceSize)else{continue}
+            let placement:Placement?
+            if speech.vertical && !speech.balloon{
+                let baseline=speech.lines.map(\.angle).first(where:{abs($0) > .pi/3}) ?? .pi/2
+                placement=placeVertical(text,area:area,target:target,fontName:fontName,fontScale:fontScale,letterSpacing:letterSpacing,maximumSize:sourceSize,theta:baseline<0 ? -.pi/2:.pi/2)
+            }else{placement=place(text,area:area,imageHeight:image.height,target:target,fontName:fontName,fontScale:fontScale,theta:CGFloat(speech.angle ?? 0),letterSpacing:letterSpacing,maximumSize:sourceSize)}
+            guard let placed=placement else{continue}
             if requireCleanSource && placed.layout.size<sourceSize*CGFloat(min(1.5,max(0.5,fontScale)))*0.55{continue}
             if !precleanedIDs.contains(speech.id){
                 let mask=sourceMask(original,width:image.width,height:image.height,speech:speech)
@@ -92,6 +97,30 @@ enum ComicPixels {
         }
         return best
     }
+    private static func placeVertical(_ text:String,area:CGRect,target:String,fontName:String?,fontScale:Double,letterSpacing:Double,maximumSize:CGFloat,theta:CGFloat)->Placement?{
+        let width=area.height-4,height=area.width-4
+        guard width>2,height>2 else{return nil}
+        var best:Placement?
+        if let value=layout(text,rect:CGRect(x:0,y:0,width:width,height:height),target:target,fontName:fontName,fontScale:fontScale,letterSpacing:letterSpacing,maximumSize:maximumSize){
+            best=Placement(layout:value,box:CGRect(x:-width/2,y:-value.height/2,width:width,height:value.height),theta:theta)
+        }
+        // A narrow rotated caption needs glyph bounds, not full font leading;
+        // otherwise a perfectly readable word is shrunk to body-text size.
+        let style=NSMutableParagraphStyle();style.baseWritingDirection=TranslationPreferences.rtl(target) ? .rightToLeft:.leftToRight
+        let resolved=fontName ?? (target.hasPrefix("ar") ? "GeezaPro":"ArialMT")
+        let content=text.split(whereSeparator:{$0.isWhitespace}).joined(separator:" ")
+        var low:CGFloat=4,high=min(512,maximumSize*CGFloat(min(1.5,max(0.5,fontScale))))
+        for _ in 0..<9{
+            let size=(low+high)/2,value=NSAttributedString(string:content,attributes:[NSAttributedString.Key(kCTFontAttributeName as String):CTFontCreateWithName(resolved as CFString,size,nil),.paragraphStyle:style,.kern:min(4,max(-1,letterSpacing))])
+            let bounds=CTLineGetBoundsWithOptions(CTLineCreateWithAttributedString(value),.useGlyphPathBounds)
+            if bounds.width<=width && bounds.height<=height{
+                let layout=TextLayout(text:value,height:ceil(bounds.height),size:size,singleLine:true)
+                if size>(best?.layout.size ?? 0){best=Placement(layout:layout,box:bounds,theta:theta)}
+                low=size
+            }else{high=size}
+        }
+        return best
+    }
     // Draw one speech with the chosen ink. All passes share the same frame path so
     // stroke, shadow and fill stay perfectly registered on every font and rotation.
     private static func letter(_ context:CGContext,image:CGImage,area:CGRect,placed:Placement,color:CGColor,ink:ComicInkStyle){
@@ -100,7 +129,12 @@ enum ComicPixels {
         context.clip(to:CGRect(x:-area.width/2,y:-area.height/2,width:area.width,height:area.height))
         if placed.theta != 0{context.rotate(by:-placed.theta)}
         let attributed=NSMutableAttributedString(attributedString:placed.layout.text);attributed.addAttribute(NSAttributedString.Key(kCTForegroundColorAttributeName as String),value:color,range:NSRange(location:0,length:attributed.length))
-        func draw(_ value:NSAttributedString){let frame=CTFramesetterCreateFrame(CTFramesetterCreateWithAttributedString(value),CFRange(),CGPath(rect:placed.box,transform:nil),nil);CTFrameDraw(frame,context)}
+        func draw(_ value:NSAttributedString){
+            if placed.layout.singleLine{
+                let line=CTLineCreateWithAttributedString(value),bounds=CTLineGetBoundsWithOptions(line,.useGlyphPathBounds)
+                context.textPosition=CGPoint(x:-bounds.midX,y:-bounds.midY);CTLineDraw(line,context);return
+            }
+            let frame=CTFramesetterCreateFrame(CTFramesetterCreateWithAttributedString(value),CFRange(),CGPath(rect:placed.box,transform:nil),nil);CTFrameDraw(frame,context)}
         switch ink{
         case .plain:draw(attributed)
         case .shadow:
@@ -119,7 +153,7 @@ enum ComicPixels {
         return luminance>0.5 ? CGColor(gray:0,alpha:1):CGColor(gray:1,alpha:1)
     }
     static func color(_ hex:String)->CGColor?{let value=hex.replacingOccurrences(of:"#",with:"");guard value.count==6,let n=UInt32(value,radix:16)else{return nil};return CGColor(red:CGFloat((n>>16)&255)/255,green:CGFloat((n>>8)&255)/255,blue:CGFloat(n&255)/255,alpha:1)}
-    struct TextLayout{var text:NSAttributedString;var height:CGFloat;var size:CGFloat}
+    struct TextLayout{var text:NSAttributedString;var height:CGFloat;var size:CGFloat;var singleLine:Bool = false}
     static func layout(_ text:String,rect:CGRect,target:String,fontName:String?,fontScale:Double,letterSpacing:Double = 0,maximumSize:CGFloat = 96)->TextLayout?{
         guard rect.width>2,rect.height>2 else{return nil}
         let style=NSMutableParagraphStyle();style.alignment = .center;style.baseWritingDirection=TranslationPreferences.rtl(target) ? .rightToLeft:.leftToRight;style.lineBreakMode = .byWordWrapping
@@ -130,7 +164,12 @@ enum ComicPixels {
         for _ in 0..<9{let size=(low+high)/2,font=CTFontCreateWithName(resolved as CFString,size,nil)
             let value=NSAttributedString(string:text,attributes:[NSAttributedString.Key(kCTFontAttributeName as String):font,.paragraphStyle:style,.kern:min(4,max(-1,letterSpacing))])
             let setter=CTFramesetterCreateWithAttributedString(value);var fit=CFRange();let measured=CTFramesetterSuggestFrameSizeWithConstraints(setter,CFRange(),nil,CGSize(width:rect.width,height:CGFloat.greatestFiniteMagnitude),&fit)
-            if measured.height<=rect.height && measured.width<=rect.width+0.5 && fit.length==value.length{best=TextLayout(text:value,height:ceil(measured.height),size:size);low=size}else{high=size}
+            let allowsCharacterWrap=["ja","zh","ko","th"].contains{target.hasPrefix($0)}
+            let wordsFit=allowsCharacterWrap || text.split(whereSeparator:{$0.isWhitespace}).allSatisfy{word in
+                let run=NSAttributedString(string:String(word),attributes:value.attributes(at:0,effectiveRange:nil))
+                return CGFloat(CTLineGetTypographicBounds(CTLineCreateWithAttributedString(run),nil,nil,nil))<=rect.width+0.5
+            }
+            if wordsFit && measured.height<=rect.height && measured.width<=rect.width+0.5 && fit.length==value.length{best=TextLayout(text:value,height:ceil(measured.height),size:size);low=size}else{high=size}
         }
         guard let best else{return nil}
         return best

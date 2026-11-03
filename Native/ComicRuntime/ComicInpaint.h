@@ -96,7 +96,7 @@ static inline void comic_inpaint(unsigned char *rgba, int width, int height,
 
 // Coverage of the actual high-contrast ink inside a tight OCR line. A renderer
 // may decline to letter an incompletely erased line instead of overlapping it.
-static inline float comic_mask_coverage(const unsigned char *rgba,const unsigned char *mask,int width,int height,int left,int top,int right,int bottom){
+static inline float comic_mask_coverage(const unsigned char *rgba,const unsigned char *mask,int width,int height,int left,int top,int right,int bottom,const unsigned char *hints=nullptr){
     if(!rgba||!mask||width<=0||height<=0)return 0;
     left=std::clamp(left,0,width-1);right=std::clamp(right,0,width);
     top=std::clamp(top,0,height-1);bottom=std::clamp(bottom,0,height);
@@ -123,7 +123,7 @@ static inline float comic_mask_coverage(const unsigned char *rgba,const unsigned
     bool bright=middle<=threshold;int ink=0,covered=0;
     for(int y=top;y<bottom;y++)for(int x=left;x<right;x++){
         int v=gray(x,y);bool foreground=bright?v>threshold:v<=threshold;
-        if(foreground){ink++;if(mask[y*width+x])covered++;}
+        if(foreground&&(!hints||hints[y*width+x])){ink++;if(mask[y*width+x])covered++;}
     }
     return ink>=4?float(covered)/ink:0;
 }
@@ -172,4 +172,19 @@ static inline bool comic_simple_background(const unsigned char *rgba,const unsig
         samples++;if(edge)edges++;
     }
     return samples>0&&edges<double(samples)*.003;
+}
+
+// Neural masks must cover the hint-supported ink and the OCR line's footprint.
+// Requiring every dark artwork pixel in the box would reject correctly preserved
+// panel lines; checking only a nonempty neural mask would accept half-erased words.
+static inline bool comic_neural_mask_valid(const unsigned char *rgba,const unsigned char *hints,const unsigned char *mask,int width,int height,int left,int top,int right,int bottom){
+    if(!rgba||!hints||!mask)return false;
+    left=std::clamp(left,0,width-1);right=std::clamp(right,0,width);top=std::clamp(top,0,height-1);bottom=std::clamp(bottom,0,height);
+    int w=right-left,h=bottom-top;if(w<2||h<2)return false;
+    if(comic_mask_coverage(rgba,mask,width,height,left,top,right,bottom,hints)<.95f)return false;
+    int count=0,minx=right,maxx=left,miny=bottom,maxy=top;
+    for(int y=top;y<bottom;y++)for(int x=left;x<right;x++)if(mask[y*width+x]){count++;minx=std::min(minx,x);maxx=std::max(maxx,x);miny=std::min(miny,y);maxy=std::max(maxy,y);}
+    if(count<std::max(4,w*h/50)||count>w*h*.98)return false;
+    float sx=float(maxx-minx+1)/w,sy=float(maxy-miny+1)/h;
+    return w>=h?(sx>=.8f&&sy>=.55f):(sy>=.8f&&sx>=.55f);
 }

@@ -96,3 +96,5 @@ extern "C" unsigned long long zeus_comic_available_memory(){
     return 0;
 #endif
 }
+
+extern "C" int zeus_comic_neural_mask_valid(const unsigned char *pixels,const unsigned char *hints,const unsigned char *mask,int width,int height,int left,int top,int right,int bottom){return comic_neural_mask_valid(pixels,hints,mask,width,height,left,top,right,bottom)?1:0;}

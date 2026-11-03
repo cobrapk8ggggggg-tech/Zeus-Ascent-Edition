@@ -5,6 +5,7 @@ extern "C" {
 #endif
 unsigned char *zeus_comic_decode_region(const unsigned char *bytes, unsigned long size, int x, int y, int width, int height);
 float zeus_comic_mask_coverage(const unsigned char *pixels, const unsigned char *mask, int width, int height, int left, int top, int right, int bottom);
+int zeus_comic_neural_mask_valid(const unsigned char *pixels, const unsigned char *hints, const unsigned char *mask, int width, int height, int left, int top, int right, int bottom);
 int zeus_comic_simple_background(const unsigned char *pixels, const unsigned char *mask, int width, int height, int left, int top, int right, int bottom);
 unsigned long long zeus_comic_available_memory(void);
 void zeus_comic_refine_text_mask(const unsigned char *pixels, const unsigned char *hints, unsigned char *mask, int width, int height, int left, int top, int right, int bottom);

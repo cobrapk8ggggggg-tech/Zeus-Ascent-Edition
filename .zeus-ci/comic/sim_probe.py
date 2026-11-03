@@ -13,6 +13,11 @@ from pathlib import Path
 
 # Core proof tests: the pipeline end to end plus Arabic lettering/contrast.
 CORE = [
+    "testPinnedNeuralRestorationRemovesLetteringOnRealArtwork",
+    "testAutomaticArabicScriptUsesTheArabicRecognizer",
+    "testAutomaticReadingRetainsMixedArabicAndEnglishLines",
+    "testVerticalJapanesePaddleReadsTopToBottom",
+    "testLanguageVoteUsesOwnedPanelInsteadOfNeighbourContext",
     "testActualWebKitSwapRestoreAndStaleResults",
     "testArabicLetteringChangesActualPixelsInsideTheBalloon",
     "testArabicCoreTextFitsAndColorIsValidated",

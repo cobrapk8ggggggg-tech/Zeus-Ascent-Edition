@@ -4,12 +4,7 @@ import cv2,numpy as np
 from PIL import Image
 from engine import Engine
 
-def ctd(engine,rgb):
- h,w=rgb.shape[:2];scale=min(1024/h,1024/w);cw=max(1,round(w*scale));ch=max(1,round(h*scale))
- image=cv2.copyMakeBorder(cv2.resize(rgb,(cw,ch)),0,1024-ch,0,1024-cw,cv2.BORDER_CONSTANT,value=(0,0,0))
- session=engine.session('ctd.onnx');outputs=session.run(None,{session.get_inputs()[0].name:image.astype(np.float32).transpose(2,0,1)[None]/255})
- mask=outputs[1][0,0][:ch,:cw];mask=cv2.resize(mask,(w,h))
- return cv2.dilate((mask>.3).astype(np.uint8)*255,np.ones((3,3),np.uint8))
+def ctd(engine,rgb):return engine.hints(rgb)
 if __name__=='__main__':
  p=argparse.ArgumentParser();p.add_argument('--models',required=True);p.add_argument('--cases',required=True);p.add_argument('--count',type=int,default=10);p.add_argument('--ids',default='');a=p.parse_args();root=pathlib.Path(a.cases);engine=Engine(a.models);results=[]
  for case in json.loads((root/'cases.json').read_text()):

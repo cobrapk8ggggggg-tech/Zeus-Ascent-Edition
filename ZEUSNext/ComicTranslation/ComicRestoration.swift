@@ -148,7 +148,10 @@ actor ComicRestoration {
                     if !rect.isNull { zeus_comic_refine_text_mask(p.baseAddress,hints.baseAddress,m.baseAddress,Int32(crop.width),Int32(crop.height),Int32(rect.minX),Int32(rect.minY),Int32(rect.maxX),Int32(rect.maxY)) }
                 }
             } } }
-            guard ComicPixels.completeMask(pixels,mask:mask,width:crop.width,height:crop.height,speech:local) else { continue }
+            let valid=pixels.withUnsafeBufferPointer{p in neural.withUnsafeBufferPointer{h in mask.withUnsafeBufferPointer{m in
+                local.lines.allSatisfy{line in let r=line.rect.integral;return zeus_comic_neural_mask_valid(p.baseAddress,h.baseAddress,m.baseAddress,Int32(crop.width),Int32(crop.height),Int32(r.minX),Int32(r.minY),Int32(r.maxX),Int32(r.maxY)) != 0}
+            }}}
+            guard valid else{continue}
             try Task.checkCancellation()
             let restored = try await inpaint(pixels,mask:mask,width:crop.width,height:crop.height)
             try Task.checkCancellation()

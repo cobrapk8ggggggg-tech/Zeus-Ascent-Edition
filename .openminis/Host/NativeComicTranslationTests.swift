@@ -185,6 +185,21 @@ import UIKit
         let speech=ComicSpeech(id:"0",text:line.text,lines:[line],rect:line.rect,vertical:false)
         XCTAssertThrowsError(try ComicPixels.render(image,speeches:[speech],translations:[TranslationSegment(id:"0",text:String(repeating:"هل يمكنكم مساعدتنا؟ ",count:20))],target:"ar",fontName:nil,fontScale:1,requireCleanSource:true))
     }
+    func testUnplatedVerticalArabicKeepsWholeRotatedWords()throws{
+        let image=renderer(CGSize(width:200,height:500)).image{context in UIColor.white.setFill();context.fill(CGRect(x:0,y:0,width:200,height:500))}.cgImage!
+        let line=ComicLine(text:"VERTICAL TITLE",confidence:1,rect:CGRect(x:80,y:50,width:30,height:400),angle:.pi/2,glyphHeight:24)
+        let speech=ComicSpeech(id:"0",text:line.text,lines:[line],rect:line.rect,vertical:true)
+        let output=try ComicPixels.render(image,speeches:[speech],translations:[TranslationSegment(id:"0",text:"قاتل الظل")],target:"ar",fontName:nil,fontScale:1,textColor:"163B72")
+        let pixels=try XCTUnwrap(ComicPixels.rgba(output,width:200,height:500));var bounds=CGRect.null
+        for y in 0..<500{for x in 0..<200{let i=(y*200+x)*4;if Int(pixels[i+2])>Int(pixels[i])+25{bounds=bounds.union(CGRect(x:x,y:y,width:1,height:1))}}}
+        XCTAssertGreaterThan(bounds.height,60);XCTAssertGreaterThan(bounds.height,bounds.width*2)
+        XCTAssertTrue(speech.rect.insetBy(dx:-5,dy:-5).contains(bounds))
+        let attachment=XCTAttachment(image:UIImage(cgImage:output));attachment.name="Whole Arabic words in a vertical caption";attachment.lifetime = .keepAlways;add(attachment)
+    }
+    func testNarrowArabicLayoutDoesNotSplitWordsIntoIsolatedGlyphs()throws{
+        let value=try XCTUnwrap(ComicPixels.layout("المستقبل",rect:CGRect(x:0,y:0,width:20,height:400),target:"ar",fontName:nil,fontScale:1,maximumSize:40))
+        XCTAssertLessThan(value.size,12,"A narrow column must fit the entire Arabic word, not stack isolated letters")
+    }
     func testLargeSourceLetteringIsNotCappedAtBodyTextSize()throws{
         let value=try XCTUnwrap(ComicPixels.layout("استيقظ",rect:CGRect(x:0,y:0,width:500,height:240),target:"ar",fontName:nil,fontScale:1,maximumSize:180))
         XCTAssertGreaterThan(value.size,110,"large source SFX must retain its scale")
@@ -271,6 +286,44 @@ import UIKit
         XCTAssertEqual(ComicBidi.logicalFromVisual("12.5"),"12.5")
         XCTAssertEqual(ComicBidi.logicalFromVisual("(ابحرم) ABC"),"ABC (مرحبا)")
         XCTAssertEqual(ComicBidi.logicalFromVisual("]ابحرم[ 12.5"),"12.5 [مرحبا]")
+    }
+    func testAutomaticArabicScriptUsesTheArabicRecognizer()async throws{
+        let image=renderer(CGSize(width:700,height:220)).image{context in
+            UIColor.white.setFill();context.fill(CGRect(x:0,y:0,width:700,height:220))
+            ("مرحبًا بكم في هذا العالم الجميل" as NSString).draw(at:CGPoint(x:35,y:65),withAttributes:[.font:UIFont(name:"GeezaPro",size:42)!, .foregroundColor:UIColor.black])
+        }.cgImage!
+        let reading=try await ComicOCR.shared.read(image,source:"auto",mode:.balanced)
+        XCTAssertEqual(reading.language,"ar","Arabic must not be overwritten by a Latin fallback recognizer")
+        XCTAssertTrue(reading.lines.map(\.text).joined().unicodeScalars.contains{(0x0600...0x06FF).contains($0.value)})
+    }
+    func testVerticalJapanesePaddleReadsTopToBottom()async throws{
+        try await ComicModelStore.shared.prepare(source:"ja")
+        let image=renderer(CGSize(width:180,height:480)).image{context in
+            UIColor.white.setFill();context.fill(CGRect(x:0,y:0,width:180,height:480))
+            let font=UIFont(name:"HiraginoSans-W3",size:42) ?? UIFont.systemFont(ofSize:42)
+            for (index,char) in "今日は良い天気".enumerated(){(String(char) as NSString).draw(at:CGPoint(x:60,y:35+index*48),withAttributes:[.font:font,.foregroundColor:UIColor.black])}
+        }.cgImage!
+        let lines=try await ComicPaddle.shared.read(image,source:"ja",careful:true)
+        XCTAssertTrue(lines.map(\.text).joined().contains("今日は良い天気"),"vertical glyph orientation must retain top-to-bottom reading order")
+    }
+    func testAutomaticReadingRetainsMixedArabicAndEnglishLines()async throws{
+        let image=renderer(CGSize(width:800,height:300)).image{context in
+            UIColor.white.setFill();context.fill(CGRect(x:0,y:0,width:800,height:300))
+            ("HELLO WORLD. This chapter contains a story and a long English caption." as NSString).draw(at:CGPoint(x:25,y:35),withAttributes:[.font:UIFont.systemFont(ofSize:28),.foregroundColor:UIColor.black])
+            ("مرحبًا بكم في العالم الجميل" as NSString).draw(at:CGPoint(x:35,y:150),withAttributes:[.font:UIFont(name:"GeezaPro",size:40)!, .foregroundColor:UIColor.black])
+        }.cgImage!
+        let reading=try await ComicOCR.shared.read(image,source:"auto",mode:.balanced),text=reading.lines.map(\.text).joined(separator:" ")
+        XCTAssertTrue(text.uppercased().contains("HELLO"));XCTAssertTrue(text.unicodeScalars.contains{(0x0600...0x06FF).contains($0.value)})
+    }
+    func testLanguageVoteUsesOwnedPanelInsteadOfNeighbourContext()async throws{
+        let image=renderer(CGSize(width:800,height:500)).image{context in
+            UIColor.white.setFill();context.fill(CGRect(x:0,y:0,width:800,height:500))
+            for row in 0..<4{("مرحبًا بكم في العالم الجميل" as NSString).draw(at:CGPoint(x:35,y:25+row*70),withAttributes:[.font:UIFont(name:"GeezaPro",size:40)!, .foregroundColor:UIColor.black])}
+            ("HELLO WORLD" as NSString).draw(at:CGPoint(x:60,y:385),withAttributes:[.font:UIFont.systemFont(ofSize:44),.foregroundColor:UIColor.black])
+        }.cgImage!
+        let reading=try await ComicOCR.shared.read(image,source:"auto",mode:.balanced,languageRegion:CGRect(x:0,y:350,width:800,height:150))
+        XCTAssertEqual(ComicModelStore.recognizer(reading.language),"latin")
+        XCTAssertTrue(reading.lines.map(\.text).joined().uppercased().contains("HELLO"))
     }
     func testActualLocalOCRReadsRasterText()async throws{
         let image=renderer(CGSize(width:640,height:180)).image{context in

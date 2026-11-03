@@ -84,7 +84,7 @@ struct ComicPreferences: Codable, Equatable {
     var letterCaseRaw: String?
     var letterSpacing: Double?
     var letterCase: ComicLetterCase { ComicLetterCase(rawValue: letterCaseRaw ?? "") ?? .original }
-    var renderIdentity: String { "render-v6|restoration:\(restorationEnabled ?? true)|\(fontName ?? "default")|\(fontScale)|\(textColor ?? "auto")|\(inkStyle.rawValue)|\(letterCase.rawValue)|\(letterSpacing ?? 0)" }
+    var renderIdentity: String { "render-v7|restoration:\(restorationEnabled ?? true)|\(fontName ?? "default")|\(fontScale)|\(textColor ?? "auto")|\(inkStyle.rawValue)|\(letterCase.rawValue)|\(letterSpacing ?? 0)" }
     var inkStyle: ComicInkStyle { get { ComicInkStyle(rawValue: inkStyleRaw ?? "") ?? .plain } set { inkStyleRaw = newValue.rawValue } }
     var engine: ComicOnlineEngine = .existing
     var translation: TranslationPreferences?
@@ -155,7 +155,7 @@ enum ComicIdentity {
         hash(segments.map{$0.id+"\0"+$0.text}.joined(separator:"\n"))
     }
     static func settings(_ preferences: ComicPreferences, translation: TranslationPreferences, provider: AIProviderConfiguration?) -> String {
-        hash("comic-v10|fallback:\(preferences.allowOnlineFallback ?? false)|\(preferences.mode.rawValue)|\(preferences.source)|\(translation.target)|" + TranslationMemory.namespace(page: "comic://content", preferences: translation, provider: provider))
+        hash("comic-v13|fallback:\(preferences.allowOnlineFallback ?? false)|\(preferences.mode.rawValue)|\(preferences.source)|\(translation.target)|" + TranslationMemory.namespace(page: "comic://content", preferences: translation, provider: provider))
     }
 }
 enum ComicGeometry {
@@ -235,7 +235,13 @@ enum ComicGeometry {
             groups.append([line])
         }
         let japanese = source.hasPrefix("ja")
-        return groups.enumerated().map { index, group in
+        let dialogue=groups.filter{group in
+            guard group.count==1,let text=group.first?.text.trimmingCharacters(in:.whitespacesAndNewlines),text.count==1,let scalar=text.unicodeScalars.first else{return true}
+            // Isolated Latin labels outside a closed balloon are usually logos
+            // or diagram markers. Keep them rather than lettering over artwork.
+            return !(scalar.value<0x0250 && scalar.properties.isAlphabetic)
+        }
+        return dialogue.enumerated().map { index, group in
             let bounds = group.reduce(CGRect.null) { $0.union($1.rect) }
             let vertical = group.allSatisfy { $0.rect.height > $0.rect.width * 1.5 }
             let ordered = orderedLines(group,vertical:vertical)

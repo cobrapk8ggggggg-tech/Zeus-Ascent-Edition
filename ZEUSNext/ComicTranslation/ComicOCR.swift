@@ -21,15 +21,16 @@ actor ComicOCR {
         fastRecognizers.removeAll()
         #endif
     }
-    func read(_ image:CGImage,source:String,mode:ComicReadingMode,onPreparing:(@Sendable (Bool) async -> Void)? = nil)async throws->ComicReading{
+    func read(_ image:CGImage,source:String,mode:ComicReadingMode,languageRegion:CGRect? = nil,onPreparing:(@Sendable (Bool) async -> Void)? = nil)async throws->ComicReading{
         try Task.checkCancellation()
-        var detected=source == "auto" ? try await Self.detectScript(image) : source
+        let probe:(String,[ComicLine])=source == "auto" ? try await Self.scriptProbe(image,region:languageRegion):(source,[])
+        var detected=probe.0
         var fastSupported=ComicModelStore.recognizer(detected)=="latin" || ["ja","zh","ko"].contains(where:detected.hasPrefix)
         var fast=fastSupported ? try await self.fast(image,source:detected):[]
         // An empty first hypothesis is not evidence that the panel has no text.
         // Probe the other bundled scripts before downloading a recognizer or
         // caching an empty reading. Explicit user language always wins.
-        if source == "auto",fast.isEmpty {
+        if source == "auto",fastSupported,fast.isEmpty {
             for alternative in ["en","ko","ja","zh"] where alternative != detected {
                 try Task.checkCancellation()
                 let candidate=try await self.fast(image,source:alternative)
@@ -63,17 +64,43 @@ actor ComicOCR {
                 lines=lines.map{line in accurate.filter{$0.rect.intersection(line.rect).area/max(1,line.rect.area)>0.5&&$0.confidence>line.confidence}.max(by:{$0.confidence<$1.confidence}) ?? line}
             }
         }
+        // Keep strong secondary-script readings from the same local Vision
+        // probe. Covers mixed-language panels without poisoning the whole page's
+        // recognizer choice or downloading every language model up front.
+        if source=="auto"{
+            let primary=ComicModelStore.recognizer(detected)
+            for sample in probe.1 where sample.confidence>=0.8{
+                let script=Self.lineScript(sample.text)
+                let overlaps=lines.indices.filter{lines[$0].rect.intersection(sample.rect).area/min(max(1,lines[$0].rect.area),max(1,sample.rect.area))>0.6}
+                if script != "latin" && script != "other" && script != primary{
+                    lines=lines.enumerated().filter{!overlaps.contains($0.offset)}.map{$0.element};lines.append(sample)
+                }else if script=="latin",primary != "latin",overlaps.isEmpty,sample.confidence>=0.95,sample.text.filter({$0.isLetter}).count>=3{lines.append(sample)}
+            }
+        }
         return ComicReading(lines:lines,speeches:ComicBalloons.speeches(lines,image:image,source:detected),language:detected,runtime:runtime)
     }
-    private static func detectScript(_ image:CGImage)async throws->String{
-        let samples=try vision(image,languages:["ko-KR","ja-JP","zh-Hans","en-US"],accurate:true)
-        let text=samples.map(\.text).joined(separator:" ")
+    private static func scriptProbe(_ image:CGImage,region:CGRect?)async throws->(String,[ComicLine]){
+        let samples=try vision(image,languages:["ar-SA","ko-KR","ja-JP","zh-Hans","ru-RU","en-US"],accurate:true,automatic:true)
+        let owned=region.map{area in samples.filter{area.contains(CGPoint(x:$0.rect.midX,y:$0.rect.midY))}} ?? samples
+        let text=(owned.isEmpty ? samples:owned).map(\.text).joined(separator:" ")
         let recognizer=NLLanguageRecognizer();recognizer.processString(text)
-        let scalars=text.unicodeScalars
-        if scalars.filter({(0xAC00...0xD7AF).contains($0.value)}).count>=2{return "ko"}
-        if scalars.filter({(0x3040...0x30FF).contains($0.value)}).count>=2{return "ja"}
-        if scalars.filter({(0x4E00...0x9FFF).contains($0.value)}).count>=2{return recognizer.dominantLanguage == .japanese ? "ja":"zh"}
-        return recognizer.dominantLanguage?.rawValue ?? "en"
+        let scalars=text.unicodeScalars.filter{$0.properties.isAlphabetic}
+        let arabic=scalars.filter{(0x0600...0x06FF).contains($0.value)||(0x0750...0x077F).contains($0.value)||(0xFB50...0xFDFF).contains($0.value)||(0xFE70...0xFEFF).contains($0.value)}.count
+        let hangul=scalars.filter{(0xAC00...0xD7AF).contains($0.value)}.count
+        let kana=scalars.filter{(0x3040...0x30FF).contains($0.value)}.count
+        let han=scalars.filter{(0x4E00...0x9FFF).contains($0.value)}.count
+        let cyrillic=scalars.filter{(0x0400...0x052F).contains($0.value)}.count
+        let latin=scalars.filter{$0.value<=0x024F}.count
+        let cjk=kana>=2 || recognizer.dominantLanguage == .japanese ? "ja":"zh"
+        let votes=[("ar",arabic),("ko",hangul),(cjk,han+kana),("ru",cyrillic),("latin",latin)]
+        if let best=votes.max(by:{$0.1<$1.1}),best.1>=2,best.0 != "latin"{return(best.0,samples)}
+        return(recognizer.dominantLanguage?.rawValue ?? "en",samples)
+    }
+
+    private static func lineScript(_ text:String)->String{
+        let s=text.unicodeScalars.filter{$0.properties.isAlphabetic}
+        let scores=[("arabic",s.filter{(0x0600...0x06FF).contains($0.value)||(0xFE70...0xFEFF).contains($0.value)}.count),("korean",s.filter{(0xAC00...0xD7AF).contains($0.value)}.count),("han",s.filter{(0x3040...0x30FF).contains($0.value)||(0x4E00...0x9FFF).contains($0.value)}.count),("cyrillic",s.filter{(0x0400...0x052F).contains($0.value)}.count),("latin",s.filter{$0.value<=0x024F}.count)]
+        return scores.max(by:{$0.1<$1.1}).flatMap{$0.1>=2 ? $0.0:nil} ?? "other"
     }
     private func fast(_ image:CGImage,source:String)async throws->[ComicLine]{
         #if canImport(MLKitTextRecognition)
@@ -98,8 +125,8 @@ actor ComicOCR {
         throw ComicFailure.message("هذا البناء لا يتضمن ML Kit. استخدم بناء ترجمة الصور الكامل.")
         #endif
     }
-    private static func vision(_ image:CGImage,languages:[String],accurate:Bool)throws->[ComicLine]{
-        let request=VNRecognizeTextRequest();request.recognitionLevel=accurate ? .accurate:.fast;let aliases=["ko":"ko-KR","ja":"ja-JP","zh":"zh-Hans","en":"en-US","ar":"ar-SA"]
+    private static func vision(_ image:CGImage,languages:[String],accurate:Bool,automatic:Bool = false)throws->[ComicLine]{
+        let request=VNRecognizeTextRequest();request.automaticallyDetectsLanguage=automatic;request.recognitionLevel=accurate ? .accurate:.fast;let aliases=["ko":"ko-KR","ja":"ja-JP","zh":"zh-Hans","en":"en-US","ar":"ar-SA"]
         let supported=try request.supportedRecognitionLanguages()
         let requested=languages.map{aliases[$0] ?? $0}.filter{supported.contains($0)}
         request.recognitionLanguages=requested.isEmpty ? ["en-US"]:requested;request.usesLanguageCorrection=false

@@ -1,16 +1,25 @@
 """CPU reference harness. Shared native masks; ONNX tensors match the app."""
-import ctypes, hashlib, json, pathlib, subprocess, time
+import ctypes, hashlib, json, pathlib, subprocess, time, os, uuid
 import cv2, numpy as np, onnxruntime as ort, yaml
 HERE=pathlib.Path(__file__).resolve().parent
 class Engine:
     def __init__(self,models):
         self.models=pathlib.Path(models);self.sessions={};self.dictionaries={}
-        library=HERE/'output'/'mask.so';library.parent.mkdir(exist_ok=True)
-        subprocess.run(['g++','-O2','-std=c++17','-shared','-fPIC',str(HERE/'native.cpp'),'-o',str(library)],check=True)
+        header=HERE.parents[2]/'Native/ComicRuntime/ComicInpaint.h'
+        self.native_sha=hashlib.sha256(header.read_bytes()+(HERE/'native.cpp').read_bytes()).hexdigest()
+        library=HERE/'output'/('mask-'+self.native_sha[:16]+'.so');library.parent.mkdir(exist_ok=True)
+        if not library.exists():
+            temporary=library.with_name(library.name+'.'+uuid.uuid4().hex+'.tmp')
+            subprocess.run(['g++','-O2','-std=c++17','-shared','-fPIC',str(HERE/'native.cpp'),'-o',str(temporary)],check=True)
+            os.replace(temporary,library)
         self.lib=ctypes.CDLL(str(library));p=np.ctypeslib.ndpointer(dtype=np.uint8,flags='C_CONTIGUOUS')
-        self.lib.clean.argtypes=[p]+[ctypes.c_int]*6;self.lib.text_mask.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.clean_source.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.coverage.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.coverage.restype=ctypes.c_float;self.lib.refine.argtypes=[p,p,p]+[ctypes.c_int]*6;self.lib.refine_ocr.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.clean_mask.argtypes=[p,p,p]+[ctypes.c_int]*6;self.lib.simple_background.argtypes=[p,p]+[ctypes.c_int]*6
+        self.lib.clean.argtypes=[p]+[ctypes.c_int]*6;self.lib.text_mask.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.clean_source.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.coverage.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.coverage.restype=ctypes.c_float;self.lib.refine.argtypes=[p,p,p]+[ctypes.c_int]*6;self.lib.refine_ocr.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.clean_mask.argtypes=[p,p,p]+[ctypes.c_int]*6;self.lib.simple_background.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.neural_valid.argtypes=[p,p,p]+[ctypes.c_int]*6
     def session(self,name):
         if name not in self.sessions:
+            # Match the app's memory discipline: only one restoration graph,
+            # or the detector plus the currently selected OCR script.
+            if name in ['ctd.onnx','lama.onnx']:self.sessions.clear()
+            else:self.sessions={k:v for k,v in self.sessions.items()if k in ['det.onnx',name]}
             options=ort.SessionOptions();options.intra_op_num_threads=2;options.inter_op_num_threads=1;options.log_severity_level=3
             self.sessions[name]=ort.InferenceSession(str(self.models/name),options,providers=['CPUExecutionProvider'])
         return self.sessions[name]
@@ -28,13 +37,13 @@ class Engine:
             # Offset by area/perimeter (DB unclip), rather than 1/4 box height.
             pad=1.5*bw*bh/(2*(bw+bh))
             box=[max(1,int((x-pad)*w/prob.shape[1])),max(1,int((y-pad)*h/prob.shape[0])),min(w-1,int(np.ceil((x+bw+pad)*w/prob.shape[1]))),min(h-1,int(np.ceil((y+bh+pad)*h/prob.shape[0])))]
-            lines.append(dict(box=box,confidence=confidence,glyph_height=bh*h/prob.shape[0]*1.7))
+            lines.append(dict(box=box,confidence=confidence,glyph_height=min(box[2]-box[0],box[3]-box[1])*.72))
         return sorted(lines,key=lambda l:(l['box'][1],l['box'][0]))
     def recognize(self,rgb,box,language):
         name={'en':'latin','ja':'han','zh':'han','ko':'korean','ar':'arabic'}[language]
         if name not in self.dictionaries:self.dictionaries[name]=['']+yaml.safe_load((self.models/(name+'.yml')).read_text())['PostProcess']['character_dict']+[' ']
         x,y,r,b=box;cut=rgb[y:b,x:r]
-        if cut.shape[0]>cut.shape[1]*1.5:cut=cv2.rotate(cut,cv2.ROTATE_90_CLOCKWISE)
+        if cut.shape[0]>cut.shape[1]*1.5:cut=cv2.rotate(cut,cv2.ROTATE_90_COUNTERCLOCKWISE)
         width=max(8,min(4096,int(np.ceil(cut.shape[1]*48/cut.shape[0]))))
         tensor=cv2.resize(cut[:,:,::-1],(width,48)).astype(np.float32)/127.5-1
         s=self.session(name+'.onnx');logits=s.run(None,{s.get_inputs()[0].name:tensor.transpose(2,0,1)[None]})[0][0]
@@ -70,12 +79,31 @@ class Engine:
             pad=max(3,(b-y)*.18);box=[max(1,int(x-pad)),max(1,int(y-pad)),min(w-1,int(r+pad)),min(h-1,int(b+pad))]
             self.lib.refine(rgba,hints,mask,w,h,*box)
         return mask
+    def hints(self,rgb):
+        h,w=rgb.shape[:2];scale=min(1024/h,1024/w);cw=max(1,round(w*scale));ch=max(1,round(h*scale))
+        image=cv2.copyMakeBorder(cv2.resize(rgb,(cw,ch)),0,1024-ch,0,1024-cw,cv2.BORDER_CONSTANT,value=(0,0,0))
+        session=self.session('ctd.onnx');output=session.run(['seg'],{session.get_inputs()[0].name:image.astype(np.float32).transpose(2,0,1)[None]/255})[0][0,0]
+        return ((cv2.resize(output[:ch,:cw],(w,h)))>.3).astype(np.uint8)*255
+    def restore_neural(self,rgb,boxes):
+        h,w=rgb.shape[:2];x=max(0,min(b[0]for b in boxes)-48);y=max(0,min(b[1]for b in boxes)-48);r=min(w,max(b[2]for b in boxes)+48);b=min(h,max(b[3]for b in boxes)+48)
+        crop=np.ascontiguousarray(rgb[y:b,x:r]);local=[[a-x,c-y,d-x,e-y]for a,c,d,e in boxes]
+        hint=self.hints(crop);mask=self.refine(crop,hint,local)
+        rgba=np.ascontiguousarray(cv2.cvtColor(crop,cv2.COLOR_RGB2RGBA))
+        if not all(self.lib.neural_valid(rgba,hint,mask,crop.shape[1],crop.shape[0],*map(int,box))for box in local):return rgb.copy(),np.zeros((h,w),np.uint8),False
+        restored=self.lama(crop,mask);result=rgb.copy();result[y:b,x:r]=restored
+        whole_mask=np.zeros((h,w),np.uint8);whole_mask[y:b,x:r]=mask
+        return result,whole_mask,True
+    def can_letter_light(self,rgb,mask,boxes):
+        return self.safe_to_letter(rgb,mask,boxes) and self.simple_background(rgb,mask,boxes)
     def safe_to_letter(self,rgb,mask,boxes):
         rgba=np.ascontiguousarray(cv2.cvtColor(rgb,cv2.COLOR_RGB2RGBA));h,w=mask.shape
         return all(self.lib.coverage(rgba,mask,w,h,*map(int,box))>=.95 for box in boxes)
     def simple_background(self,rgb,mask,boxes):
         rgba=np.ascontiguousarray(cv2.cvtColor(rgb,cv2.COLOR_RGB2RGBA));h,w=mask.shape
-        return all(self.lib.simple_background(rgba,mask,w,h,*map(int,box)) for box in boxes)
+        expanded=[]
+        for x,y,r,b in boxes:
+            pad=max(3,min(r-x,b-y)*.18);expanded.append([max(1,int(x-pad)),max(1,int(y-pad)),min(w-1,int(np.ceil(r+pad))),min(h-1,int(np.ceil(b+pad)))])
+        return all(self.lib.simple_background(rgba,mask,w,h,*box) for box in expanded)
     def lama(self,rgb,mask):
         ys,xs=np.where(mask>0)
         if not len(xs):return rgb.copy()
