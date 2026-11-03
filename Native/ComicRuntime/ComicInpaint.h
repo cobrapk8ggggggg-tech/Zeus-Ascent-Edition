@@ -238,14 +238,18 @@ static inline int comic_concave_cut(const std::vector<unsigned char>&mask,int w,
         Point p=defects[a].p,q=defects[b].p;float dx=q.x-p.x,dy=q.y-p.y,len=std::hypot(dx,dy);if(len<glyph||len>std::min(w,h)*1.5f)continue;
         float score=(defects[a].depth+defects[b].depth)/len;if(score<.4f||score<=best)continue;
         int inside=0;for(int t=1;t<20;t++){int x=int(p.x+dx*t/20),y=int(p.y+dy*t/20);inside+=mask[y*w+x]>0;}if(inside<17)continue;
-        int sides[2]={0,0},regions[8]={w,h,0,0,w,h,0,0};bool clear=true;
+        int sides[2]={0,0},regions[8]={w,h,0,0,w,h,0,0};
         for(int i=0;i<count;i++){
             const int*r=boxes+4*i;float lo=1e9f,hi=-1e9f;
             for(int x:{r[0],r[2]})for(int y:{r[1],r[3]}){float d=(dx*(y-p.y)-dy*(x-p.x))/len;lo=std::min(lo,d);hi=std::max(hi,d);}
-            if(lo<0&&hi>0){clear=false;break;}int side=hi<=0?0:1;sides[side]++;int*region=regions+side*4;for(int c=0;c<2;c++)region[c]=std::min(region[c],r[c]);for(int c=2;c<4;c++)region[c]=std::max(region[c],r[c]);
+            // Diagonal neck lines can intersect an OCR bounding corner while
+            // a horizontal/vertical whitespace separator still clears every
+            // word. Assign by centre; the full group bounds below must prove
+            // that final, axis-aligned lettering cut before accepting it.
+            int side=(lo+hi)<=0?0:1;sides[side]++;int*region=regions+side*4;for(int c=0;c<2;c++)region[c]=std::min(region[c],r[c]);for(int c=2;c<4;c++)region[c]=std::max(region[c],r[c]);
         }
         int gx=std::max(regions[0],regions[4])-std::min(regions[2],regions[6]),gy=std::max(regions[1],regions[5])-std::min(regions[3],regions[7]);
-        if(clear&&sides[0]&&sides[1]&&std::max(gx,gy)>=glyph*.8f){best=score;ca=p;cb=q;}
+        if(sides[0]&&sides[1]&&std::max(gx,gy)>=glyph*.8f){best=score;ca=p;cb=q;}
     }
     if(!best)return 0;
     for(int i=0;i<2;i++){bounds[i*4]=w;bounds[i*4+1]=h;bounds[i*4+2]=bounds[i*4+3]=0;}

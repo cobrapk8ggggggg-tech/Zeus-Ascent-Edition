@@ -3,6 +3,7 @@ import base64,io,json,pathlib,unittest
 import cv2,numpy as np
 from PIL import Image,ImageDraw,ImageFont
 from engine import Engine
+from balloons import paragraphs
 class BalloonsAndInk(unittest.TestCase):
  @classmethod
  def setUpClass(cls):cls.engine=Engine(pathlib.Path(__file__).parent/'models')
@@ -57,4 +58,13 @@ class BalloonsAndInk(unittest.TestCase):
   for bg,fill in [((255,)*3,(0,)*3),((0,)*3,(255,)*3),((90,120,170),(210,20,40))]:
    im=Image.new('RGB',(400,130),bg);draw=ImageDraw.Draw(im);box=draw.textbbox((30,30),'HELLO',font=font);draw.text((30,30),'HELLO',font=font,fill=fill)
    style=self.engine.ink_style(np.array(im),[box]);self.assertIsNone(style['stroke'],style);self.assertLess(max(abs(a-b)for a,b in zip(style['fill'],fill)),12)
+ def test_staggered_real_connected_balloons_have_two_text_owners(self):
+  f=json.loads((pathlib.Path(__file__).parent/'fixtures/neural-connected-staggered.json').read_text())
+  rgb=np.array(Image.open(io.BytesIO(base64.b64decode(f['image']))).convert('RGB'))
+  lines=[dict(text=l['text'],confidence=1,box=[l['x'],l['y'],l['x']+l['width'],l['y']+l['height']])for l in f['lines']]
+  groups=paragraphs(rgb,lines,True,self.engine)
+  self.assertEqual(len(groups),2)
+  self.assertEqual([len(g[0])for g in groups],[5,5])
+  self.assertTrue(all(g[2]for g in groups))
+  self.assertLessEqual(groups[0][1][3],groups[1][1][1])
 if __name__=='__main__':unittest.main()
