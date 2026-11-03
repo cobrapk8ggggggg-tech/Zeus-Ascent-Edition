@@ -36,10 +36,10 @@ jobs:
         timeout-minutes: 15
         run: python3 .zeus-ci/comic/boot_simulator.py
       - name: Run actual WebKit, automatic OCR and Google on the live chapter
-        timeout-minutes: 15
+        timeout-minutes: 22
         run: |
           set -o pipefail
-          xcodebuild -project ZEUSNext.xcodeproj -scheme ZEUSNext -configuration Release -sdk iphonesimulator -destination "platform=iOS Simulator,id=$COMIC_SIMULATOR" -derivedDataPath "$RUNNER_TEMP/ZeusVioletLive" -resultBundlePath results/violet.xcresult -only-testing:ZEUSNextTests/NativeComicTranslationTests -parallel-testing-enabled NO -test-timeouts-enabled YES -default-test-execution-time-allowance 240 -maximum-test-execution-time-allowance 300 test CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- ENABLE_TESTABILITY=YES ONLY_ACTIVE_ARCH=YES ARCHS=arm64 2>&1 | tee results/live.log
+          xcodebuild -project ZEUSNext.xcodeproj -scheme ZEUSNext -configuration Release -sdk iphonesimulator -destination "platform=iOS Simulator,id=$COMIC_SIMULATOR" -derivedDataPath "$RUNNER_TEMP/ZeusVioletLive" -resultBundlePath results/violet.xcresult -only-testing:ZEUSNextTests/NativeComicTranslationTests -parallel-testing-enabled NO -test-timeouts-enabled YES -default-test-execution-time-allowance 1000 -maximum-test-execution-time-allowance 1100 test CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- ENABLE_TESTABILITY=YES ONLY_ACTIVE_ARCH=YES ARCHS=arm64 2>&1 | tee results/live.log
       - name: Export evidence and skip status
         if: always()
         run: |

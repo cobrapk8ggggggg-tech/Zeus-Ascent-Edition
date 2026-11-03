@@ -20,7 +20,7 @@ import CryptoKit
         view.load(URLRequest(url:URL(string:pageURL)!))
         let loaded=Date();var deadline=Date().addingTimeInterval(60),found=false
         while Date()<deadline{
-            let result=try? await view.callAsyncJavaScript("const i=[...document.images].find(e=>e.currentSrc===expected&&e.complete&&e.naturalWidth===720);if(!i||!globalThis.zeusComic)return false;globalThis.__violetLiveTestPanel=i;window.scrollTo(0,i.getBoundingClientRect().top+scrollY+2);return true;",arguments:["expected":imageURL],in:nil,contentWorld:ComicTranslation.world)
+            let result=try? await view.callAsyncJavaScript("const i=[...document.images].find(e=>e.currentSrc===expected&&e.complete&&e.naturalWidth===720);if(!i||!globalThis.zeusComic)return false;globalThis.__violetLiveTestPanel=i;globalThis.__violetOriginalPanels={};for(const e of document.images){for(const u of [e.currentSrc,e.src,e.getAttribute('data-src'),e.getAttribute('data-lazy-src')]){if(u)globalThis.__violetOriginalPanels[u]=e;}}window.scrollTo(0,i.getBoundingClientRect().top+scrollY+2);return true;",arguments:["expected":imageURL],in:nil,contentWorld:ComicTranslation.world)
             if result as? Bool==true{found=true;break}
             try await Task.sleep(for:.milliseconds(250))
         }
@@ -48,7 +48,42 @@ import CryptoKit
         _=try await view.callAsyncJavaScript("const i=globalThis.__violetLiveTestPanel;const r=i.getBoundingClientRect();window.scrollTo(0,scrollY+r.top+1500*r.height/i.naturalHeight);return true;",arguments:[:],in:nil,contentWorld:ComicTranslation.world)
         try await Task.sleep(for:.milliseconds(300))
         attach(try await view.takeSnapshot(configuration:nil),"Live Violet real site translated in the browser")
+        let applied=try await view.callAsyncJavaScript("const i=globalThis.__violetLiveTestPanel;const b=await fetch(i.src).then(r=>r.blob());return await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result.split(',')[1]);r.onerror=reject;r.readAsDataURL(b);});",arguments:[:],in:nil,contentWorld:ComicTranslation.world)as? String
+        let appliedBytes=try XCTUnwrap(Data(base64Encoded:try XCTUnwrap(applied)))
+        attach(try XCTUnwrap(UIImage(data:appliedBytes)),"Live Violet actual applied image pixels")
         XCTAssertGreaterThanOrEqual(session.detectedTexts,4);XCTAssertGreaterThanOrEqual(session.translatedTexts,4);XCTAssertGreaterThan(session.completed,0);XCTAssertEqual(painted,true)
+        // Continue scrolling the real chapter, including its coloured captions,
+        // connected balloons and outside lettering. Counts are observations, not
+        // annotated recall or a claim that each source bubble was translated.
+        let chapterURLs:[String]=["https://violetmanga.com/wp-content/uploads/manga/the-broken-ring-this-marriage-will-fail-anyway/1/0.jpeg", "https://violetmanga.com/wp-content/uploads/manga/the-broken-ring-this-marriage-will-fail-anyway/1/1.jpeg", "https://violetmanga.com/wp-content/uploads/manga/the-broken-ring-this-marriage-will-fail-anyway/1/2.jpeg", "https://violetmanga.com/wp-content/uploads/manga/the-broken-ring-this-marriage-will-fail-anyway/1/3.jpeg", "https://violetmanga.com/wp-content/uploads/manga/the-broken-ring-this-marriage-will-fail-anyway/1/4.jpeg", "https://violetmanga.com/wp-content/uploads/manga/the-broken-ring-this-marriage-will-fail-anyway/1/5.jpeg", "https://violetmanga.com/wp-content/uploads/manga/the-broken-ring-this-marriage-will-fail-anyway/1/6.jpeg", "https://violetmanga.com/wp-content/uploads/manga/the-broken-ring-this-marriage-will-fail-anyway/1/7.jpeg", "https://violetmanga.com/wp-content/uploads/manga/the-broken-ring-this-marriage-will-fail-anyway/1/8.jpeg", "https://violetmanga.com/wp-content/uploads/manga/the-broken-ring-this-marriage-will-fail-anyway/1/9.jpeg", "https://violetmanga.com/wp-content/uploads/manga/the-broken-ring-this-marriage-will-fail-anyway/1/10.jpeg", "https://violetmanga.com/wp-content/uploads/manga/the-broken-ring-this-marriage-will-fail-anyway/1/11.jpeg", "https://violetmanga.com/wp-content/uploads/manga/the-broken-ring-this-marriage-will-fail-anyway/1/12.jpeg", "https://violetmanga.com/wp-content/uploads/manga/the-broken-ring-this-marriage-will-fail-anyway/1/13.jpeg", "https://violetmanga.com/wp-content/uploads/manga/the-broken-ring-this-marriage-will-fail-anyway/1/14.jpeg", "https://violetmanga.com/wp-content/uploads/manga/the-broken-ring-this-marriage-will-fail-anyway/1/15.jpeg", "https://violetmanga.com/wp-content/uploads/manga/the-broken-ring-this-marriage-will-fail-anyway/1/16.jpeg", "https://violetmanga.com/wp-content/uploads/manga/the-broken-ring-this-marriage-will-fail-anyway/1/17.jpeg", "https://violetmanga.com/wp-content/uploads/manga/the-broken-ring-this-marriage-will-fail-anyway/1/18.jpeg", "https://violetmanga.com/wp-content/uploads/manga/the-broken-ring-this-marriage-will-fail-anyway/1/19.jpg", "https://violetmanga.com/wp-content/uploads/manga/the-broken-ring-this-marriage-will-fail-anyway/1/20.jpg", "https://violetmanga.com/wp-content/uploads/manga/the-broken-ring-this-marriage-will-fail-anyway/1/21.jpeg"]
+        var pageReports:[[String:String]]=[]
+        let normalDialoguePages:Set<Int>=[0,1,5,8,9,10,11,12,14,15,17,19]
+        for(index,url)in chapterURLs.enumerated(){
+            session.pause()
+            let pageBegan=Date();var available=false
+            deadline=Date().addingTimeInterval(25)
+            while Date()<deadline{
+                let value=try? await view.callAsyncJavaScript("globalThis.__violetChapterPanels ??= {};let i=globalThis.__violetChapterPanels[index];if(!i){i=globalThis.__violetOriginalPanels[expected]||[...document.images].find(e=>[e.currentSrc,e.src,e.getAttribute('data-src'),e.getAttribute('data-lazy-src')].includes(expected));if(i)globalThis.__violetChapterPanels[index]=i;}if(!i)return false;const r=i.getBoundingClientRect();window.scrollTo(0,r.top+scrollY+Math.min(1500,i.naturalHeight/2)*r.height/Math.max(1,i.naturalHeight));return i.complete&&i.naturalWidth===720;",arguments:["expected":url,"index":index],in:nil,contentWorld:ComicTranslation.world)
+                if value as? Bool==true{available=true;break}
+                try await Task.sleep(for:.milliseconds(200))
+            }
+            if !available{pageReports.append(["image":url,"loaded":"false","painted":"false"]);XCTFail("The live chapter image did not load: "+url);continue}
+            let detectedBefore=session.detectedTexts,translatedBefore=session.translatedTexts
+            session.start();deadline=Date().addingTimeInterval(45);var pagePainted=false
+            while Date()<deadline{
+                let value=try? await view.callAsyncJavaScript("const i=globalThis.__violetChapterPanels[index];return !!i&&(i.src.startsWith('blob:')||i.style.backgroundImage.includes('blob:'));",arguments:["index":index],in:nil,contentWorld:ComicTranslation.world)
+                pagePainted=value as? Bool==true
+                if pagePainted{break}
+                if !session.running && Date().timeIntervalSince(pageBegan)>2{break}
+                try await Task.sleep(for:.milliseconds(200))
+            }
+            pageReports.append(["image":url,"loaded":"true","painted":String(pagePainted),"seconds":String(Date().timeIntervalSince(pageBegan)),"detected_delta":String(session.detectedTexts-detectedBefore),"translated_delta":String(session.translatedTexts-translatedBefore),"error":session.error ?? "none","notice":session.contextNotice ?? "none"])
+            print("VIOLET LIVE PAGE \(index) painted=\(pagePainted) detected=\(session.detectedTexts) translated=\(session.translatedTexts)")
+            if normalDialoguePages.contains(index){XCTAssertTrue(pagePainted,"A page with ordinary readable dialogue must paint: "+url)}
+            if [0,5,12,18,20].contains(index){attach(try await view.takeSnapshot(configuration:nil),"Live Violet chapter page \(index)")}
+        }
+        session.pause()
+        let sweep=XCTAttachment(data:try JSONSerialization.data(withJSONObject:pageReports,options:[.prettyPrinted,.sortedKeys]),uniformTypeIdentifier:"public.json");sweep.name="live-violet-full-chapter-observations";sweep.lifetime = .keepAlways;add(sweep)
     }
     private func attach(_ image:UIImage,_ name:String){let a=XCTAttachment(image:image);a.name=name;a.lifetime = .keepAlways;add(a)}
 }
