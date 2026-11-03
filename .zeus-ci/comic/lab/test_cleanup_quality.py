@@ -24,4 +24,8 @@ class CleanupQuality(unittest.TestCase):
   self.assertFalse(self.engine.plate_has_edge(rgb,paper,[0,0],[]))
   im=Image.new('RGB',(w,h),(20,35,70));d=ImageDraw.Draw(im);d.ellipse((80,50,280,250),fill='white',outline='black',width=3);rgb=np.array(im);paper=(rgb.min(2)>240).astype(np.uint8)*255
   self.assertTrue(self.engine.plate_has_edge(rgb,paper,[0,0],[]))
+ def test_preserved_radial_frame_is_not_counted_as_surviving_glyphs(self):
+  f=json.loads((pathlib.Path(__file__).parent/'fixtures/neural-staggered-columns.json').read_text());decode=lambda key:np.array(Image.open(io.BytesIO(base64.b64decode(f[key]))).convert('RGB'));source=decode('image');clean=decode('goodRestoration');mask=np.full(source.shape[:2],255,np.uint8);boxes=[[l['x'],l['y'],l['x']+l['width'],l['y']+l['height']]for l in f['lines']]
+  self.assertLessEqual(self.engine.ink_residue(source,clean,mask,boxes),.08)
+  self.assertGreater(self.engine.ink_residue(source,source,mask,boxes),.9)
 if __name__=='__main__':unittest.main()

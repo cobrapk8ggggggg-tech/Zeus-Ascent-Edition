@@ -143,6 +143,7 @@ static inline void comic_refine_text_mask(const unsigned char *rgba,const unsign
     for(int i=0;i<255;i++){weight+=histogram[i];partial+=double(i)*histogram[i];if(!weight||weight==total)continue;double d=partial/weight-(sum-partial)/(total-weight),v=double(weight)*(total-weight)*d*d;if(v>best){best=v;threshold=i;}}
     if(best<=0)return;
     std::vector<int> border;for(int x=left;x<right;x++){border.push_back(gray(x,top-1));border.push_back(gray(x,bottom));}
+    for(int y=top;y<bottom;y++){border.push_back(gray(left-1,y));border.push_back(gray(right,y));}
     std::nth_element(border.begin(),border.begin()+border.size()/2,border.end());bool bright=border[border.size()/2]<=threshold;
     std::vector<unsigned char> foreground(w*h,0),seen(w*h,0),ink(w*h,0);
     for(int y=0;y<h;y++)for(int x=0;x<w;x++){int v=gray(left+x,top+y);foreground[y*w+x]=bright?v>threshold:v<=threshold;}
@@ -525,10 +526,26 @@ static inline float comic_ink_residue(const unsigned char *source,const unsigned
     for(int v=0;v<255;v++){weight+=hist[v];partial+=double(v)*hist[v];if(!weight||weight==total)continue;double d=partial/weight-(sum-partial)/(total-weight),score=double(weight)*(total-weight)*d*d;if(score>best){best=score;threshold=v;}}
     if(best<=0)return 0;
     std::vector<int> border;for(int x=left;x<right;x++){border.push_back(gray(std::max(0,top-3)*w+x));border.push_back(gray(std::min(h-1,bottom+2)*w+x));}
+    for(int y=top;y<bottom;y++){border.push_back(gray(y*w+std::max(0,left-3)));border.push_back(gray(y*w+std::min(w-1,right+2)));}
     if(border.empty())return 1;std::nth_element(border.begin(),border.begin()+border.size()/2,border.end());bool bright=border[border.size()/2]<=threshold;
+    // Artwork can legitimately retain its original edges inside padded OCR
+    // bounds (for example a radial balloon frame beside a Japanese column).
+    // Only enclosed foreground components supply glyph evidence. Expand the
+    // window first so tight OCR boxes cannot turn a cropped glyph into a frame.
+    int sx=std::max(0,left-3),sy=std::max(0,top-3),ex=std::min(w,right+3),ey=std::min(h,bottom+3),rw=ex-sx,rh=ey-sy;
+    if(int64_t(rw)*rh>1000000)return 1;
+    std::vector<unsigned char> foreground(rw*rh,0);std::vector<int> component;
+    for(int y=0;y<rh;y++)for(int x=0;x<rw;x++){int v=gray((y+sy)*w+x+sx);foreground[y*rw+x]=(bright?v>threshold:v<=threshold)?1:0;}
+    for(int i=0;i<rw*rh;i++)if(foreground[i]==1){
+        component.assign(1,i);foreground[i]=3;bool boundary=false;
+        for(size_t k=0;k<component.size();k++){int q=component[k],x=q%rw,y=q/rw;boundary=boundary||x==0||x==rw-1||y==0||y==rh-1;
+            for(int dy=-1;dy<=1;dy++)for(int dx=-1;dx<=1;dx++){int xx=x+dx,yy=y+dy;if(xx>=0&&xx<rw&&yy>=0&&yy<rh&&foreground[yy*rw+xx]==1){foreground[yy*rw+xx]=3;component.push_back(yy*rw+xx);}}
+        }
+        if(boundary)for(int q:component)foreground[q]=2;
+    }
     int evidence=0,retained=0;
     for(int y=top;y<bottom;y++)for(int x=left;x<right;x++){
-        int p=y*w+x,v=gray(p);if(!(bright?v>threshold:v<=threshold))continue;
+        int p=y*w+x;if(foreground[(y-sy)*rw+x-sx]!=3)continue;
         float strongest=0;int neighbour=-1;
         for(int dy:{-3,0,3})for(int dx:{-3,0,3})if(dx||dy){int xx=std::clamp(x+dx,0,w-1),yy=std::clamp(y+dy,0,h-1),q=yy*w+xx;float norm=0;for(int c=0;c<3;c++){float d=int(source[p*4+c])-int(source[q*4+c]);norm+=d*d;}if(norm>strongest){strongest=norm;neighbour=q;}}
         if(strongest<1800||neighbour<0)continue;
@@ -536,5 +553,5 @@ static inline float comic_ink_residue(const unsigned char *source,const unsigned
         for(int c=0;c<3;c++){float a=int(source[p*4+c])-int(source[neighbour*4+c]),b=int(clean[p*4+c])-int(clean[neighbour*4+c]);dot+=a*b;outputNorm+=b*b;}
         if(dot>strongest*.22f&&dot*dot>=strongest*outputNorm*.64f)retained++;
     }
-    return evidence>=8?float(retained)/evidence:0;
+    return evidence>=8?float(retained)/evidence:1;
 }
