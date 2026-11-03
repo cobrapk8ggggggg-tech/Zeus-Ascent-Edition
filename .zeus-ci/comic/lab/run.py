@@ -82,12 +82,13 @@ def run(args):
         for page in pages:
             if count>=limit:break
             rgb=np.asarray(Image.open(root/page['path']).convert('RGB'));start=time.perf_counter();lines=engine.detect(rgb)
-            groups=paragraphs(rgb,lines,include_layout=True,engine=engine,include_cleanup=True);random.Random(0).shuffle(groups)
-            for paragraph,area,closed,flat in groups[:per_page]:
+            groups=paragraphs(rgb,lines,include_layout=True,engine=engine,include_cleanup=True,include_bounds=True);random.Random(0).shuffle(groups)
+            for paragraph,area,closed,flat,physical in groups[:per_page]:
                 if count>=limit:break
                 boxes=[l['box'] for l in paragraph];x=min(b[0]for b in boxes);y=min(b[1]for b in boxes);r=max(b[2]for b in boxes);b=max(b[3]for b in boxes)
                 if r-x<15 or b-y<10 or (r-x)*(b-y)>750000:continue
-                pad=24;cx=max(0,min(x,area[0])-pad);cy=max(0,min(y,area[1])-pad);cr=min(rgb.shape[1],max(r,area[2])+pad);cb=min(rgb.shape[0],max(b,area[3])+pad)
+                context=physical if physical is not None else area
+                pad=24;cx=max(0,min(x,context[0])-pad);cy=max(0,min(y,context[1])-pad);cr=min(rgb.shape[1],max(r,context[2])+pad);cb=min(rgb.shape[0],max(b,context[3])+pad)
                 crop=np.ascontiguousarray(rgb[cy:cb,cx:cr]);local=[[a-cx,c-cy,d-cx,e-cy] for a,c,d,e in boxes]
                 recognized=[];confidence=[]
                 if args.ocr:
@@ -99,15 +100,21 @@ def run(args):
                 fg=(12,12,12) if np.median(crop)>128 else (248,248,248)
                 vertical=not closed and all(q[3]-q[1]>(q[2]-q[0])*1.5 for q in local)
                 area_local=[area[0]-cx,area[1]-cy,area[2]-cx,area[3]-cy]
+                physical_local=None if physical is None else[physical[0]-cx,physical[1]-cy,physical[2]-cx,physical[3]-cy]
+                columnar=vertical and any(0x3040<=ord(ch)<=0x30ff or 0x3400<=ord(ch)<=0x9fff or 0xac00<=ord(ch)<=0xd7af for ch in ''.join(recognized))
+                if columnar:
+                    upright=[x-cx,y-cy,r-cx,b-cy]
+                    _,fits=lettering(crop,upright,text,np.median([l['glyph_height']for l in paragraph])*1.3,fg,direction='ltr' if chapter['language']=='ar' else 'rtl',ink_style=source_style)
+                    if fits:vertical=False;area_local=upright
                 _,fit=lettering(crop,area_local,text,np.median([l['glyph_height']for l in paragraph])*1.3,fg,direction='ltr' if chapter['language']=='ar' else 'rtl',vertical=vertical,ink_style=source_style)
                 accepted=False;route='original';clean=crop.copy();mask=np.zeros(crop.shape[:2],np.uint8)
                 if fit and readable:
                     if flat is not None:clean,mask,accepted=engine.apply_flat_cleanup(crop,[cx,cy],flat)
-                    else:clean,mask=engine.clean(crop,local);accepted=engine.can_letter_light(crop,mask,local,area_local if closed else None)
+                    else:clean,mask=engine.clean(crop,local);accepted=engine.can_letter_light(crop,mask,local,physical_local if closed else None)
                     if accepted and engine.ink_residue(crop,clean,mask,local)>.08:accepted=False
                     if accepted:route='flat'if flat is not None and flat['uniform']else'light'
                     elif args.neural:
-                        clean,mask,accepted=engine.restore_neural(crop,local,area_local if closed else None)
+                        clean,mask,accepted=engine.restore_neural(crop,local,physical_local if closed else None)
                         if accepted:route='neural'
                 if not accepted:clean=crop.copy()
                 rendered=clean
@@ -115,7 +122,7 @@ def run(args):
                 outside=int(np.count_nonzero(np.any(clean!=crop,axis=2)&(mask==0)))
                 cid=f'{chapter["language"]}-{chapter["id"][:8]}-{chapter["split"]}-{count:03d}';dest=out/cid;dest.mkdir(exist_ok=True)
                 for name,a in [('original',crop),('mask',mask),('clean',clean),('rendered',rendered)]:Image.fromarray(a).save(dest/(name+'.png'))
-                case=dict(id=cid,language=chapter['language'],split=chapter['split'],chapter=chapter['id'],source=page['path'],source_sha256=page['sha256'],box=[cx,cy,cr,cb],layout_box=[area[0]-cx,area[1]-cy,area[2]-cx,area[3]-cy],lines=paragraph,balloon=closed,vertical_caption=vertical,ocr=recognized,ocr_confidence=confidence,source_readable=readable,outside_mask_changes=outside,fit=fit,restoration_route=route,cleanup_accepted=accepted,source_ink_style=source_style,annotation_status='unreviewed',translation='fixed Arabic layout probe',seconds=time.perf_counter()-start)
+                case=dict(id=cid,language=chapter['language'],split=chapter['split'],chapter=chapter['id'],source=page['path'],source_sha256=page['sha256'],box=[cx,cy,cr,cb],layout_box=area_local,balloon_bounds=physical_local,lines=paragraph,balloon=closed,vertical_caption=vertical,ocr=recognized,ocr_confidence=confidence,source_readable=readable,outside_mask_changes=outside,fit=fit,restoration_route=route,cleanup_accepted=accepted,source_ink_style=source_style,annotation_status='unreviewed',translation='fixed Arabic layout probe',seconds=time.perf_counter()-start)
                 cases.append(case);count+=1;start=time.perf_counter()
                 if args.lama and count<=args.lama:
                     restored=engine.lama(crop,mask);Image.fromarray(restored).save(dest/'lama.png')
@@ -123,7 +130,7 @@ def run(args):
             print(chapter['language'],chapter['split'],page['path'],'regions',count,flush=True)
         completed.append(chapter['id']);checkpoint()
     gallery(out,cases)
-    report=dict(chapters=len(corpus['chapters']),pages=sum(len(c['pages'])for c in corpus['chapters']),regions=len(cases),languages=sorted(set(c['language']for c in cases)),outside_mask_changes=sum(c['outside_mask_changes']for c in cases),layout_probe_fits=sum(c['fit']for c in cases),neural_restored=sum(c['restoration_route']=='neural'for c in cases),light_restored=sum(c['restoration_route']in['flat','light']for c in cases),flat_restored=sum(c['restoration_route']=='flat'for c in cases),cleanup_gate_accepted=sum(c['cleanup_accepted']for c in cases),cleanup_gate_abstained=sum(not c['cleanup_accepted']for c in cases),manually_reviewed=0,quality_acceptance_proven=False,native_kernel_sha256=engine.native_sha,protocol='adaptive-v5: connected-lobe ownership; source fill and outline; whole-balloon gate; layout preflight',peak_rss_kib=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
+    report=dict(chapters=len(corpus['chapters']),pages=sum(len(c['pages'])for c in corpus['chapters']),regions=len(cases),languages=sorted(set(c['language']for c in cases)),outside_mask_changes=sum(c['outside_mask_changes']for c in cases),layout_probe_fits=sum(c['fit']for c in cases),neural_restored=sum(c['restoration_route']=='neural'for c in cases),light_restored=sum(c['restoration_route']in['flat','light']for c in cases),flat_restored=sum(c['restoration_route']=='flat'for c in cases),cleanup_gate_accepted=sum(c['cleanup_accepted']for c in cases),cleanup_gate_abstained=sum(not c['cleanup_accepted']for c in cases),manually_reviewed=0,quality_acceptance_proven=False,native_kernel_sha256=engine.native_sha,protocol='adaptive-v12: inscribed lettering rectangles; separate cleanup bounds; upright CJK paragraph translation; post-clean glyph gate',peak_rss_kib=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
     (out/'report.json').write_text(json.dumps(report,indent=2));print(json.dumps(report),flush=True)
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--corpus',required=True);p.add_argument('--models',required=True);p.add_argument('--output',required=True);p.add_argument('--regions',type=int,default=400);p.add_argument('--ocr',action='store_true');p.add_argument('--lama',type=int,default=0);p.add_argument('--neural',action='store_true');p.add_argument('--resume',action='store_true');run(p.parse_args())

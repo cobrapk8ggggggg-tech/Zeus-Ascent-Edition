@@ -394,6 +394,8 @@ import UIKit
         }
         let speeches=ComicBalloons.speeches(lines,image:image,source:"ja")
         XCTAssertEqual(speeches.count,1);XCTAssertEqual(speeches.first?.lines.count,4)
+        let plan=try XCTUnwrap(ComicPixels.planned(XCTUnwrap(speeches.first),text:"إذا فكرت في الأمر، إلى أين يمكن أن يذهب؟",width:image.width,height:image.height,target:"ar",fontName:nil,fontScale:1,letterSpacing:0,requireReadable:true))
+        XCTAssertEqual(plan.1.theta,0,"Upright Japanese columns must yield an upright Arabic paragraph when it fits")
         let restored=try await ComicRestoration.shared.restore(image,speeches:speeches,requiredHeadroom:0)
         let values=speeches.map{TranslationSegment(id:$0.id,text:"إذا فكرت في الأمر، إلى أين يمكن أن يذهب؟")}
         let output=try ComicPixels.renderReport(restored.image,speeches:speeches,translations:values,target:"ar",fontName:nil,fontScale:1,requireCleanSource:true,precleanedIDs:restored.restored,styleSource:image)
@@ -409,6 +411,7 @@ import UIKit
         let speeches=ComicBalloons.speeches(lines,image:image,source:"en"),requests=speeches.map{TranslationSegment(id:$0.id,text:$0.text)}
         XCTAssertEqual(requests.count,2);XCTAssertEqual(Set(requests.map(\.id)).count,2)
         XCTAssertEqual(speeches.map{$0.lines.count},[5,5])
+        XCTAssertFalse(speeches.first?.rect.contains(CGPoint(x:80,y:100)) ?? true,"The upper balloon's lettering must stay out of the neighbouring white panel")
         XCTAssertTrue(requests.first?.text.hasPrefix("Why are you getting")==true);XCTAssertTrue(requests.last?.text.hasPrefix("If some-")==true)
         let values=zip(speeches,["لماذا تشعر بالإحباط؟","إذا كان هناك ما يزعجك، أخبرني!"]).map{TranslationSegment(id:$0.0.id,text:$0.1)}
         let output=try ComicPixels.renderReport(image,speeches:speeches,translations:values,target:"ar",fontName:nil,fontScale:1,requireCleanSource:true)

@@ -179,7 +179,7 @@ actor ComicRestoration {
         var result = original, ids = Set<String>(),jobs:[MaskedCrop]=[],pendingPixels=0
         for speech in candidates {
             try Task.checkCancellation()
-            let sourceBounds=speech.balloon ? speech.rect:speech.lines.reduce(CGRect.null) { $0.union($1.rect) }
+            let sourceBounds=speech.balloon ? (speech.balloonBounds ?? speech.rect):speech.lines.reduce(CGRect.null) { $0.union($1.rect) }
             let bounds = sourceBounds.insetBy(dx: -48, dy: -48).integral.intersection(CGRect(x:0,y:0,width:image.width,height:image.height))
             // Sparse masks and source crops stay below 20 MB per chunk. Detect
             // the whole chunk with CTD, then switch once to LaMa for its patches.
@@ -201,7 +201,7 @@ actor ComicRestoration {
             pixels.withUnsafeBufferPointer { p in neural.withUnsafeBufferPointer { hints in mask.withUnsafeMutableBufferPointer { m in
                 for line in local.lines {
                     let pad=max(3,min(line.rect.height,line.rect.width)*0.18)
-                    let rect=line.rect.insetBy(dx:-pad,dy:-pad).intersection(local.balloon ? local.rect:CGRect(x:1,y:1,width:crop.width-2,height:crop.height-2)).integral
+                    let rect=line.rect.insetBy(dx:-pad,dy:-pad).intersection(local.balloon ? (local.balloonBounds ?? local.rect):CGRect(x:1,y:1,width:crop.width-2,height:crop.height-2)).integral
                     if !rect.isNull { zeus_comic_refine_text_mask(p.baseAddress,hints.baseAddress,m.baseAddress,Int32(crop.width),Int32(crop.height),Int32(rect.minX),Int32(rect.minY),Int32(rect.maxX),Int32(rect.maxY)) }
                 }
             } } }
@@ -212,7 +212,7 @@ actor ComicRestoration {
             try Task.checkCancellation()
             let glyphs=local.lines.map{min($0.rect.width,$0.rect.height)}.sorted(),glyph=glyphs[glyphs.count/2]
             let textBounds=local.lines.reduce(CGRect.null){$0.union($1.rect)}
-            let protected=(local.balloon ? local.rect:textBounds.insetBy(dx:-max(8,min(18,glyph*0.4)),dy:-max(8,min(18,glyph*0.4)))).integral.intersection(CGRect(x:1,y:1,width:crop.width-2,height:crop.height-2))
+            let protected=(local.balloon ? (local.balloonBounds ?? local.rect):textBounds.insetBy(dx:-max(8,min(18,glyph*0.4)),dy:-max(8,min(18,glyph*0.4)))).integral.intersection(CGRect(x:1,y:1,width:crop.width-2,height:crop.height-2))
             grow(&mask,width:crop.width,height:crop.height,area:protected,radius:2)
             jobs.append(MaskedCrop(id:speech.id,pixels:pixels,mask:mask,bounds:bounds,width:crop.width,height:crop.height,boxes:local.lines.map(\.rect),protected:protected,retryMargin:max(8,min(18,Int(ceil(glyph*0.4))))));pendingPixels+=crop.width*crop.height
         }

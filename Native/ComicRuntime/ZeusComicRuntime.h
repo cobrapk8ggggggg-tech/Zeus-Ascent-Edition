@@ -11,6 +11,7 @@ int zeus_comic_simple_background(const unsigned char *pixels, const unsigned cha
 int zeus_comic_balloon_lobes(const unsigned char *interior, int width, int height, const int *boxes, int count, int *owners, int *bounds);
 float zeus_comic_ink_style(const unsigned char *pixels, int width, int height, const int *boxes, int count, float *output);
 int zeus_comic_flat_balloon_mask(const unsigned char *paper, unsigned char *mask, int width, int height, int left, int top, int right, int bottom, const int *boxes, int count);
+int zeus_comic_lettering_box(const unsigned char *paper, int width, int height, int left, int top, int right, int bottom, const int *boxes, int count, int *output);
 int zeus_comic_plate_color(const unsigned char *pixels, int image_width, int image_height, const unsigned char *paper, int width, int height, int origin_x, int origin_y, unsigned char *color);
 int zeus_comic_plate_has_edge(const unsigned char *pixels, int image_width, int image_height, const unsigned char *paper, int width, int height, int origin_x, int origin_y, const int *boxes, int count);
 void zeus_comic_grow_text_mask(unsigned char *mask, int width, int height, int left, int top, int right, int bottom, int radius);

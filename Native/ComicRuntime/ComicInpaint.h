@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstdint>
 #include <vector>
+#include <utility>
 
 // A bounded, CPU-only text mask. The surrounding colour field seeds a harmonic
 // reconstruction; unlike a solid fill this retains local gradients. Coordinates
@@ -482,6 +483,40 @@ static inline bool comic_flat_balloon_mask(const unsigned char *paper,unsigned c
     return true;
 }
 
+
+// Largest axis-aligned lettering rectangle inside this lobe's actual paper.
+// Glyph holes are filled first; a bounding rectangle alone can cross the frame
+// of staggered joined balloons. Every source line centre must remain inside.
+static inline bool comic_lettering_box(const unsigned char *paper,int w,int h,int left,int top,int right,int bottom,const int *boxes,int count,int *output){
+    if(!paper||!boxes||!output||w<3||h<3||count<1||int64_t(w)*h>1000000)return false;
+    left=std::clamp(left,1,w-1);right=std::clamp(right,1,w-1);top=std::clamp(top,1,h-1);bottom=std::clamp(bottom,1,h-1);
+    if(right<=left||bottom<=top)return false;
+    std::vector<unsigned char> outside(w*h,0);std::vector<int> queue;
+    auto add=[&](int p){if(!paper[p]&&!outside[p]){outside[p]=1;queue.push_back(p);}};
+    for(int x=0;x<w;x++){add(x);add((h-1)*w+x);}for(int y=1;y<h-1;y++){add(y*w);add(y*w+w-1);}
+    for(size_t k=0;k<queue.size();k++){int p=queue[k],x=p%w,y=p/w;if(x)add(p-1);if(x+1<w)add(p+1);if(y)add(p-w);if(y+1<h)add(p+w);}
+    std::vector<int> distance(w*h,0);for(int p=0;p<w*h;p++)distance[p]=outside[p]?0:w+h;
+    for(int y=0;y<h;y++)for(int x=0;x<w;x++){int p=y*w+x;if(distance[p])distance[p]=std::min({distance[p],x?distance[p-1]+1:1,y?distance[p-w]+1:1});}
+    for(int y=h-1;y>=0;y--)for(int x=w-1;x>=0;x--){int p=y*w+x;if(distance[p])distance[p]=std::min({distance[p],x+1<w?distance[p+1]+1:1,y+1<h?distance[p+w]+1:1});}
+    float minx=w,miny=h,maxx=0,maxy=0;
+    for(int i=0;i<count;i++){float x=(boxes[i*4]+boxes[i*4+2])*.5f,y=(boxes[i*4+1]+boxes[i*4+3])*.5f;minx=std::min(minx,x);maxx=std::max(maxx,x);miny=std::min(miny,y);maxy=std::max(maxy,y);}
+    int best=0;float bestDistance=1e20f;std::vector<int> heights(w,0);std::vector<std::pair<int,int>> stack;
+    for(int y=top;y<bottom;y++){
+        for(int x=left;x<right;x++)heights[x]=distance[y*w+x]>=3?heights[x]+1:0;
+        stack.clear();
+        for(int x=left;x<=right;x++){
+            int value=x==right?0:heights[x],start=x;
+            while(!stack.empty()&&stack.back().second>value){
+                auto bar=stack.back();stack.pop_back();start=bar.first;int yy=y-bar.second+1,area=(x-bar.first)*bar.second;
+                if(bar.first<=minx&&x>maxx&&yy<=miny&&y+1>maxy){float dx=(bar.first+x)*.5f-(minx+maxx)*.5f,dy=(yy+y+1)*.5f-(miny+maxy)*.5f,d=dx*dx+dy*dy;
+                    if(area>best||(area==best&&d<bestDistance)){best=area;bestDistance=d;output[0]=bar.first;output[1]=yy;output[2]=x;output[3]=y+1;}
+                }
+            }
+            if(value>0&&(stack.empty()||stack.back().second<value))stack.push_back({start,value});
+        }
+    }
+    return best>=16;
+}
 
 // JPEG ringing belongs to text/frame edges, not the paper colour field.
 // Sample beyond that narrow fringe, then use a robust channel median. A real

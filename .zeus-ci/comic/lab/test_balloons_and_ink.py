@@ -67,6 +67,9 @@ class BalloonsAndInk(unittest.TestCase):
   self.assertEqual([len(g[0])for g in groups],[5,5])
   self.assertTrue(all(g[2]for g in groups))
   self.assertLessEqual(groups[0][1][3],groups[1][1][1])
+  paper=(rgb.min(2)>230).astype(np.uint8)*255;_,labels,_,_=cv2.connectedComponentsWithStats(paper,4);l,t,r,b=lines[0]['box'];ids,hits=np.unique(labels[t:b,l:r],return_counts=True);owner=max(((n,i)for i,n in zip(ids,hits)if i),default=(0,0))[1];paper=(labels==owner).astype(np.uint8)*255;flood=paper.copy();cv2.floodFill(flood,None,(0,0),255);filled=(paper>0)|(flood==0)
+  for rows,area,closed in groups:
+   l,t,r,b=map(int,area);self.assertTrue(filled[t:b,l:r].all(),'A lettering rectangle must not cross the real frame or enter the other white panel')
  def test_japanese_column_order_cannot_drop_a_recognized_column(self):
   from run_geometry import group
   f=json.loads((pathlib.Path(__file__).parent/'fixtures/neural-staggered-columns.json').read_text())
@@ -75,4 +78,9 @@ class BalloonsAndInk(unittest.TestCase):
    groups=group(order);self.assertEqual(len(groups),1);self.assertEqual(len(groups[0]),4)
   separate=[dict(text='separate',confidence=1,box=[390,60,440,280])]
   self.assertEqual(len(group(lines+separate)),2)
+ def test_maximum_paper_rectangle_does_not_collapse_to_a_thin_strip(self):
+  paper=np.zeros((400,400),np.uint8);cv2.circle(paper,(200,200),150,255,-1)
+  boxes=[[150,150,200,175],[180,195,240,220]];area=self.engine.lettering_box(paper,[1,1,399,399],boxes)
+  self.assertIsNotNone(area);l,t,r,b=area;self.assertGreater((r-l)*(b-t),40000);self.assertTrue((paper[t:b,l:r]>0).all())
+  for a,c,d,f in boxes:self.assertTrue(l<=(a+d)/2<r and t<=(c+f)/2<b)
 if __name__=='__main__':unittest.main()

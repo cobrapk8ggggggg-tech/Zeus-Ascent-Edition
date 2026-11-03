@@ -2,7 +2,7 @@
 import cv2,numpy as np
 from run_geometry import group
 
-def paragraphs(rgb,lines,include_layout=False,engine=None,include_cleanup=False):
+def paragraphs(rgb,lines,include_layout=False,engine=None,include_cleanup=False,include_bounds=False):
  h,w=rgb.shape[:2];cache={};plates=[];shapes={};colors={}
  def plate(box):
   x,y,r,b=box
@@ -65,8 +65,12 @@ def paragraphs(rgb,lines,include_layout=False,engine=None,include_cleanup=False)
 
    x,y,r,b=p;dx=(r-x)*.15;dy=(b-y)*.15
    area=[max(x+2,min(x+dx,min(l['box'][0]-3 for l in g))),max(y+2,min(y+dy,min(l['box'][1]-3 for l in g))),min(r-2,max(r-dx,max(l['box'][2]+3 for l in g))),min(b-2,max(b-dy,max(l['box'][3]+3 for l in g)))]
-   result.append((sorted(g,key=lambda l:(l['box'][1],l['box'][0])),[int(v)for v in area],True,flat))
+   if engine is not None:
+    xx,yy,rr,bb=original_plate;local=[[l['box'][0]-xx+1,l['box'][1]-yy+1,l['box'][2]-xx+1,l['box'][3]-yy+1]for l in g]
+    inside=engine.lettering_box(shapes[tuple(original_plate)],[p[0]-xx+1,p[1]-yy+1,p[2]-xx+1,p[3]-yy+1],local)
+    if inside is not None:area=[inside[0]+xx-1,inside[1]+yy-1,inside[2]+xx-1,inside[3]+yy-1]
+   result.append((sorted(g,key=lambda l:(l['box'][1],l['box'][0])),[int(v)for v in area],True,flat,list(p)))
  for g in group(unplated):
   x=min(l['box'][0]for l in g);y=min(l['box'][1]for l in g);r=max(l['box'][2]for l in g);b=max(l['box'][3]for l in g);pad=max(3,min(r-x,b-y)*.12)
-  result.append((g,[max(1,int(x-pad)),max(1,int(y-pad)),min(w-1,int(r+pad)),min(h-1,int(b+pad))],False,None))
- return result if include_cleanup else[(g,area,closed)for g,area,closed,_ in result]if include_layout else[(g,area)for g,area,_,_ in result]
+  result.append((g,[max(1,int(x-pad)),max(1,int(y-pad)),min(w-1,int(r+pad)),min(h-1,int(b+pad))],False,None,None))
+ return result if include_bounds else[(g,area,closed,flat)for g,area,closed,flat,_ in result]if include_cleanup else[(g,area,closed)for g,area,closed,_,_ in result]if include_layout else[(g,area)for g,area,_,_,_ in result]

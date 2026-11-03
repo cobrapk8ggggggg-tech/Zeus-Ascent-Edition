@@ -14,6 +14,10 @@ class Engine:
             os.replace(temporary,library)
         self.lib=ctypes.CDLL(str(library));p=np.ctypeslib.ndpointer(dtype=np.uint8,flags='C_CONTIGUOUS')
         self.lib.clean.argtypes=[p]+[ctypes.c_int]*6;self.lib.text_mask.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.clean_source.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.coverage.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.coverage.restype=ctypes.c_float;self.lib.refine.argtypes=[p,p,p]+[ctypes.c_int]*6;self.lib.refine_ocr.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.clean_mask.argtypes=[p,p,p]+[ctypes.c_int]*6;self.lib.simple_background.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.neural_valid.argtypes=[p,p,p]+[ctypes.c_int]*6;self.lib.mask_owned.argtypes=[p]+[ctypes.c_int]*6+[np.ctypeslib.ndpointer(dtype=np.int32,flags='C_CONTIGUOUS'),ctypes.c_int]
+    def lettering_box(self,paper,area,boxes):
+        u8=np.ctypeslib.ndpointer(dtype=np.uint8,flags='C_CONTIGUOUS');i32=np.ctypeslib.ndpointer(dtype=np.int32,flags='C_CONTIGUOUS');self.lib.lettering_box.argtypes=[u8]+[ctypes.c_int]*6+[i32,ctypes.c_int,i32]
+        boxes=np.ascontiguousarray(boxes,np.int32).reshape(-1,4);out=np.zeros(4,np.int32);h,w=paper.shape
+        return out.tolist()if self.lib.lettering_box(paper,w,h,*map(int,area),boxes.reshape(-1),len(boxes),out)else None
     def plate_color(self,rgb,paper,origin):
         u8=np.ctypeslib.ndpointer(dtype=np.uint8,flags='C_CONTIGUOUS');self.lib.plate_color.argtypes=[u8,ctypes.c_int,ctypes.c_int,u8]+[ctypes.c_int]*4+[u8]
         rgba=np.ascontiguousarray(cv2.cvtColor(rgb,cv2.COLOR_RGB2RGBA));ih,iw=rgb.shape[:2];h,w=paper.shape;color=np.zeros(3,np.uint8)

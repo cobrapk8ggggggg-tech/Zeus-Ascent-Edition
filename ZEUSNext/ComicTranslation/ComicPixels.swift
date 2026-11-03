@@ -76,7 +76,7 @@ enum ComicPixels {
             return planned(speech,text:text,width:width,height:height,target:target,fontName:fontName,fontScale:fontScale,letterSpacing:letterSpacing,requireReadable:true) != nil
         }
     }
-    private static func planned(_ speech:ComicSpeech,text:String,width:Int,height:Int,target:String,fontName:String?,fontScale:Double,letterSpacing:Double,requireReadable:Bool)->(CGRect,Placement)?{
+    static func planned(_ speech:ComicSpeech,text:String,width:Int,height:Int,target:String,fontName:String?,fontScale:Double,letterSpacing:Double,requireReadable:Bool)->(CGRect,Placement)?{
         let source=speech.lines.reduce(CGRect.null){$0.union($1.rect)}
         guard !source.isNull,!speech.lines.isEmpty else{return nil}
         let pad=max(3,min(source.width,source.height)*0.12)
@@ -86,6 +86,11 @@ enum ComicPixels {
         let sourceSize=heights[heights.count/2]*1.3
         let placement:Placement?
         if speech.vertical && !speech.balloon{
+            let columns=speech.text.unicodeScalars.contains{(0x3040...0x30FF).contains($0.value)||(0x3400...0x9FFF).contains($0.value)||(0xAC00...0xD7AF).contains($0.value)} && speech.lines.allSatisfy{abs($0.angle)<Double.pi/3}
+            if columns{
+                let uprightArea=source.intersection(CGRect(x:0,y:0,width:width,height:height)).integral
+                if let upright=place(text,area:uprightArea,imageHeight:height,target:target,fontName:fontName,fontScale:fontScale,theta:0,letterSpacing:letterSpacing,maximumSize:sourceSize),upright.layout.size>=sourceSize*CGFloat(min(1.5,max(0.5,fontScale)))*0.55{return(uprightArea,upright)}
+            }
             let baseline=speech.lines.map(\.angle).first(where:{abs($0) > .pi/3}) ?? .pi/2
             placement=placeVertical(text,area:area,target:target,fontName:fontName,fontScale:fontScale,letterSpacing:letterSpacing,maximumSize:sourceSize,theta:baseline<0 ? -.pi/2:.pi/2)
         }else{placement=place(text,area:area,imageHeight:height,target:target,fontName:fontName,fontScale:fontScale,theta:CGFloat(speech.angle ?? 0),letterSpacing:letterSpacing,maximumSize:sourceSize)}
@@ -227,7 +232,7 @@ enum ComicPixels {
     static func ownsText(_ pixels:[UInt8],width:Int,height:Int,speech:ComicSpeech,evidence:[UInt8]? = nil)->Bool{
         guard speech.balloon else{return true}
         if let flat=speech.flatCleanup,evidence==nil{return flat.complete}
-        let area=speech.rect.integral.intersection(CGRect(x:1,y:1,width:max(0,width-2),height:max(0,height-2)))
+        let area=(speech.balloonBounds ?? speech.rect).integral.intersection(CGRect(x:1,y:1,width:max(0,width-2),height:max(0,height-2)))
         guard !area.isNull,area.width*area.height<=1_000_000 else{return false}
         var mask=evidence ?? [UInt8](repeating:0,count:width*height)
         if evidence==nil{pixels.withUnsafeBufferPointer{p in mask.withUnsafeMutableBufferPointer{m in zeus_comic_text_mask(p.baseAddress,m.baseAddress,Int32(width),Int32(height),Int32(area.minX),Int32(area.minY),Int32(area.maxX),Int32(area.maxY))}}}
@@ -274,7 +279,7 @@ enum ComicPixels {
     }
     private static func cleanupBoxes(width:Int,height:Int,speech:ComicSpeech)->[CGRect]{
         let bounds=CGRect(x:1,y:1,width:max(0,width-2),height:max(0,height-2))
-        let protected=speech.balloon ? speech.rect:bounds
+        let protected=speech.balloon ? (speech.balloonBounds ?? speech.rect):bounds
         var boxes:[CGRect]=[]
         for line in speech.lines{
             // Include outlines, antialiasing and shadows outside tight OCR boxes.
