@@ -121,6 +121,26 @@ import UIKit
         XCTAssertEqual(outside,0,"rotated lettering must never paint outside the speech it belongs to")
         let attachment=XCTAttachment(image:UIImage(cgImage:drawn));attachment.name="Rotated tail lettering";attachment.lifetime = .keepAlways;add(attachment)
     }
+    func testRealComicCropsRenderThroughProductionCoreText()async throws{
+        struct Line:Decodable{var text:String;var confidence:Float;var x:Double;var y:Double;var width:Double;var height:Double;var glyphHeight:Double}
+        struct Fixture:Decodable{var id:String;var lines:[Line];var image:String;var translation:String}
+        let base="http://127.0.0.1:8765/comic-quality-fixtures"
+        let (data,_)=try await URLSession.shared.data(from:URL(string:base)!)
+        let names=try JSONDecoder().decode([String].self,from:data);XCTAssertGreaterThanOrEqual(names.count,6)
+        for name in names{
+            let (data,_)=try await URLSession.shared.data(from:URL(string:base+"?name="+name)!)
+            let fixture=try JSONDecoder().decode(Fixture.self,from:data)
+            let image=try ComicPixels.decode(XCTUnwrap(Data(base64Encoded:fixture.image)))
+            let lines=fixture.lines.map{ComicLine(text:$0.text,confidence:$0.confidence,rect:CGRect(x:$0.x,y:$0.y,width:$0.width,height:$0.height),glyphHeight:$0.glyphHeight)}
+            let speeches=ComicBalloons.speeches(lines,image:image,source:"en")
+            XCTAssertFalse(speeches.isEmpty)
+            let translations=speeches.map{TranslationSegment(id:$0.id,text:fixture.translation)}
+            let output=try ComicPixels.render(image,speeches:speeches,translations:translations,target:"ar",fontName:nil,fontScale:1,textColor:"163B72")
+            let attachment=XCTAttachment(image:UIImage(cgImage:output));attachment.name="Real comic CoreText - "+fixture.id;attachment.lifetime = .keepAlways;add(attachment)
+            let pixels=try XCTUnwrap(ComicPixels.rgba(output,width:output.width,height:output.height))
+            XCTAssertTrue(stride(from:0,to:pixels.count,by:4).contains{Int(pixels[$0+2])>Int(pixels[$0])+25},"real comic crop must contain rendered Arabic")
+        }
+    }
     func testSourceFontCapPreventsOneWordFillingHugeBalloon()throws{
         let short=try XCTUnwrap(ComicPixels.layout("سجن",rect:CGRect(x:0,y:0,width:450,height:350),target:"ar",fontName:nil,fontScale:1,maximumSize:26))
         let long=try XCTUnwrap(ComicPixels.layout("عذرًا، لكن هل يمكنكم مساعدتنا؟",rect:CGRect(x:0,y:0,width:450,height:350),target:"ar",fontName:nil,fontScale:1,maximumSize:26))

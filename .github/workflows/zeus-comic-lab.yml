@@ -1,0 +1,36 @@
+name: Comic pixel quality lab
+on:
+  push:
+    branches: [fix/comic-translation-reliability]
+    paths: ['Native/ComicRuntime/ComicInpaint.h', '.zeus-ci/comic/lab/**', '.github/workflows/zeus-comic-lab.yml']
+  workflow_dispatch:
+    inputs:
+      real_chapters:
+        type: boolean
+        default: false
+        description: Download and exercise ten real chapters (review proposals, not visual acceptance)
+permissions:
+  contents: read
+jobs:
+  masks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: sudo apt-get update -qq && sudo apt-get install -y fonts-noto-core fonts-dejavu-core
+      - run: pip install -r .zeus-ci/comic/lab/requirements.txt
+      - run: python .zeus-ci/comic/lab/test_masks.py
+      - if: inputs.real_chapters == true
+        run: |
+          python .zeus-ci/comic/lab/models.py .zeus-ci/comic/lab/models
+          python .zeus-ci/comic/lab/acquire.py .zeus-ci/comic/lab/data
+          python .zeus-ci/comic/lab/run.py --corpus .zeus-ci/comic/lab/data --models .zeus-ci/comic/lab/models --output .zeus-ci/comic/lab/output/review --regions 400 --ocr
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: comic-local-pixel-evidence
+          path: |
+            .zeus-ci/comic/lab/output/review
+            .zeus-ci/comic/lab/data/corpus.json

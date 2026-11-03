@@ -23,3 +23,7 @@ Pods/
 *.xcworkspace/
 node_modules/
 __pycache__/
+# Real comic chapters, local model weights and lab output are reproducible artifacts.
+.zeus-ci/comic/lab/data/
+.zeus-ci/comic/lab/output/
+.zeus-ci/comic/lab/models/

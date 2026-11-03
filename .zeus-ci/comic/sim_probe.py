@@ -17,7 +17,7 @@ CORE = [
     "testArabicLetteringChangesActualPixelsInsideTheBalloon",
     "testArabicCoreTextFitsAndColorIsValidated",
     "testActualLocalOCRReadsRasterText",
-    "testDiagonalTailEstimatesAngleAndRotatedLetteringStaysInsideBounds",
+    "testExplicitBaselineAngleAndRotatedLetteringStaysInsideBounds",
     "testOutlineInkAddsOppositeStrokeOverNoisyBackground",
     "testEndToEndImagesDoNotTranslateDOMAndFontChangesReuseOCRAndProvider",
     "testCrossOriginNoReferrerImagesTranslateThroughNativeFetch",

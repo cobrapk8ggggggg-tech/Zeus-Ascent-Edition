@@ -1,5 +1,6 @@
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import time
+from pathlib import Path
 import base64
 from threading import Thread
 import json
@@ -235,6 +236,14 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if github_response(self, 'GET'): return
+        if self.path.startswith('/comic-quality-fixtures'):
+            root=Path(__file__).resolve().parent/'comic/lab/fixtures'
+            name=parse_qs(urlparse(self.path).query).get('name',[''])[0]
+            if not name: body=json.dumps(sorted(p.name for p in root.glob('*.json'))).encode()
+            elif name in [p.name for p in root.glob('*.json')]: body=(root/name).read_bytes()
+            else: self.send_response(404);self.end_headers();return
+            self.send_response(200);self.send_header('Content-Type','application/json');self.send_header('Content-Length',str(len(body)));self.end_headers();self.wfile.write(body);return
+
         if self.path.startswith('/translation-requests'):
             model = parse_qs(urlparse(self.path).query).get('model', [''])[0]
             with TRANSLATION_LOCK: body = json.dumps(TRANSLATION_REQUESTS.get(model, [])).encode()

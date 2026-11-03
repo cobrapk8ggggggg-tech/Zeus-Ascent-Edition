@@ -129,6 +129,7 @@ struct ComicLine: Codable, Equatable {
     var confidence: Float
     var rect: CGRect
     var angle: Double = 0
+    var glyphHeight: Double? = nil
 }
 struct ComicSpeech: Codable, Equatable {
     var id: String
@@ -153,7 +154,7 @@ enum ComicIdentity {
         hash(segments.map{$0.id+"\0"+$0.text}.joined(separator:"\n"))
     }
     static func settings(_ preferences: ComicPreferences, translation: TranslationPreferences, provider: AIProviderConfiguration?) -> String {
-        hash("comic-v3|fallback:\(preferences.allowOnlineFallback ?? false)|\(preferences.mode.rawValue)|\(preferences.source)|\(translation.target)|" + TranslationMemory.namespace(page: "comic://content", preferences: translation, provider: provider))
+        hash("comic-v4|fallback:\(preferences.allowOnlineFallback ?? false)|\(preferences.mode.rawValue)|\(preferences.source)|\(translation.target)|" + TranslationMemory.namespace(page: "comic://content", preferences: translation, provider: provider))
     }
 }
 enum ComicGeometry {

@@ -38,7 +38,7 @@ enum ComicPixels {
             let background=backgroundColor(original,width:image.width,height:image.height,rect:area)
             // Anchor the em size to source glyph height, rather than balloon size.
             // A one-word translation must never grow to fill an entire balloon.
-            let heights=speech.lines.map{min($0.rect.height,$0.rect.width)}.sorted()
+            let heights=speech.lines.map{CGFloat($0.glyphHeight ?? Double(min($0.rect.height,$0.rect.width)))}.sorted()
             let sourceSize=heights[heights.count/2]*1.3
             guard let placed=place(text,area:area,imageHeight:image.height,target:target,fontName:fontName,fontScale:fontScale,theta:CGFloat(speech.angle ?? 0),letterSpacing:letterSpacing,maximumSize:sourceSize)else{continue}
             clean(&pixels,width:image.width,height:image.height,speech:speech)
@@ -77,6 +77,7 @@ enum ComicPixels {
     private static func letter(_ context:CGContext,image:CGImage,area:CGRect,placed:Placement,color:CGColor,ink:ComicInkStyle){
         context.saveGState();context.textMatrix = .identity
         context.translateBy(x:area.midX,y:CGFloat(image.height)-area.midY)
+        context.clip(to:CGRect(x:-area.width/2,y:-area.height/2,width:area.width,height:area.height))
         if placed.theta != 0{context.rotate(by:-placed.theta)}
         let attributed=NSMutableAttributedString(attributedString:placed.layout.text);attributed.addAttribute(NSAttributedString.Key(kCTForegroundColorAttributeName as String),value:color,range:NSRange(location:0,length:attributed.length))
         func draw(_ value:NSAttributedString){let frame=CTFramesetterCreateFrame(CTFramesetterCreateWithAttributedString(value),CFRange(),CGPath(rect:placed.box,transform:nil),nil);CTFrameDraw(frame,context)}
@@ -129,12 +130,18 @@ enum ComicPixels {
         for line in speech.lines{
             // Include outlines, antialiasing and shadows outside tight OCR boxes.
             let pad=max(3,min(line.rect.height,line.rect.width)*0.18)
-            let box=line.rect.insetBy(dx:-pad,dy:-pad).integral.intersection(protected).intersection(bounds)
+            var box=line.rect.insetBy(dx:-pad,dy:-pad).integral.intersection(protected).intersection(bounds)
             guard !box.isNull,box.width>2,box.height>2 else{continue}
-            if let index=boxes.firstIndex(where:{!$0.intersection(box).isNull}){boxes[index]=boxes[index].union(box)}else{boxes.append(box)}
+            while let index=boxes.firstIndex(where:{!$0.intersection(box).isNull}){
+                box=box.union(boxes.remove(at:index))
+            }
+            boxes.append(box)
         }
-        pixels.withUnsafeMutableBufferPointer{buffer in
-            for box in boxes{zeus_comic_inpaint(buffer.baseAddress,Int32(width),Int32(height),Int32(box.minX),Int32(box.minY),Int32(box.maxX),Int32(box.maxY))}
+        let source=pixels
+        source.withUnsafeBufferPointer{original in
+            pixels.withUnsafeMutableBufferPointer{buffer in
+                for box in boxes{zeus_comic_inpaint_from_source(original.baseAddress,buffer.baseAddress,Int32(width),Int32(height),Int32(box.minX),Int32(box.minY),Int32(box.maxX),Int32(box.maxY))}
+            }
         }
     }
 }

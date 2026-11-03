@@ -61,7 +61,7 @@ actor ComicPaddle {
             guard s.count==3 else{throw ComicFailure.message("أبعاد خرج قارئ النص غير صالحة.")}
             let result=Self.ctc(logits,steps:s[1],classes:s[2],dictionary:dictionary)
             let text=name=="arabic" ? ComicBidi.logicalFromVisual(result.0):result.0
-            if !text.trimmingCharacters(in:CharacterSet.whitespacesAndNewlines).isEmpty{lines.append(ComicLine(text:text,confidence:result.1,rect:rect))}
+            if result.1>=0.65 && text.contains(where:{$0.isLetter || $0.isNumber}){lines.append(ComicLine(text:text,confidence:result.1,rect:rect,glyphHeight:Double(min(rect.height,rect.width))*0.72))}
         }
         // Careful mode re-detects at native-sized overlapping crops, retaining lines
         // missed by a reduced global pass. The scheduler bounds image dimensions.
@@ -99,7 +99,7 @@ actor ComicPaddle {
             while head<queue.count{let i=queue[head];head+=1;score+=map[i];let x=i%width,y=i/width;minX=min(minX,x);maxX=max(maxX,x);minY=min(minY,y);maxY=max(maxY,y)
                 for (dx,dy)in [(-1,0),(1,0),(0,-1),(0,1)]{let nx=x+dx,ny=y+dy;if nx>=0&&nx<width&&ny>=0&&ny<height{let n=ny*width+nx;if seen[n]==0&&map[n]>0.3{seen[n]=1;queue.append(n)}}}
             }
-            if queue.count>=3 && score/Float(queue.count)>0.5{let rect=CGRect(x:minX,y:minY,width:maxX-minX+1,height:maxY-minY+1);let expansion=min(rect.width,rect.height)*0.25;result.append(rect.insetBy(dx:-expansion,dy:-expansion))}
+            if queue.count>=3 && score/Float(queue.count)>0.5{let rect=CGRect(x:minX,y:minY,width:maxX-minX+1,height:maxY-minY+1);let expansion=1.5*rect.width*rect.height/(2*(rect.width+rect.height));result.append(rect.insetBy(dx:-expansion,dy:-expansion))}
         }
         return result
     }
