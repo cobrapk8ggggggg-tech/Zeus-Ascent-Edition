@@ -39,6 +39,14 @@ class FlatBalloons(unittest.TestCase):
   result,mask,accepted=self.engine.apply_flat_cleanup(rgb,[0,0],flat);self.assertTrue(accepted)
   self.assertLess(int(np.abs(result.astype(int)-clean.astype(int)).max()),8)
   self.assertEqual(int(np.count_nonzero(np.any(rgb!=result,axis=2)&(mask==0))),0)
+ def test_attached_white_outline_is_preserved_outside_the_dialogue(self):
+  clean=Image.new('RGB',(400,320),(25,45,80));draw=ImageDraw.Draw(clean);draw.ellipse((80,90,320,305),fill='white');draw.line((130,68,150,115),fill='white',width=2);draw.ellipse((105,22,151,68),outline='white',width=5)
+  source=clean.copy();draw=ImageDraw.Draw(source);font=ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',27);box=draw.textbbox((140,160),'HELLO',font=font);draw.text((140,160),'HELLO',font=font,fill='black')
+  rgb=np.array(source);match=(np.abs(rgb.astype(int)-255).sum(2)<75).astype(np.uint8);_,labels,_,_=cv2.connectedComponentsWithStats(match,4);paper=(labels==labels[120,200]).astype(np.uint8)*255
+  l,t,r,b=box;mask,complete=self.engine.flat_balloon_mask(paper,[[l-8,t-8,r+8,b+8]]);self.assertTrue(complete)
+  result=rgb.copy();result[mask>0]=255
+  self.assertTrue(np.array_equal(result[:80],rgb[:80]),'The attached ornament must remain original')
+  self.assertLessEqual(int(np.abs(result.astype(int)-np.array(clean).astype(int)).max()),3)
  def test_missing_source_line_blocks_erasure_and_leaves_identity(self):
   clean,original,result,mask,complete=self.sample((255,255,255),missing=True)
   self.assertFalse(complete);self.assertFalse(mask.any());self.assertTrue(np.array_equal(original,result))

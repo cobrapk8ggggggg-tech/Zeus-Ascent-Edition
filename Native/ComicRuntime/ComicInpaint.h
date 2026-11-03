@@ -349,7 +349,7 @@ static inline float comic_ink_style(const unsigned char *rgba,int w,int h,const 
     }
     for(int p=0;p<w*h;p++)if(roi[p]){int k=key(p);hist[k]++;for(int c=0;c<3;c++)sums[k][c]+=rgba[p*4+c];}
     int bg=int(std::max_element(edgeHist,edgeHist+512)-edgeHist);
-    auto center=[&](int k,int c){return (c==0?k/64:c==1?(k/8)%8:k%8)*32+16;};
+    auto center=[&](int k,int c)->float{if(hist[k])return float(sums[k][c])/hist[k];return (c==0?k/64:c==1?(k/8)%8:k%8)*32+16;};
     auto delta=[&](int a,int b){int d=0;for(int c=0;c<3;c++)d+=std::abs(center(a,c)-center(b,c));return d;};
     std::vector<int> palette;for(int k=0;k<512;k++)if(hist[k]>=8&&delta(k,bg)>=80)palette.push_back(k);
     std::sort(palette.begin(),palette.end(),[&](int a,int b){return hist[a]>hist[b];});if(palette.size()>8)palette.resize(8);
@@ -360,6 +360,16 @@ static inline float comic_ink_style(const unsigned char *rgba,int w,int h,const 
     for(int k:palette)if(energy(k)>energy(fill))fill=k;
     int sampled=0;for(int k=0;k<512;k++)sampled+=hist[k];
     for(int a:palette)for(int b:palette)if(a!=b&&delta(a,b)>=160&&hist[b]<sampled*.7f){
+        // Antialias pixels lie between the two solid inks. An intermediate
+        // cluster cannot replace a stronger colour farther along the same ray.
+        auto farther=[&](int start,int middle,int end){
+            float dot=0,length=0;for(int c=0;c<3;c++){float u=center(middle,c)-center(start,c),v=center(end,c)-center(start,c);dot+=u*v;length+=u*u;}
+            float factor=dot/std::max(1.f,length),error=0;
+            for(int c=0;c<3;c++){float d=center(end,c)-center(start,c)-factor*(center(middle,c)-center(start,c));error+=d*d;}
+            return factor>1.08f&&delta(end,start)>=delta(middle,start)+64&&error<1800;
+        };
+        bool antialias=false;for(int c:palette)if(c!=a&&c!=b){if(hist[c]>=hist[a]*.5f&&farther(b,a,c))antialias=true;if(hist[c]>=hist[b]*.5f&&farther(a,b,c))antialias=true;}
+        if(antialias)continue;
         // A colour lying inside the fill-to-paper antialias ramp is not a
         // separate outline. Its apparent band changes with JPEG/raster sampling.
         float dot=0,length=0;for(int c=0;c<3;c++){float u=center(bg,c)-center(a,c),v=center(b,c)-center(a,c);dot+=u*v;length+=u*u;}
@@ -390,7 +400,7 @@ static inline float comic_ink_style(const unsigned char *rgba,int w,int h,const 
         float enclosure=float(ab)/std::max(1,ab+otherA),outer=float(otherB)/std::max(1,ab+otherB);
         float thickness=float(hist[b])/std::max(1,ab);
         if(ab<12||cores<8||enclosure<.75f||outer<.12f||thickness>glyph*.22f)continue;
-        float score=enclosure+outer*.25f;
+        float score=enclosure+outer*.25f+.35f*std::sqrt(float(hist[a])/hist[palette[0]])+.1f*std::sqrt(float(hist[b])/hist[palette[0]]);
         if(score>best){best=score;fill=a;stroke=b;strokePercent=std::clamp(160.f*thickness/glyph,2.f,20.f);}
     }
     if(stroke<0&&delta(fill,bg)>=300){
@@ -421,8 +431,8 @@ static inline float comic_ink_style(const unsigned char *rgba,int w,int h,const 
         if(radius){stroke=bg;strokePercent=std::clamp(160.f*radius/glyph,2.f,20.f);}
     }
     double mass=0;for(int k:palette)mass+=energy(k);
-    if(energy(fill)<mass*.18||hist[fill]<12)return 0;
-    for(int c=0;c<3;c++){output[c]=float(sums[fill][c])/hist[fill];output[c+3]=stroke<0?0:hist[stroke] ? float(sums[stroke][c])/hist[stroke]:std::min(255,center(stroke,c));}
+    if((stroke<0&&energy(fill)<mass*.18)||hist[fill]<12)return 0;
+    for(int c=0;c<3;c++){output[c]=float(sums[fill][c])/hist[fill];output[c+3]=stroke<0?0:hist[stroke] ? float(sums[stroke][c])/hist[stroke]:std::min(255.f,center(stroke,c));}
     output[6]=strokePercent;return stroke>=0?.95f:.7f;
 }
 

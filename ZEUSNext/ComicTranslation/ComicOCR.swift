@@ -181,8 +181,8 @@ actor ComicOCR {
             guard let value=r.topCandidates(1).first else{return nil}
             func pixels(_ b:CGRect)->CGRect{CGRect(x:b.minX*CGFloat(image.width),y:(1-b.maxY)*CGFloat(image.height),width:b.width*CGFloat(image.width),height:b.height*CGFloat(image.height))}
             var words:[ComicWord]=[]
-            value.string.enumerateSubstrings(in:value.string.startIndex..<value.string.endIndex,options:[.byWords,.substringNotRequired]){_,range,_,_ in
-                if let observation=try? value.boundingBox(for:range){words.append(ComicWord(text:String(value.string[range]),rect:pixels(observation.boundingBox)))}
+            for word in value.string.split(whereSeparator:{$0.isWhitespace}){
+                if let observation=try? value.boundingBox(for:word.startIndex..<word.endIndex){words.append(ComicWord(text:String(word),rect:pixels(observation.boundingBox)))}
             }
             if !value.string.contains(where:{$0.isWhitespace}),value.string.unicodeScalars.contains(where:{(0x3040...0x30ff).contains($0.value)||(0x4e00...0x9fff).contains($0.value)}){
                 words=[]
@@ -193,13 +193,8 @@ actor ComicOCR {
                     start=end
                 }
             }
-            // Keep punctuation attached and the original line text intact. Word
-            // ranges are used only when one OCR line spans different lobes.
-            if words.count>1{
-                let parts=value.string.split(whereSeparator:{$0.isWhitespace}).map(String.init)
-                if parts.count==words.count{for i in words.indices{words[i].text=parts[i]}}
-                else if value.string.contains(where:{$0.isWhitespace}){words=[]}
-            }
+            // Whitespace token ranges retain contractions and punctuation;
+            // only lines spanning distinct shape owners use these fragments.
             return ComicLine(text:value.string,confidence:value.confidence,rect:pixels(r.boundingBox),angle:atan2(Double((r.topLeft.y-r.topRight.y)*CGFloat(image.height)),Double((r.topRight.x-r.topLeft.x)*CGFloat(image.width))),words:words.isEmpty ? nil:words)
         }
     }

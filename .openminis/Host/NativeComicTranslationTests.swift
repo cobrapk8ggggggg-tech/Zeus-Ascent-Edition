@@ -308,6 +308,18 @@ import UIKit
         let rgb=try XCTUnwrap(stroke.converted(to:CGColorSpace(name:CGColorSpace.sRGB)!,intent:.defaultIntent,options:nil)?.components)
         XCTAssertGreaterThan(rgb[0],0.9);XCTAssertGreaterThan(style.strokePercent,2)
     }
+    func testNativeOCRKeepsContractionsInTwoJoinedBalloons()async throws{
+        let image=renderer(CGSize(width:600,height:300)).image{context in
+            UIColor.black.setFill();context.fill(CGRect(x:0,y:0,width:600,height:300));UIColor.white.setFill()
+            UIBezierPath(ovalIn:CGRect(x:20,y:20,width:260,height:260)).fill();UIBezierPath(ovalIn:CGRect(x:320,y:20,width:260,height:260)).fill();context.fill(CGRect(x:270,y:145,width:60,height:10))
+            let attributes:[NSAttributedString.Key:Any]=[.font:UIFont.boldSystemFont(ofSize:25),.foregroundColor:UIColor.black]
+            ("I'M HERE" as NSString).draw(at:CGPoint(x:85,y:130),withAttributes:attributes)
+            ("YOU'RE THERE" as NSString).draw(at:CGPoint(x:355,y:130),withAttributes:attributes)
+        }.cgImage!
+        let reading=try await ComicOCR.shared.read(image,source:"en",mode:.fastest)
+        XCTAssertEqual(reading.speeches.count,2)
+        XCTAssertTrue(reading.speeches.first?.text.contains("HERE")==true);XCTAssertTrue(reading.speeches.last?.text.contains("THERE")==true)
+    }
     func testRealDiagonalConnectedBalloonsKeepTheirOwnDialogues()async throws{
         struct Line:Decodable{var text:String;var confidence:Float;var x:Double;var y:Double;var width:Double;var height:Double;var glyphHeight:Double}
         struct Fixture:Decodable{var image:String;var lines:[Line]}

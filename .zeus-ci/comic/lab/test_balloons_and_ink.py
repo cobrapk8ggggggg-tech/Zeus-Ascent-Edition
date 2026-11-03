@@ -39,6 +39,13 @@ class BalloonsAndInk(unittest.TestCase):
    for fill,stroke in [((0,0,0),(255,255,255)),((255,255,255),(0,0,0)),((210,20,40),(255,255,255)),((240,200,30),(0,0,0))]:
     im=Image.new('RGB',(500,150),(75,110,150));draw=ImageDraw.Draw(im);sw=max(1,round(size*.06));box=draw.textbbox((30,30),'HELLO',font=font,stroke_width=sw);draw.text((30,30),'HELLO',font=font,fill=fill,stroke_fill=stroke,stroke_width=sw)
     style=self.engine.ink_style(np.array(im),[box]);self.assertIsNotNone(style['stroke'],(size,fill,style));self.assertLess(max(abs(a-b)for a,b in zip(style['fill'],fill)),12);self.assertLess(max(abs(a-b)for a,b in zip(style['stroke'],stroke)),12)
+ def test_a_thick_outline_cannot_replace_thin_black_letter_cores(self):
+  font=ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',50)
+  alpha=Image.new('L',(450,130));draw=ImageDraw.Draw(alpha);draw.text((30,25),'HELLO',font=font,fill=255)
+  alpha=np.array(alpha);kernel=cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(7,7));outer=cv2.dilate(alpha,kernel);inner=cv2.erode(alpha,kernel)
+  source=np.zeros((130,450,3),np.float32);source[:]=(65,100,150);a=outer[:,:,None]/255;source=source*(1-a)+255*a;a=inner[:,:,None]/255;source=source*(1-a)
+  yy,xx=np.where(outer>0);box=[int(xx.min()),int(yy.min()),int(xx.max()+1),int(yy.max()+1)];self.assertGreater(int((inner>240).sum()),12)
+  style=self.engine.ink_style(source.astype(np.uint8),[box]);self.assertIsNotNone(style['stroke']);self.assertLess(max(style['fill']),15);self.assertGreater(min(style['stroke']),235)
  def test_real_ink_ignores_antialias_ramp_but_keeps_halftone_halo(self):
   for filename,outlined in [('neural-connected.json',False),('neural-halftone-style.json',True)]:
    f=json.loads((pathlib.Path(__file__).parent/'fixtures'/filename).read_text());rgb=np.array(Image.open(io.BytesIO(base64.b64decode(f['image']))).convert('RGB'));boxes=[[l['x'],l['y'],l['x']+l['width'],l['y']+l['height']]for l in f['lines']]
