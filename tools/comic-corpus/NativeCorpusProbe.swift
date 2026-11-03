@@ -50,7 +50,8 @@ import CryptoKit
                     for source in ordered{
                         if count>=manifest.quota || pageCount>=cap{break}
                         guard source.rect.maxY>CGFloat(region.coreTop),source.rect.minY<CGFloat(region.coreBottom)else{continue}
-                        let area=source.rect.insetBy(dx:-64,dy:-64).integral.intersection(CGRect(x:0,y:0,width:image.width,height:image.height))
+                        let sourceInk=source.lines.reduce(CGRect.null){$0.union($1.rect)}
+                        let area=source.rect.union(sourceInk).insetBy(dx:-64,dy:-64).integral.intersection(CGRect(x:0,y:0,width:image.width,height:image.height))
                         guard area.width>12,area.height>12,area.width*area.height<=1_000_000,let crop=image.cropping(to:area)else{continue}
                         var local=source
                         let id="native-\(chapter.language)-\(chapter.id.prefix(8))-\(String(format:"%03d",count))"
