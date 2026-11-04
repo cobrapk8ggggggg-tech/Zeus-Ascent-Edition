@@ -94,7 +94,15 @@ actor ComicOCR {
         }
         var repairUnavailable=false
         if fastSupported{
-            let repairs=speeches.filter{$0.flatCleanup?.complete==false || difficult($0)}.prefix(mode == .fastest ? 3:8)
+            // Context rows complete cut balloons, but must not spend the limited
+            // repair budget before text owned by this part of the reader.
+            let repairs=speeches.filter{$0.flatCleanup?.complete==false || difficult($0)}.sorted{left,right in
+                let a=languageRegion?.contains(CGPoint(x:left.rect.midX,y:left.rect.midY)) ?? true
+                let b=languageRegion?.contains(CGPoint(x:right.rect.midX,y:right.rect.midY)) ?? true
+                if a != b{return a}
+                if left.rect.minY != right.rect.minY{return left.rect.minY<right.rect.minY}
+                return left.rect.minX<right.rect.minX
+            }.prefix(mode == .fastest ? 3:8)
             var additional:[ComicLine]=[],replacements:[([ComicLine],[ComicLine])]=[]
             for speech in repairs{
                 try Task.checkCancellation()
@@ -262,7 +270,12 @@ actor ComicOCR {
             return ComicLine(text:line.text,confidence:0.8,rect:line.frame,angle:angle,words:line.elements.map{ComicWord(text:$0.text,rect:$0.frame)})
         }
         #elseif targetEnvironment(simulator)
-        return try Self.vision(image,languages:[source == "auto" ? "en-US":source],accurate:true)
+        // Exercise the same repair policy as ML Kit's uncalibrated 0.8 score.
+        // Vision can assign 1.0 to a wrong brush word in a neighbouring-page
+        // window. The independent script probe keeps its original confidence.
+        return try Self.vision(image,languages:[source == "auto" ? "en-US":source],accurate:true).map{line in
+            var value=line;value.confidence=min(value.confidence,0.8);return value
+        }
         #else
         // Standalone builds without the SDK remain diagnosable, not falsely labelled ML Kit.
         throw ComicFailure.message("هذا البناء لا يتضمن ML Kit. استخدم بناء ترجمة الصور الكامل.")

@@ -9,8 +9,17 @@ import WebKit
             let(data,_)=try await URLSession.shared.data(from:URL(string:"http://127.0.0.1:8781/images/"+file)!)
             let areas=file=="009.webp" ? [CGRect(x:0,y:12188,width:800,height:3812)]:[CGRect(x:0,y:0,width:800,height:3300)]
             for area in areas{
-                let image=try ComicPixels.decodeRegion(data,region:ComicRegion(y:Int(area.minY),width:Int(area.width),height:Int(area.height),coreTop:0,coreBottom:Int(area.height)),expectedHeight:file=="009.webp" ? 16000:3300)
-                let reading=try await ComicOCR.shared.read(image,source:"auto",mode:.fastest)
+                let center=try ComicPixels.decodeRegion(data,region:ComicRegion(y:Int(area.minY),width:Int(area.width),height:Int(area.height),coreTop:0,coreBottom:Int(area.height)),expectedHeight:file=="009.webp" ? 16000:3300)
+                var image=center,owned:CGRect?=nil
+                if file=="002.webp"{
+                    let(previous,_)=try await URLSession.shared.data(from:URL(string:"http://127.0.0.1:8781/images/001.webp")!)
+                    let(next,_)=try await URLSession.shared.data(from:URL(string:"http://127.0.0.1:8781/images/003.webp")!)
+                    let before=try ComicPixels.decodeRegion(previous,region:ComicRegion(y:15744,width:800,height:256,coreTop:0,coreBottom:256),expectedHeight:16000)
+                    let after=try ComicPixels.decodeRegion(next,region:ComicRegion(y:0,width:800,height:256,coreTop:0,coreBottom:256),expectedHeight:11904)
+                    let window=try ComicWindow.join(center,before:before,after:after)
+                    image=window.image;owned=CGRect(x:0,y:window.offset,width:center.width,height:center.height)
+                }
+                let reading=try await ComicOCR.shared.read(image,source:"auto",mode:.fastest,languageRegion:owned)
                 let text=reading.lines.map(\.text).joined(separator:" ").uppercased()
                 for token in expected{XCTAssertTrue(text.contains(token),"Fast local OCR missed \(token): \(text)")}
                 let attachment=XCTAttachment(data:try JSONEncoder().encode(reading),uniformTypeIdentifier:"public.json");attachment.name="Asura actual fastest geometry "+file;attachment.lifetime = .keepAlways;add(attachment)

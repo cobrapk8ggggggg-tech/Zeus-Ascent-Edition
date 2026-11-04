@@ -304,7 +304,7 @@ import CoreGraphics
                     // A cover's Latin title must not choose the script for the
                     // following Japanese/Arabic page. Hints belong to one image.
                     let languageHintKey=document+"|"+candidate.id+"|"+candidate.revision
-                    let readingKey=imageHash+"|ocr-v25|\(prefs.source)|\(prefs.mode.rawValue)|vote:\(region.coreTop+offset):\(region.coreBottom-region.coreTop)"
+                    let readingKey=imageHash+"|ocr-v26|\(prefs.source)|\(prefs.mode.rawValue)|vote:\(region.coreTop+offset):\(region.coreBottom-region.coreTop)"
                     measure(.recognizing);phase = .recognizing
                     let reading:ComicReading
                     if let saved=readings[readingKey]{reading=saved}
