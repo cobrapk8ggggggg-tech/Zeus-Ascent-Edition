@@ -267,6 +267,7 @@ import CoreGraphics
                     let renderedKey=translationKey+"|"+prefs.renderIdentity
                     let rendered:Data
                     var renderingPartial=translated.count != segments.count
+                    var retryPartial=renderingPartial
                     if persistent,let stored=await ComicMemory.shared.data(profile:owner,layer:.rendered,key:renderedKey){rendered=stored;countTexts(countKey,detected:counted.count,translated:counted.count)}
                     else{
                         let lettering=translated.map{TranslationSegment(id:$0.id,text:prefs.letterCase.apply($0.text))}
@@ -302,10 +303,10 @@ import CoreGraphics
                             let next=try await ComicRestoration.shared.restore(base,speeches:eligible.filter{!already.contains($0.id)},onPreparing:{ [weak self] preparing in
                                 await MainActor.run{if self?.epoch==ticket{self?.phase=preparing ? .downloading:.rendering}}
                             })
-                            restored=ComicRestoration.Result(image:next.image,restored:already.union(next.restored),notice:next.notice)
+                            restored=ComicRestoration.Result(image:next.image,restored:already.union(next.restored),notice:next.notice,retryable:next.retryable)
                             try valid(ticket)
                             try await saveCleanup(restored.image,ids:restored.restored,job:job)
-                            if let notice=restored.notice{contextNotice=notice;sweepFailure=true;renderingPartial=true}
+                            if let notice=restored.notice{contextNotice=notice;sweepFailure=true;renderingPartial=true;retryPartial = retryPartial || restored.retryable}
                         }else{restored=ComicRestoration.Result(image:image,restored:[],notice:nil)}
                         let result=try await Task.detached{let drawing=try ComicPixels.renderReport(restored.image,speeches:core,translations:lettering,target:translation.target,fontName:prefs.fontName,fontScale:prefs.fontScale,textColor:prefs.textColor,ink:prefs.inkStyle,letterSpacing:prefs.letterSpacing ?? 0,requireCleanSource:true,precleanedIDs:restored.restored,styleSource:image)
                         // Only this core is applied. Recognition context is retained above/below.
@@ -321,7 +322,7 @@ import CoreGraphics
                     let outputRegion:[String:Int]=["x":0,"y":region.y+region.coreTop,"width":region.width,"height":region.coreBottom-region.coreTop]
                     let applied=try await apply(rendered,candidate:candidate,region:outputRegion,mark:mark,generation:generation,frame:frame,ticket:ticket)
                     guard applied else{throw ComicFailure.message("لم يسمح الموقع بعرض الصورة المترجمة؛ بقي الأصل متاحًا.")}
-                    if renderingPartial{failed.insert(job);retry(job,ticket:ticket)}else{done.insert(job);cleanupCheckpoints[job]=nil;cleanupOrder.removeAll{$0==job}}
+                    if renderingPartial{failed.insert(job);if retryPartial{retry(job,ticket:ticket)}}else{done.insert(job);cleanupCheckpoints[job]=nil;cleanupOrder.removeAll{$0==job}}
                     appliedRegions.insert("\(document)|\(candidate.id)|\(candidate.revision)|\(region.y)");completed=appliedRegions.count
                 }catch is CancellationError{throw CancellationError()}catch{try valid(ticket);failed.insert(job);self.record(error,at:phase)
                     let diagnostic=ComicDiagnostic.capture(error,phase:phase)

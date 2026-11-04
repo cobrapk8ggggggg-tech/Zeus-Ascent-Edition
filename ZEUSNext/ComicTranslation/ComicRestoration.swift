@@ -7,7 +7,7 @@ import ZeusComicRuntime
 /// Model output is composited only inside the validated, source-resolution ink mask.
 actor ComicRestoration {
     static let shared = ComicRestoration()
-    struct Result { var image: CGImage; var restored: Set<String>; var notice: String? }
+    struct Result { var image: CGImage; var restored: Set<String>; var notice: String?; var retryable=false }
     private let environment = try! ORTEnv(loggingLevel: .error)
     private var current: ORTSession?
     private var currentName:String?
@@ -170,7 +170,7 @@ actor ComicRestoration {
         if candidates.isEmpty { return Result(image: image, restored: [], notice: nil) }
         await ComicOCR.shared.purge(); await ComicPaddle.shared.purge(); await ComicLocalTranslator.shared.unload(); current = nil;currentName=nil
         guard zeus_comic_available_memory() >= requiredHeadroom else {
-            return Result(image: image, restored: [], notice: "لم تتوفر ذاكرة كافية لترميم بعض الخلفيات؛ احتُفظ بأصلها.")
+            return Result(image: image, restored: [], notice: "لم تتوفر ذاكرة كافية لترميم بعض الخلفيات؛ احتُفظ بأصلها.", retryable:true)
         }
         await onPreparing?(true)
         do { try await prepare() } catch { await onPreparing?(false); throw error }

@@ -151,6 +151,19 @@ import UIKit
         XCTAssertEqual(speeches.count,1);XCTAssertEqual(speeches.first?.lines.count,4)
         XCTAssertTrue(speeches.first?.text.contains("AFTER ALL, SHE BELONGS")==true)
     }
+    func testMemoryDeferralIsRetryableWithoutRunningModelsOrChangingSource()async throws{
+        struct Line:Decodable{var x:Double;var y:Double;var width:Double;var height:Double}
+        struct Fixture:Decodable{var image:String;var lines:[Line]}
+        let(data,_)=try await URLSession.shared.data(from:URL(string:"http://127.0.0.1:8765/comic-quality-fixtures?name=neural-title.json")!)
+        let fixture=try JSONDecoder().decode(Fixture.self,from:data),image=try ComicPixels.decode(XCTUnwrap(Data(base64Encoded:fixture.image)))
+        let lines=fixture.lines.map{ComicLine(text:"SOURCE",confidence:1,rect:CGRect(x:$0.x,y:$0.y,width:$0.width,height:$0.height))}
+        let speech=ComicSpeech(id:"deferred",text:"SOURCE",lines:lines,rect:lines.reduce(CGRect.null){$0.union($1.rect)},vertical:false,balloon:false)
+        let before=await ComicRestoration.shared.sessionLoads
+        let result=try await ComicRestoration.shared.restore(image,speeches:[speech],requiredHeadroom:UInt64.max)
+        let after=await ComicRestoration.shared.sessionLoads
+        XCTAssertTrue(result.retryable);XCTAssertTrue(result.restored.isEmpty);XCTAssertNotNil(result.notice)
+        XCTAssertEqual(before,after);XCTAssertEqual(try ComicPixels.png(result.image),try ComicPixels.png(image))
+    }
     func testPostRestorationGateRejectsCapturedRemainingEnglish()async throws{
         struct Line:Decodable{var x:Double;var y:Double;var width:Double;var height:Double}
         struct Fixture:Decodable{var image:String;var badRestoration:String;var mask:String;var lines:[Line]}
