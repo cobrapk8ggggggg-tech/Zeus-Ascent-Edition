@@ -92,3 +92,11 @@ test('far reader lazy images wake without scrolling, in bounded batches',()=>{
  assert.equal([...s.w.document.images].filter(el=>el.src.includes('/chapter/')).length,8);
  }finally{s.close()}
 });
+test('chapter load events advance lazy fetches while native processing is busy',async()=>{
+ const s=setup('<div id="readerarea">'+Array.from({length:12},(_,i)=>`<img data-pending="yes" data-src="/story/${i}.webp" src="/spinner.gif">`).join('')+'</div>');
+ try{s.bridge.start();s.bridge.scan(true);
+ for(const el of [...s.w.document.images].slice(0,4)){el.dataset.pending='no';el.dispatchEvent(new s.w.Event('load'));}
+ await new Promise(r=>setTimeout(r,100));
+ assert.equal([...s.w.document.images].filter(i=>i.src.includes('/story/')).length,8);
+ }finally{s.close()}
+});

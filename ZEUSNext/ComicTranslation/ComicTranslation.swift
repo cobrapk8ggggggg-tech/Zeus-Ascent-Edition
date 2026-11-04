@@ -325,7 +325,7 @@ import CoreGraphics
                     appliedRegions.insert("\(document)|\(candidate.id)|\(candidate.revision)|\(region.y)");completed=appliedRegions.count
                 }catch is CancellationError{throw CancellationError()}catch{try valid(ticket);failed.insert(job);self.record(error,at:phase)
                     let diagnostic=ComicDiagnostic.capture(error,phase:phase)
-                    if diagnostic.retryable{retry(job,ticket:ticket)}
+                    if diagnostic.retryable || phase == .translating{retry(job,ticket:ticket)}
                     _ = try? await call("zeusComic.release(id)",args:["id":candidate.id],frame:frame)}
                 await Task.yield()
                 if pending{return}

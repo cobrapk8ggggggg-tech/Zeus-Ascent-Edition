@@ -209,9 +209,13 @@ class Handler(BaseHTTPRequestHandler):
             if isinstance(prompt, list): prompt = next((p['text'] for p in prompt if p.get('type') == 'text'), '')
             if 'INPUT_JSON:' in prompt:
                 items = json.loads(prompt.split('INPUT_JSON:', 1)[1])
-                with TRANSLATION_LOCK: TRANSLATION_REQUESTS.setdefault(body.get('model', ''), []).append([x['text'] for x in items])
+                with TRANSLATION_LOCK:
+                    requests = TRANSLATION_REQUESTS.setdefault(body.get('model', ''), [])
+                    requests.append([x['text'] for x in items])
+                    transient_invalid = body.get('model', '').startswith('comic-retry-') and len(requests) == 1
                 text = json.dumps([{'id': x['id'], 'text': 'هل يمكنك مساعدتنا؟' if body.get('model','').startswith('comic-violet') else 'ترجمة: ' + x['text']} for x in items], ensure_ascii=False)
             else: text = 'OK'
+            if body.get('model', '').startswith('comic-retry-') and 'INPUT_JSON:' in prompt and transient_invalid: text = '[{"id":"wrong","text":"wrong"}]'
             if body.get('model') == 'broken-json': text = '[{"id":"wrong","text":"wrong"}]'
             if body.get('model') == 'slow-translator': time.sleep(0.4)
             if body.get('stream') is True:

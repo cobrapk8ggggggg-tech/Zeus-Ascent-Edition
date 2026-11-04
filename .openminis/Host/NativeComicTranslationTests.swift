@@ -765,11 +765,12 @@ import UIKit
         XCTAssertTrue(tiles.allSatisfy{$0.width==800 && $0.height<=1536})
         for pair in zip(tiles,tiles.dropFirst()){XCTAssertGreaterThanOrEqual(pair.0.maxY-pair.1.minY,128)}
     }
-    private func runImagePipeline(crossOrigin:Bool,panelCount:Int=1,wholeChapter:Bool=false)async throws{
+    func testInvalidProviderReplyRetriesWithoutScrolling()async throws{try await runImagePipeline(crossOrigin:false,retryProvider:true)}
+    private func runImagePipeline(crossOrigin:Bool,panelCount:Int=1,wholeChapter:Bool=false,retryProvider:Bool=false)async throws{
         let root=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let model=BrowserModel(profiles:ProfileStore(root:root,downloadsRoot:root.appendingPathComponent("Downloads")),useBackgroundDownloads:false)
         model.data.settings.shieldsEnabled=false
-        var provider=AIProviderConfiguration();provider.baseURL="http://127.0.0.1:8765/v1";provider.model="comic-"+UUID().uuidString;model.data.settings.aiProviders=[provider]
+        var provider=AIProviderConfiguration();provider.baseURL="http://127.0.0.1:8765/v1";provider.model=(retryProvider ? "comic-retry-":"comic-")+UUID().uuidString;model.data.settings.aiProviders=[provider]
         var preferences=ComicPreferences();preferences.source="en";preferences.showUntranslated=true
         if panelCount>1{preferences.readAhead=wholeChapter}
         if wholeChapter{preferences.mode = .fastest;preferences.restorationEnabled=false}
@@ -800,7 +801,7 @@ import UIKit
             XCTAssertEqual(tainted,true,"Fixture must exercise native fallback after canvas is tainted")
         }
         session.start();deadline=Date().addingTimeInterval(wholeChapter ? 90:35)
-        while Date()<deadline && (session.running||session.completed<panelCount) && session.error==nil{try await Task.sleep(for:.milliseconds(100))}
+        while Date()<deadline && (session.running||session.completed<panelCount) && (retryProvider || session.error==nil){try await Task.sleep(for:.milliseconds(100))}
         XCTAssertNil(session.error);XCTAssertEqual(session.completed,panelCount)
         if wholeChapter{let scroll=try await view.evaluateJavaScript("scrollY")as? Int;XCTAssertEqual(scroll,0,"Preparing the chapter must not move the reader")}
         let paintedCount=try await view.evaluateJavaScript("[...document.images].filter(i=>i.src.startsWith('blob:')).length")as? Int
@@ -812,7 +813,8 @@ import UIKit
         let endpoint=URL(string:"http://127.0.0.1:8765/translation-requests?model="+provider.model)!
         let (firstData,_)=try await URLSession.shared.data(from:endpoint)
         let before=try XCTUnwrap(JSONSerialization.jsonObject(with:firstData)as? [[String]])
-        XCTAssertFalse(before.isEmpty);let ocrBefore=session.ocrRuns,completeBefore=session.completed,detectedBefore=session.detectedTexts
+        XCTAssertFalse(before.isEmpty);if retryProvider{XCTAssertEqual(before.count,2,"Only the invalid response should be retried, without scrolling")}
+        let ocrBefore=session.ocrRuns,completeBefore=session.completed,detectedBefore=session.detectedTexts
         preferences.fontScale=0.65;preferences.textColor="163B72";model.data.settings.comicTranslation=preferences
         session.pause();session.start();deadline=Date().addingTimeInterval(25)
         while Date()<deadline && session.running && session.error==nil{try await Task.sleep(for:.milliseconds(100))}
