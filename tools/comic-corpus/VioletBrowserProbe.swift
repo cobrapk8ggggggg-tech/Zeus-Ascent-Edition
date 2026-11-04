@@ -5,7 +5,7 @@ import CryptoKit
 @testable import ZEUSNext
 
 @MainActor final class NativeComicTranslationTests:XCTestCase{
-    func testLiveVioletReaderWithRestorationDisabled()async throws{
+    func testLiveVioletReaderFlatAndComplexBalloons()async throws{
         let pageURL="https://violetmanga.com/the-broken-ring-this-marriage-will-fail-anyway-chapter-1/"
         let imageURL="https://violetmanga.com/wp-content/uploads/manga/the-broken-ring-this-marriage-will-fail-anyway/1/1.jpeg"
         let root=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -60,6 +60,11 @@ import CryptoKit
         let normalDialoguePages:Set<Int>=[0,1,5,8,9,10,11,12,14,15,17,19]
         for(index,url)in chapterURLs.enumerated(){
             session.pause()
+            // The final pages have translucent balloons with real artwork
+            // showing through their paper. Keep every ordinary-page assertion,
+            // and exercise their actual complex restoration after proving the
+            // first scanning eighteen pages and proving the initial flat dialogues without it.
+            if index==18{preferences.restorationEnabled=true;model.data.settings.comicTranslation=preferences}
             let pageBegan=Date();var available=false
             deadline=Date().addingTimeInterval(25)
             while Date()<deadline{
@@ -70,15 +75,18 @@ import CryptoKit
             if !available{pageReports.append(["image":url,"loaded":"false","painted":"false"]);XCTFail("The live chapter image did not load: "+url);continue}
             let geometry=try await view.callAsyncJavaScript("const i=globalThis.__violetChapterPanels[index],r=i.getBoundingClientRect(),s=zeusComic.scan(false);return JSON.stringify({connected:i.isConnected,top:r.top,bottom:r.bottom,scroll:s.scroll,viewport:s.viewport,candidates:s.items.map(c=>({id:c.id,image:c.source.includes('/the-broken-ring-this-marriage-will-fail-anyway/1/')?c.source.split('/').pop():'other',top:c.y-s.scroll,height:c.h,pending:c.pending}))});",arguments:["index":index],in:nil,contentWorld:ComicTranslation.world)as? String ?? "unavailable"
             let detectedBefore=session.detectedTexts,translatedBefore=session.translatedTexts,ocrBefore=session.ocrRuns
-            session.start();deadline=Date().addingTimeInterval(45);var pagePainted=false;var idleSince:Date?
+            session.start();deadline=Date().addingTimeInterval(preferences.restorationEnabled==true ? 90:45);var pagePainted=false;var firstPagePaint:Double?;var idleSince:Date?
             while Date()<deadline{
                 let value=try? await view.callAsyncJavaScript("const i=globalThis.__violetChapterPanels[index];return !!i&&(i.src.startsWith('blob:')||i.style.backgroundImage.includes('blob:'));",arguments:["index":index],in:nil,contentWorld:ComicTranslation.world)
                 pagePainted=value as? Bool==true
-                if pagePainted{break}
+                if pagePainted && firstPagePaint==nil{firstPagePaint=Date().timeIntervalSince(pageBegan)}
+                // A blob can be the early simple-dialogue preview. Wait for
+                // the worker to settle before inspecting or pausing this page;
+                // otherwise the test cancels its still-running reconstruction.
                 if session.running{idleSince=nil}else if let idleSince,Date().timeIntervalSince(idleSince)>1.5{break}else if idleSince==nil{idleSince=Date()}
                 try await Task.sleep(for:.milliseconds(200))
             }
-            pageReports.append(["image":url,"loaded":"true","painted":String(pagePainted),"seconds":String(Date().timeIntervalSince(pageBegan)),"ocr_runs_delta":String(session.ocrRuns-ocrBefore),"viewport_before":geometry,"detected_delta":String(session.detectedTexts-detectedBefore),"translated_delta":String(session.translatedTexts-translatedBefore),"error":session.error ?? "none","notice":session.contextNotice ?? "none"])
+            pageReports.append(["image":url,"loaded":"true","painted":String(pagePainted),"restoration_enabled":String(preferences.restorationEnabled==true),"first_paint_seconds":firstPagePaint.map{String($0)} ?? "none","seconds":String(Date().timeIntervalSince(pageBegan)),"ocr_runs_delta":String(session.ocrRuns-ocrBefore),"viewport_before":geometry,"detected_delta":String(session.detectedTexts-detectedBefore),"translated_delta":String(session.translatedTexts-translatedBefore),"error":session.error ?? "none","notice":session.contextNotice ?? "none"])
             print("VIOLET LIVE PAGE \(index) painted=\(pagePainted) detected=\(session.detectedTexts) translated=\(session.translatedTexts) OCR=\(session.ocrRuns-ocrBefore) geometry=\(geometry)")
             if normalDialoguePages.contains(index){XCTAssertTrue(pagePainted,"A page with ordinary readable dialogue must paint: "+url)}
             if pagePainted{
