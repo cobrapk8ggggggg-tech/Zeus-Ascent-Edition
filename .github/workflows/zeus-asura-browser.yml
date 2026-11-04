@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [fix/comic-translation-reliability]
-    paths: ['tools/asura-reader/**', '.github/workflows/zeus-asura-browser.yml', 'ZEUSNext/ComicTranslation/**', 'ZEUSNext/Resources/comic-images.js']
+    paths: ['.zeus-ci/comic/build_runtime.sh', 'Native/ComicRuntime/**', 'tools/asura-reader/**', '.github/workflows/zeus-asura-browser.yml', 'ZEUSNext/ComicTranslation/**', 'ZEUSNext/Resources/comic-images.js']
 permissions:
   contents: read
 concurrency:
