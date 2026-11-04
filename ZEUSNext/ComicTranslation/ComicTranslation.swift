@@ -25,6 +25,8 @@ import CoreGraphics
     private func countTexts(_ job:String,detected:Int,translated:Int){textCounts[job]=(detected,translated);detectedTexts=textCounts.values.reduce(0){$0+$1.0};translatedTexts=textCounts.values.reduce(0){$0+$1.1}}
     private(set) var ocrRuns=0
     private(set) var phaseSeconds:[String:Double]=[:]
+    // Optional test observer; no image, text or translation telemetry is stored by the app.
+    var onRegionAudit:((ComicReading,[TranslationSegment],[String:String])->Void)?
     @Published var phase: ComicSessionPhase = .idle
     var stage: String { phase.title }
     @Published var showingOriginal = false
@@ -315,10 +317,11 @@ import CoreGraphics
                             if reading.repairUnavailable != true{try await saveCleanup(restored.image,ids:restored.restored,job:job)}
                             if let notice=restored.notice{contextNotice=notice;sweepFailure=true;renderingPartial=true;retryPartial = retryPartial || restored.retryable}
                         }else{restored=ComicRestoration.Result(image:image,restored:[],notice:nil)}
-                        let result=try await Task.detached{let drawing=try ComicPixels.renderReport(restored.image,speeches:core,translations:lettering,target:translation.target,fontName:prefs.fontName,fontScale:prefs.fontScale,textColor:prefs.textColor,ink:prefs.inkStyle,letterSpacing:prefs.letterSpacing ?? 0,requireCleanSource:true,precleanedIDs:restored.restored,styleSource:image)
+                        let result=try await Task.detached{let drawing=try ComicPixels.renderReport(restored.image,speeches:core,translations:lettering,target:translation.target,fontName:prefs.fontName,fontScale:prefs.fontScale,textColor:prefs.textColor,ink:prefs.inkStyle,letterSpacing:prefs.letterSpacing ?? 0,requireCleanSource:true,precleanedIDs:restored.restored,styleSource:image,allowEmpty:true)
                         // Only this core is applied. Recognition context is retained above/below.
                         let rect=CGRect(x:0,y:region.coreTop+offset,width:region.width,height:region.coreBottom-region.coreTop)
-                        guard let crop=drawing.image.cropping(to:rect)else{throw ComicFailure.message("تعذّر قص منطقة الرسم.")};return (try ComicPixels.png(crop),drawing.unresolved)}.value
+                        guard let crop=drawing.image.cropping(to:rect)else{throw ComicFailure.message("تعذّر قص منطقة الرسم.")};return (try ComicPixels.png(crop),drawing.unresolved,drawing.reasons)}.value
+                        onRegionAudit?(ComicReading(lines:reading.lines,speeches:core,language:reading.language,runtime:reading.runtime),translated,result.2)
                         rendered=result.0
                         countTexts(countKey,detected:counted.count,translated:counted.filter{source in translated.contains{$0.id==source.id} && !result.1.contains(source.id)}.count)
                         if !result.1.isEmpty{renderingPartial=true;sweepFailure=true;contextNotice="احتُفظ ببعض النصوص الأصلية لعدم اكتمال تنظيفها أو ملاءمة خطها."}

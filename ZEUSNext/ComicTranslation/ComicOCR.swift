@@ -82,13 +82,14 @@ actor ComicOCR {
                 }else if script=="latin",overlaps.isEmpty,sample.confidence >= (primary=="latin" ? 0.8:0.95),sample.text.filter({$0.isLetter}).count>=2{lines.append(sample)}
             }
         }
+        let initialLines=lines
         var speeches=ComicBalloons.speeches(lines,image:image,source:detected)
         // Closed dialogues with missing ink need another crop. Low-confidence
         // external lettering also needs a local Paddle read: Vision can report
         // a brush word as ALPIGHY, and ML Kit's iOS API has no calibrated score.
         let uncertain=fast.filter{$0.confidence<0.85}.map(\.rect)
         func difficult(_ speech:ComicSpeech)->Bool{
-            guard !speech.balloon,ComicModelStore.recognizer(detected)=="latin" else{return false}
+            guard !speech.balloon,(ComicModelStore.recognizer(detected)=="latin" || Self.lineScript(speech.text)=="latin") else{return false}
             return speech.lines.contains{line in uncertain.contains{r in r.intersection(line.rect).area/min(max(1,r.area),max(1,line.rect.area))>0.6}}
         }
         var repairUnavailable=false
@@ -107,13 +108,14 @@ actor ComicOCR {
                 }}
                 additional+=shifted(try await self.fast(cut,source:detected))
                 if difficult(speech){
+                    let repairSource=ComicModelStore.recognizer(detected)=="latin" ? detected:"en"
                     do{
-                        if !(await ComicModelStore.shared.isPrepared(source:detected)){
+                        if !(await ComicModelStore.shared.isPrepared(source:repairSource)){
                             await onPreparing?(true)
-                            do{try await ComicModelStore.shared.prepare(source:detected)}catch{await onPreparing?(false);throw error}
+                            do{try await ComicModelStore.shared.prepare(source:repairSource)}catch{await onPreparing?(false);throw error}
                             await onPreparing?(false)
                         }
-                        let precise=shifted(try await ComicPaddle.shared.read(cut,source:detected,careful:false)).filter{line in
+                        let precise=shifted(try await ComicPaddle.shared.read(cut,source:repairSource,careful:false)).filter{line in
                             line.confidence>=0.8 && speech.rect.contains(CGPoint(x:line.rect.midX,y:line.rect.midY))
                         }
                         // A confident short fragment must not replace a whole
@@ -141,7 +143,7 @@ actor ComicOCR {
                     if let language=recognizer.dominantLanguage,ComicModelStore.recognizer(language.rawValue)=="latin",recognizer.languageHypotheses(withMaximum:1)[language,default:0]>=0.6{detected=language.rawValue}
                 }
             }
-            if !additional.isEmpty || !replacements.isEmpty{speeches=ComicBalloons.speeches(lines,image:image,source:detected)}
+            if lines != initialLines{speeches=ComicBalloons.speeches(lines,image:image,source:detected)}
         }
         return ComicReading(lines:lines,speeches:speeches,language:detected,runtime:runtime,repairUnavailable:repairUnavailable)
     }

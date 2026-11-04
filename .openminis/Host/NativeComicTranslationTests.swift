@@ -329,6 +329,10 @@ import UIKit
         let restored=try await ComicRestoration.shared.restore(image,speeches:eligible,requiredHeadroom:0)
         XCTAssertEqual(ComicPixels.rgba(image,width:300,height:200),ComicPixels.rgba(restored.image,width:300,height:200))
         XCTAssertTrue(restored.restored.isEmpty)
+        let report=try ComicPixels.renderReport(image,speeches:[speech],translations:values,target:"ar",fontName:nil,fontScale:1,requireCleanSource:true,allowEmpty:true)
+        XCTAssertEqual(report.unresolved,["0"])
+        XCTAssertEqual(report.reasons,["0":"layout"])
+        XCTAssertEqual(ComicPixels.rgba(image,width:300,height:200),ComicPixels.rgba(report.image,width:300,height:200),"Rejected lettering must return the exact original and a reason")
     }
     func testUnplatedVerticalArabicKeepsWholeRotatedWords()throws{
         let image=renderer(CGSize(width:200,height:500)).image{context in UIColor.white.setFill();context.fill(CGRect(x:0,y:0,width:200,height:500))}.cgImage!

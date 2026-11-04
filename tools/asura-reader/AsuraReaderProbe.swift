@@ -26,7 +26,7 @@ import WebKit
         let root=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let model=BrowserModel(profiles:ProfileStore(root:root,downloadsRoot:root.appendingPathComponent("Downloads")),useBackgroundDownloads:false)
         model.data.settings.shieldsEnabled=false
-        var prefs=ComicPreferences();prefs.mode = .fastest;prefs.engine = .google;prefs.restorationEnabled=true;prefs.readAhead=true;prefs.showUntranslated=true;prefs.source="en"
+        var prefs=ComicPreferences();prefs.mode = .fastest;prefs.engine = .google;prefs.restorationEnabled=true;prefs.readAhead=true;prefs.showUntranslated=true;prefs.source="auto"
         var translation=TranslationPreferences();translation.target="ar";prefs.translation=translation;model.data.settings.comicTranslation=prefs
         let tab=try XCTUnwrap(model.current);tab.url="http://127.0.0.1:8781/index.html"
         let prepared=await model.prepare(tab),view=try XCTUnwrap(prepared),session=try XCTUnwrap(tab.comicTranslation)
@@ -36,6 +36,12 @@ import WebKit
         view.load(URLRequest(url:URL(string:tab.url)!))
         var deadline=Date().addingTimeInterval(30)
         while Date()<deadline{if (try? await view.evaluateJavaScript("document.images.length"))as? Int==27{break};try await Task.sleep(for:.milliseconds(200))}
+        var audits:[[String:Any]]=[]
+        session.onRegionAudit={reading,translations,reasons in
+            guard let data=try? JSONEncoder().encode(reading),let geometry=try? JSONSerialization.jsonObject(with:data),
+                  let texts=try? JSONEncoder().encode(translations),let translated=try? JSONSerialization.jsonObject(with:texts)else{return}
+            audits.append(["reading":geometry,"translations":translated,"unresolved_reasons":reasons])
+        }
         let began=Date();session.start();deadline=began.addingTimeInterval(1600);var idle:Date?,firstPaint:Double?
         while Date()<deadline{
             if firstPaint==nil && session.translatedTexts>0{firstPaint=Date().timeIntervalSince(began)}
@@ -48,7 +54,7 @@ import WebKit
         XCTAssertEqual(rows.count,27);XCTAssertFalse(session.running,"Whole chapter exceeded the bounded test deadline")
         XCTAssertGreaterThan(session.detectedTexts,100,"The queue must discover dialogue far beyond the initial viewport")
         XCTAssertTrue(rows.contains{$0["index"]as? String=="25" && $0["painted"]as? Bool==true},"The last story image must be processed without a scroll")
-        let report:[String:Any]=["source":"Asura chapter 2, 27 SHA-pinned originals","mode":"fastest, restoration on, Google Arabic","scroll":scroll ?? -1,"seconds":Date().timeIntervalSince(began),"first_paint_seconds":firstPaint.map{$0 as Any} ?? NSNull(),"detected":session.detectedTexts,"ready":session.translatedTexts,"regions":session.completed,"ocr_runs":session.ocrRuns,"phase_seconds":session.phaseSeconds,"phase":session.phase.rawValue,"notice":session.contextNotice ?? "","error":session.error ?? "","images":rows]
+        let report:[String:Any]=["source":"Asura chapter 2, 27 SHA-pinned originals","mode":"fastest, restoration on, Google Arabic","scroll":scroll ?? -1,"seconds":Date().timeIntervalSince(began),"first_paint_seconds":firstPaint.map{$0 as Any} ?? NSNull(),"detected":session.detectedTexts,"ready":session.translatedTexts,"regions":session.completed,"ocr_runs":session.ocrRuns,"phase_seconds":session.phaseSeconds,"region_audits":audits,"phase":session.phase.rawValue,"notice":session.contextNotice ?? "","error":session.error ?? "","images":rows]
         let attachment=XCTAttachment(data:try JSONSerialization.data(withJSONObject:report,options:[.prettyPrinted,.sortedKeys]),uniformTypeIdentifier:"public.json");attachment.name="Asura entire chapter without scrolling measured results";attachment.lifetime = .keepAlways;add(attachment)
         for index in [1,2,3,5,9,17,25]{
             // Export the actual applied PNG patches, not a URL or early preview.

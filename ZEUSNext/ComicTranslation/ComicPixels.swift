@@ -34,24 +34,28 @@ enum ComicPixels {
     static func render(_ image:CGImage,speeches:[ComicSpeech],translations:[TranslationSegment],target:String,fontName:String?,fontScale:Double,textColor:String? = nil,ink:ComicInkStyle = .automatic,letterSpacing:Double = 0,requireCleanSource:Bool = false,precleanedIDs:Set<String> = [],styleSource:CGImage? = nil)throws->CGImage{
         try renderReport(image,speeches:speeches,translations:translations,target:target,fontName:fontName,fontScale:fontScale,textColor:textColor,ink:ink,letterSpacing:letterSpacing,requireCleanSource:requireCleanSource,precleanedIDs:precleanedIDs,styleSource:styleSource).image
     }
-    struct Rendering{var image:CGImage;var unresolved:[String]}
-    static func renderReport(_ image:CGImage,speeches:[ComicSpeech],translations:[TranslationSegment],target:String,fontName:String?,fontScale:Double,textColor:String? = nil,ink:ComicInkStyle = .automatic,letterSpacing:Double = 0,requireCleanSource:Bool = false,precleanedIDs:Set<String> = [],styleSource:CGImage? = nil)throws->Rendering{
+    struct Rendering{var image:CGImage;var unresolved:[String];var reasons:[String:String]=[:]}
+    static func renderReport(_ image:CGImage,speeches:[ComicSpeech],translations:[TranslationSegment],target:String,fontName:String?,fontScale:Double,textColor:String? = nil,ink:ComicInkStyle = .automatic,letterSpacing:Double = 0,requireCleanSource:Bool = false,precleanedIDs:Set<String> = [],styleSource:CGImage? = nil,allowEmpty:Bool = false)throws->Rendering{
         guard let context=context(width:image.width,height:image.height),var pixels=rgba(image,width:image.width,height:image.height)else{throw ComicFailure.message("ذاكرة غير كافية للرسم.")}
         let original=pixels
         let translated=Dictionary(translations.map{($0.id,$0.text)},uniquingKeysWith:{$1})
         var prepared:[(CGRect,Placement,CGColor,InkAppearance?)]=[]
-        var resolved=Set<String>()
+        var resolved=Set<String>(),reasons:[String:String]=[:]
         for speech in speeches {
             guard let text=translated[speech.id],!text.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty else{continue}
             if !needsLettering(speech.text,text){resolved.insert(speech.id);continue}
-            guard let (area,placed)=planned(speech,text:text,width:image.width,height:image.height,target:target,fontName:fontName,fontScale:fontScale,letterSpacing:letterSpacing,requireReadable:requireCleanSource)else{continue}
+            guard let (area,placed)=planned(speech,text:text,width:image.width,height:image.height,target:target,fontName:fontName,fontScale:fontScale,letterSpacing:letterSpacing,requireReadable:requireCleanSource)else{reasons[speech.id]="layout";continue}
             let background=backgroundColor(original,width:image.width,height:image.height,rect:area)
             if !precleanedIDs.contains(speech.id){
                 let mask=sourceMask(original,width:image.width,height:image.height,speech:speech)
-                if requireCleanSource && !(speech.flatCleanup?.complete==true && speech.flatCleanup?.uniform==true) && (!completeMask(original,mask:mask,width:image.width,height:image.height,speech:speech) || !simpleBackground(original,mask:mask,width:image.width,height:image.height,speech:speech) || !ownsText(original,width:image.width,height:image.height,speech:speech)){continue}
+                if requireCleanSource && !(speech.flatCleanup?.complete==true && speech.flatCleanup?.uniform==true){
+                    if !completeMask(original,mask:mask,width:image.width,height:image.height,speech:speech){reasons[speech.id]="mask coverage";continue}
+                    if !simpleBackground(original,mask:mask,width:image.width,height:image.height,speech:speech){reasons[speech.id]="complex background";continue}
+                    if !ownsText(original,width:image.width,height:image.height,speech:speech){reasons[speech.id]="unowned ink";continue}
+                }
                 var candidate=pixels
                 clean(&candidate,width:image.width,height:image.height,speech:speech,source:original,approvedMask:mask)
-                if requireCleanSource && inkResidue(original,clean:candidate,mask:mask,width:image.width,height:image.height,boxes:speech.lines.map(\.rect))>0.08{continue}
+                if requireCleanSource && inkResidue(original,clean:candidate,mask:mask,width:image.width,height:image.height,boxes:speech.lines.map(\.rect))>0.08{reasons[speech.id]="source residue";continue}
                 pixels=candidate
             }
             let automatic=background.0*0.2126+background.1*0.7152+background.2*0.0722>0.5 ? CGColor(gray:0.04,alpha:1):CGColor(gray:0.98,alpha:1)
@@ -60,12 +64,12 @@ enum ComicPixels {
         }
         // Finish every source mask before lettering. A later cleanup pass must
         // never erase an earlier Arabic glyph where source boxes touch.
-        if requireCleanSource && prepared.isEmpty && resolved.isEmpty{throw ComicFailure.message("لم يُعتمد تنظيف النص كاملًا؛ بقيت الصورة الأصلية دون كتابة ترجمة فوقها.")}
+        if requireCleanSource && !allowEmpty && prepared.isEmpty && resolved.isEmpty{throw ComicFailure.message("لم يُعتمد تنظيف النص كاملًا؛ بقيت الصورة الأصلية دون كتابة ترجمة فوقها.")}
         let data=Data(pixels)
         guard let provider=CGDataProvider(data:data as CFData),let cleaned=CGImage(width:image.width,height:image.height,bitsPerComponent:8,bitsPerPixel:32,bytesPerRow:image.width*4,space:CGColorSpace(name:CGColorSpace.sRGB)!,bitmapInfo:CGBitmapInfo(rawValue:CGImageAlphaInfo.premultipliedLast.rawValue|CGBitmapInfo.byteOrder32Big.rawValue),provider:provider,decode:nil,shouldInterpolate:false,intent:.defaultIntent)else{throw ComicFailure.message("فشل تجهيز الصورة النظيفة.")}
         context.draw(cleaned,in:CGRect(x:0,y:0,width:image.width,height:image.height))
         for (area,placed,color,appearance) in prepared{letter(context,image:image,area:area,placed:placed,color:color,ink:ink,appearance:appearance)}
-        guard let result=context.makeImage()else{throw ComicFailure.message("فشل رسم النص.")};return Rendering(image:result,unresolved:speeches.filter{translated[$0.id] != nil && !resolved.contains($0.id)}.map(\.id))
+        guard let result=context.makeImage()else{throw ComicFailure.message("فشل رسم النص.")};return Rendering(image:result,unresolved:speeches.filter{translated[$0.id] != nil && !resolved.contains($0.id)}.map(\.id),reasons:reasons)
     }
     // Resolve the exact layout before any neural erasure. A restoration that
     // succeeds for an unplaceable translation must never leave an empty bubble.
