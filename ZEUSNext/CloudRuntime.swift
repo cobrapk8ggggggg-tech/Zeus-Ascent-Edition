@@ -424,7 +424,6 @@ public struct NativeCloudExecutionSettings: View {
             guard let delegate = NativeCloudAccountAPI.dataDelegate else { throw CloudAccountError.incomplete("مسار نقل بيانات الوكيل غير متاح حاليًا.") }
             if value {
                 try delegate.validateLocalExecutionIdle()
-                try await NativeCloudAccountAPI.setEnabled(true)
                 let data = try await NativeCloudAccountAPI.runtime("v1/capabilities")
                 guard let capability = try JSONSerialization.jsonObject(with: data) as? [String: Any], capability["ready"] as? Bool == true else {
                     throw CloudAccountError.incomplete("الخادم غير جاهز للتنفيذ بعد؛ بقي الوضع المحلي كما هو.")
@@ -437,6 +436,7 @@ public struct NativeCloudExecutionSettings: View {
                 return
             }
             try await delegate.validateExecutionTransition()
+            try await NativeCloudAccountAPI.setEnabled(true)
             try await delegate.finishExecutionTransition(enabled: value)
             progress = value ? "فُعّل التشغيل السحابي بعد التحقق من النقل." : "فُعّل التشغيل المحلي. النسخة السحابية محفوظة."
         } catch {
