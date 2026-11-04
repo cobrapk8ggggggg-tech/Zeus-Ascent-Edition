@@ -1,0 +1,16 @@
+[
+  {
+    "name": "lama.onnx",
+    "url": "https://huggingface.co/Carve/LaMa-ONNX/resolve/c3c0c9e468934d62e79c329e35d82dd09ff8c444/lama_fp32.onnx",
+    "bytes": 208044816,
+    "sha256": "1faef5301d78db7dda502fe59966957ec4b79dd64e16f03ed96913c7a4eb68d6",
+    "comparison_only": false
+  },
+  {
+    "name": "ctd.onnx",
+    "url": "https://huggingface.co/mayocream/comic-text-detector-onnx/resolve/a5d67ec772adef819ef5b0e7aa701fcf4c8bf74a/comic-text-detector.onnx",
+    "bytes": 94669756,
+    "sha256": "1a86ace74961413cbd650002e7bb4dcec4980ffa21b2f19b86933372071d718f",
+    "comparison_only": false
+  }
+]

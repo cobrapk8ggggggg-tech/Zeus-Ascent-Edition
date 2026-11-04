@@ -2,17 +2,20 @@ name: ZEUS integrated IPA - build and publish (no tests)
 run-name: IPA from ${{ github.ref_name }} (${{ github.sha }})
 on:
   push:
-    branches: [fix/unsigned-ipa-20261101, main, edition/ascent-parity-20261101, feature/zeus-manhwa-translation-20261101, build/zeus-unsigned-ipa-repair-20261023, feature/zeus-project-agent-20261023, feature/zeus-direct-integrations-20261023, feature/zeus-ipad-layout-studio-20261025, feature/zeus-cloud-account-20261026, feature/zeus-android-lab-20261030]
-    paths: [.github/workflows/zeus-ipa-download.yml, .openminis/**, ZEUSNext/**]
+    branches: [fix/comic-translation-reliability,fix/image-translation-entry-20261102, fix/unsigned-ipa-20261101, main, edition/ascent-parity-20261101, feature/zeus-manhwa-translation-20261101, build/zeus-unsigned-ipa-repair-20261023, feature/zeus-project-agent-20261023, feature/zeus-direct-integrations-20261023, feature/zeus-ipad-layout-studio-20261025, feature/zeus-cloud-account-20261026, feature/zeus-android-lab-20261030]
+    paths: [.github/workflows/zeus-ipa-download.yml, .openminis/**, ZEUSNext/**, Native/ComicRuntime/**, .zeus-ci/**]
   workflow_dispatch:
     inputs:
       source_ref:
-        description: Browser source branch, tag or commit to package
+        description: Optional source override; leave empty to build the selected workflow branch
         required: false
-        default: main
+        default: ''
         type: string
 permissions:
   contents: read
+concurrency:
+  group: zeus-ipa-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   ipa:
     runs-on: macos-15
@@ -34,16 +37,37 @@ jobs:
       - uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: '26.3'
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Verify image bridge and evidence provenance before packaging
+        run: |
+          set -euo pipefail
+          mkdir -p results
+          npm ci --prefix browser/.zeus-ci/comic
+          node --test browser/.zeus-ci/comic/bridge.test.mjs 2>&1 | tee results/verification.log
+          python3 browser/.zeus-ci/comic/evidence_test.py 2>&1 | tee -a results/verification.log
+          python3 browser/.zeus-ci/comic/compare_test.py 2>&1 | tee -a results/verification.log
       - uses: actions/setup-go@v5
         with:
           go-version: '1.25.0'
           cache-dependency-path: upstream/deps/rclone-mobile/go.sum
       - name: Prepare device build and record exact source revisions
+        env:
+          ZEUS_SOURCE_REF: ${{ inputs.source_ref || github.ref_name }}
         run: |
           set -euo pipefail
           test "$(uname -m)" = arm64
           mkdir -p results
           git -C browser rev-parse HEAD > results/browser-commit.txt
+          printf '%s\n' "$ZEUS_SOURCE_REF" > results/browser-ref.txt
+          python3 - <<'PY'
+          import json,os,subprocess
+          from pathlib import Path
+          value={"source_commit":subprocess.check_output(['git','-C','browser','rev-parse','HEAD'],text=True).strip(),"source_ref":os.environ['ZEUS_SOURCE_REF'],"bridge_verified":True,"evidence_checks_verified":True,"physical_device_quality_measured":False}
+          text=json.dumps(value,indent=2)+'\n'
+          Path('browser/ZEUSNext/Resources/comic-build.json').write_text(text)
+          Path('results/comic-build.json').write_text(text)
+          PY
           git -C upstream rev-parse HEAD > results/openminis-commit.txt
           python3 browser/.openminis/prepare_reference.py upstream --sdk iphoneos --manifest results/original-source.json
           brew install ninja llvm lld libarchive pkg-config meson
@@ -139,6 +163,9 @@ jobs:
             results/*.ipa
             results/*.sha256
             results/*commit.txt
+            results/browser-ref.txt
+            results/comic-build.json
+            results/verification.log
             results/native-adapters.json
             results/ipa-zip-check.txt
             results/ipa-size-audit.json

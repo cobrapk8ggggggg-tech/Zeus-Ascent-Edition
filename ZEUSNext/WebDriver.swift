@@ -52,6 +52,13 @@ import UIKit
     }
     func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse, decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
         let response = navigationResponse.response as? HTTPURLResponse
+        if let response,let url=response.url,let policy=response.value(forHTTPHeaderField:"Referrer-Policy") {
+            let supported=Set(["no-referrer","no-referrer-when-downgrade","origin","origin-when-cross-origin","same-origin","strict-origin","strict-origin-when-cross-origin","unsafe-url"])
+            if let effective=policy.split(separator:",").map({$0.trimmingCharacters(in:.whitespacesAndNewlines).lowercased()}).last(where:{supported.contains($0)}) {
+                if tab?.comicDocumentPolicies.count ?? 0 >= 64 {tab?.comicDocumentPolicies.removeAll()}
+                tab?.comicDocumentPolicies[url.absoluteString]=effective
+            }
+        }
         let disposition = response?.value(forHTTPHeaderField: "Content-Disposition")?.lowercased() ?? ""
         if !navigationResponse.canShowMIMEType || disposition.hasPrefix("attachment") { decisionHandler(model?.profile.account?.allowDownloads == false ? .cancel : .download) }
         else { decisionHandler(.allow) }
@@ -62,7 +69,7 @@ import UIKit
         guard let model, let tab, let owner = model.profiles.profile(tab.profileID) else { download.cancel { _ in }; return }
         model.downloads.attach(download, profile: owner); tab.loading = false; model.changed(); model.notify("أُضيف الملف إلى التنزيلات.")
     }
-    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) { tab?.comicTranslation?.navigationStarted(); tab?.translation?.navigationStarted(); tab?.error = nil; tab?.loading = true; model?.changed() }
+    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) { tab?.comicDocumentPolicies.removeAll();tab?.comicTranslation?.navigationStarted(); tab?.translation?.navigationStarted(); tab?.error = nil; tab?.loading = true; model?.changed() }
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         tab?.committed = true
         if let url = webView.url { tab?.url = url.absoluteString; if model?.current?.id == tab?.id { model?.address = url.absoluteString } }

@@ -1,5 +1,8 @@
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import time
+from pathlib import Path
+import base64
+from threading import Thread
 import json
 import os
 from urllib.parse import urlparse, parse_qs
@@ -206,9 +209,13 @@ class Handler(BaseHTTPRequestHandler):
             if isinstance(prompt, list): prompt = next((p['text'] for p in prompt if p.get('type') == 'text'), '')
             if 'INPUT_JSON:' in prompt:
                 items = json.loads(prompt.split('INPUT_JSON:', 1)[1])
-                with TRANSLATION_LOCK: TRANSLATION_REQUESTS.setdefault(body.get('model', ''), []).append([x['text'] for x in items])
-                text = json.dumps([{'id': x['id'], 'text': 'ترجمة: ' + x['text']} for x in items], ensure_ascii=False)
+                with TRANSLATION_LOCK:
+                    requests = TRANSLATION_REQUESTS.setdefault(body.get('model', ''), [])
+                    requests.append([x['text'] for x in items])
+                    transient_invalid = body.get('model', '').startswith('comic-retry-') and len(requests) == 1
+                text = json.dumps([{'id': x['id'], 'text': 'هل يمكنك مساعدتنا؟' if body.get('model','').startswith('comic-violet') else 'ترجمة: ' + x['text']} for x in items], ensure_ascii=False)
             else: text = 'OK'
+            if body.get('model', '').startswith('comic-retry-') and 'INPUT_JSON:' in prompt and transient_invalid: text = '[{"id":"wrong","text":"wrong"}]'
             if body.get('model') == 'broken-json': text = '[{"id":"wrong","text":"wrong"}]'
             if body.get('model') == 'slow-translator': time.sleep(0.4)
             if body.get('stream') is True:
@@ -233,6 +240,28 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if github_response(self, 'GET'): return
+        if self.path.startswith('/comic-violet/'):
+            root=Path(__file__).resolve().parent/'comic/lab/output/violet'
+            manifest=json.loads((Path(__file__).resolve().parent/'comic/violet.json').read_text())
+            pages={p['path']:p for p in manifest['pages']}
+            name=urlparse(self.path).path.removeprefix('/comic-violet/image/')
+            if self.path.startswith('/comic-violet/image/') and name in pages:
+                body=(root/name).read_bytes();kind='image/jpeg'
+            elif urlparse(self.path).path=='/comic-violet/':
+                number=int(parse_qs(urlparse(self.path).query).get('page',['1'])[0])
+                selected=manifest['pages'][number:number+1]
+                markup=''.join('<img alt="Violet original chapter page" src="/comic-violet/image/'+p['path']+'" width="'+str(p['width'])+'" height="'+str(p['height'])+'">' for p in selected)
+                body=('<meta name="viewport" content="width=device-width,initial-scale=1"><title>Violet real chapter</title><style>body{margin:0;background:#111;color:white}img{display:block;width:100%;height:auto}</style><p>Violet real chapter</p>'+markup).encode();kind='text/html; charset=utf-8'
+            else:self.send_response(404);self.end_headers();return
+            self.send_response(200);self.send_header('Content-Type',kind);self.send_header('Content-Length',str(len(body)));self.end_headers();self.wfile.write(body);return
+        if self.path.startswith('/comic-quality-fixtures'):
+            root=Path(__file__).resolve().parent/'comic/lab/fixtures'
+            name=parse_qs(urlparse(self.path).query).get('name',[''])[0]
+            if not name: body=json.dumps(sorted(p.name for p in root.glob('*.json'))).encode()
+            elif name in [p.name for p in root.glob('*.json')]: body=(root/name).read_bytes()
+            else: self.send_response(404);self.end_headers();return
+            self.send_response(200);self.send_header('Content-Type','application/json');self.send_header('Content-Length',str(len(body)));self.end_headers();self.wfile.write(body);return
+
         if self.path.startswith('/translation-requests'):
             model = parse_qs(urlparse(self.path).query).get('model', [''])[0]
             with TRANSLATION_LOCK: body = json.dumps(TRANSLATION_REQUESTS.get(model, [])).encode()
@@ -253,6 +282,16 @@ class Handler(BaseHTTPRequestHandler):
             <button onclick="const p=document.createElement('p');p.id='dynamic';p.textContent='Another chapter arrives after the initial translation.';document.body.append(p)">Add paragraph</button>
             <a href="/translate-fixture?next">Next page</a><iframe src="/translate-frame" width="500" height="80"></iframe></body></html>'''
             self.send_response(200); self.send_header('Content-Type', 'text/html; charset=utf-8'); self.send_header('Content-Length', str(len(body))); self.end_headers(); self.wfile.write(body); return
+        if self.path.startswith('/comic-no-referrer.png'):
+            if self.headers.get('Referer'):
+                self.send_response(403);self.end_headers();return
+            try:
+                value=parse_qs(urlparse(self.path).query).get('image',[''])[0]
+                body=base64.b64decode(value,validate=True) if value else IMAGE
+                if len(body)>1_048_576: raise ValueError('image too large')
+            except (ValueError,TypeError):
+                self.send_response(400);self.end_headers();return
+            self.send_response(200);self.send_header('Content-Type','image/png');self.send_header('Content-Length',str(len(body)));self.end_headers();self.wfile.write(body);return
         if self.path.startswith('/image.png'):
             self.send_response(200); self.send_header('Content-Type', 'image/png'); self.send_header('Content-Length', str(len(IMAGE))); self.end_headers(); self.wfile.write(IMAGE)
         elif self.path.startswith('/attachment'):
@@ -283,4 +322,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(200); self.send_header('Content-Type', 'text/html; charset=utf-8'); self.send_header('Content-Length', str(len(body))); self.end_headers(); self.wfile.write(body)
 
 
-ThreadingHTTPServer(('0.0.0.0', int(os.environ.get('ZEUS_FIXTURE_PORT', '8765'))), Handler).serve_forever()
+fixture_port=int(os.environ.get('ZEUS_FIXTURE_PORT','8765'))
+image_server=ThreadingHTTPServer(('0.0.0.0',fixture_port+1),Handler)
+Thread(target=image_server.serve_forever,daemon=True).start()
+ThreadingHTTPServer(('0.0.0.0',fixture_port),Handler).serve_forever()

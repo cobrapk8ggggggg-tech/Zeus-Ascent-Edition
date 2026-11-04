@@ -16,7 +16,7 @@
       "id": "fetch",
       "name": "جلب الأصل بأبعاده الحقيقية مع سقوط آمن إلى Canvas",
       "ascent": "native fetch بالـ URL + raster() مجزأ للblob/data/canvas بحد RASTER_KEPT=6",
-      "zeus_test": "bridge",
+      "zeus_test": "simulator",
       "zeus_files": [
         "ZEUSNext/ComicTranslation/ComicTranslation.swift"
       ],
@@ -28,7 +28,7 @@
       "ascent": "شرائح بحجم عرض الشريط وسياق حتى 256px",
       "zeus_test": "decoder",
       "zeus_files": [
-        "ZEUSNext/ComicTranslation/ComicGeometry.swift"
+        "ZEUSNext/ComicTranslation/ComicTypes.swift"
       ],
       "zeus_status": "yes"
     },
@@ -181,7 +181,7 @@
       "ascent": "مدعوم",
       "zeus_test": "unit",
       "zeus_files": [
-        "ZEUSNext/ComicTranslation/ComicGeometry.swift"
+        "ZEUSNext/ComicTranslation/ComicTypes.swift"
       ],
       "zeus_status": "yes"
     },
@@ -191,7 +191,7 @@
       "ascent": "معالجات مائلة داخل الفقاعات",
       "zeus_test": "unit",
       "zeus_files": [
-        "ZEUSNext/ComicTranslation/ComicGeometry.swift",
+        "ZEUSNext/ComicTranslation/ComicTypes.swift",
         "ZEUSNext/ComicTranslation/ComicPixels.swift"
       ],
       "zeus_status": "partial-diagonal-tails",
@@ -209,7 +209,7 @@
       "id": "process_isolation",
       "name": "فك الصور خارج عملية المتصفح",
       "ascent": "DecodeService + SharedMemory صفر-نسخ",
-      "zeus_test": "decoder",
+      "zeus_test": "none",
       "zeus_files": [
         "Native/ComicRuntime/ComicRegionDecoder.cpp"
       ],

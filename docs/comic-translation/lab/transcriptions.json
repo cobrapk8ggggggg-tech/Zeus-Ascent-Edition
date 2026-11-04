@@ -1,0 +1,167 @@
+[
+  {
+    "id": "en-comix-14-calibration-022",
+    "source": "en/comix-148/panel-03.png",
+    "source_sha256": "21b73b08575bb085ad4577e6062d4dcf9bc5abd4dd409d07501664f84d602e9f",
+    "crop": [
+      87,
+      470,
+      390,
+      580
+    ],
+    "source_text": "DAMN IT...",
+    "review_type": "manual transcription from first-sweep original crop",
+    "mask_ground_truth": false,
+    "bounding_polygon_ground_truth": false
+  },
+  {
+    "id": "en-comix-14-calibration-023",
+    "source": "en/comix-148/panel-03.png",
+    "source_sha256": "21b73b08575bb085ad4577e6062d4dcf9bc5abd4dd409d07501664f84d602e9f",
+    "crop": [
+      440,
+      892,
+      726,
+      1100
+    ],
+    "source_text": "DAMN IIIIIIT?!!",
+    "review_type": "manual transcription from first-sweep original crop",
+    "mask_ground_truth": false,
+    "bounding_polygon_ground_truth": false
+  },
+  {
+    "id": "en-comix-14-calibration-024",
+    "source": "en/comix-148/panel-04.png",
+    "source_sha256": "b33e7b28592d7e6d99acdbc8ed80f16a3797faa15e97ea094aaac797ab7b499a",
+    "crop": [
+      78,
+      90,
+      439,
+      312
+    ],
+    "source_text": "WHY DO ALL THESE FANS HAVE NOTHING BUT WORTHLESS JUNK ON THEM?!",
+    "review_type": "manual transcription from first-sweep original crop",
+    "mask_ground_truth": false,
+    "bounding_polygon_ground_truth": false
+  },
+  {
+    "id": "en-comix-14-calibration-025",
+    "source": "en/comix-148/panel-05.png",
+    "source_sha256": "05bb592a85f49b3b8a114f577ccb07e55b1ae2b798d586bc8dbab035c0a8a212",
+    "crop": [
+      319,
+      624,
+      721,
+      902
+    ],
+    "source_text": "WHAT A BUNCH OF USELESS TRASH!!",
+    "review_type": "manual transcription from first-sweep original crop",
+    "mask_ground_truth": false,
+    "bounding_polygon_ground_truth": false
+  },
+  {
+    "id": "en-comix-14-calibration-026",
+    "source": "en/comix-148/panel-05.png",
+    "source_sha256": "05bb592a85f49b3b8a114f577ccb07e55b1ae2b798d586bc8dbab035c0a8a212",
+    "crop": [
+      120,
+      1325,
+      360,
+      1429
+    ],
+    "source_text": "MORE...",
+    "review_type": "manual transcription from first-sweep original crop",
+    "mask_ground_truth": false,
+    "bounding_polygon_ground_truth": false
+  },
+  {
+    "id": "en-comix-14-calibration-029",
+    "source": "en/comix-148/panel-06.png",
+    "source_sha256": "a8e56bdac4bf1ad6e0ff344043482d6ce7540be4f30f38acb8c9f52c4504324c",
+    "crop": [
+      523,
+      873,
+      768,
+      1000
+    ],
+    "source_text": "I NEED TO FIND MORE \"COLLECTIBLES\".",
+    "review_type": "manual transcription from first-sweep original crop",
+    "mask_ground_truth": false,
+    "bounding_polygon_ground_truth": false
+  },
+  {
+    "id": "en-comix-14-calibration-030",
+    "source": "en/comix-148/panel-06.png",
+    "source_sha256": "a8e56bdac4bf1ad6e0ff344043482d6ce7540be4f30f38acb8c9f52c4504324c",
+    "crop": [
+      59,
+      1203,
+      316,
+      1385
+    ],
+    "source_text": "ONLY THEN—",
+    "review_type": "manual transcription from first-sweep original crop",
+    "mask_ground_truth": false,
+    "bounding_polygon_ground_truth": false
+  },
+  {
+    "id": "en-comix-14-calibration-032",
+    "source": "en/comix-148/panel-07.png",
+    "source_sha256": "5fa1c0724af4b2c1aff3ccf948f041a9f5729bab09a5b3e302178fd910537e7d",
+    "crop": [
+      236,
+      1315,
+      705,
+      1553
+    ],
+    "source_text": "CAN I BECOME THE ONLY ONE IN SISTER LI’S HEART!",
+    "review_type": "manual transcription from first-sweep original crop",
+    "mask_ground_truth": false,
+    "bounding_polygon_ground_truth": false
+  },
+  {
+    "id": "en-comix-14-calibration-033",
+    "source": "en/comix-148/panel-08.png",
+    "source_sha256": "199eefd80eef221ba35a770e0bdea39685d39abed6f248e6ebf7d3af5bb2fe92",
+    "crop": [
+      19,
+      332,
+      293,
+      479
+    ],
+    "source_text": "IT’S A TALISMAN USED BY THE FENG SHUI MASTER CLASS.",
+    "review_type": "manual transcription from first-sweep original crop",
+    "mask_ground_truth": false,
+    "bounding_polygon_ground_truth": false
+  },
+  {
+    "id": "en-comix-14-calibration-035",
+    "source": "en/comix-148/panel-08.png",
+    "source_sha256": "199eefd80eef221ba35a770e0bdea39685d39abed6f248e6ebf7d3af5bb2fe92",
+    "crop": [
+      544,
+      1229,
+      743,
+      1322
+    ],
+    "source_text": "VANISH.",
+    "review_type": "manual transcription from first-sweep original crop",
+    "mask_ground_truth": false,
+    "bounding_polygon_ground_truth": false
+  },
+  {
+    "id": "en-comix-14-calibration-037",
+    "source": "en/comix-148/panel-09.png",
+    "source_sha256": "b0a3cc705937d0a03d1981986c34683bc664648878c9529805000060e7b3b641",
+    "crop": [
+      79,
+      1457,
+      370,
+      1579
+    ],
+    "source_text": "AT THIS MEETING...",
+    "review_type": "manual transcription from first-sweep original crop",
+    "mask_ground_truth": false,
+    "bounding_polygon_ground_truth": false
+  }
+]

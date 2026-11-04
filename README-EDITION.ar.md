@@ -1,5 +1,8 @@
 # ZEUS Browser — Ascent Edition 🎌➡📱
 
+إصلاح صور المواقع وتصميم أدوات القراءة: [التغييرات وأدلة التحقق](docs/comic-translation/RELIABILITY-20261102.ar.md). نجاح بناء IPA لا يعني اكتمال اختبارات ترجمة الصور أو إثبات التكافؤ مع Android.
+
+
 مستودع التعديلات المستمر على ميزة **ترجمة صور المانجا/المانهوا** في متصفح ZEUS (iOS)،
 مبني على أحدث عمل موثق: فرع `ascent/parity-20261101` في `Zeus-Browser-Ascent`
 (وهو نفسه امتداد لفرع `feature/zeus-manhwa-translation-20261101` في `Zeus-Browser`).

@@ -1,0 +1,1881 @@
+{
+  "version": 1,
+  "chapters": [
+    {
+      "id": "0aaf8b27-0013-4ae0-8935-91a089466874",
+      "manga": "127820bd-8fc5-47b8-8782-e680317bf41d",
+      "language": "en",
+      "title": "",
+      "chapter": "1",
+      "split": "calibration",
+      "source": "https://mangadex.org/chapter/0aaf8b27-0013-4ae0-8935-91a089466874",
+      "pages": [
+        {
+          "path": "en/0aaf8b27-0013-4ae0-8935-91a089466874/000.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/7c07a7fecb2fe3868aa22aae2edf0e5a/1-fefb667afaf589128da66a6a08dfd064c39d9d4c8ed9e30512de2b75d6908c6a.png",
+          "width": 1250,
+          "height": 1800,
+          "sha256": "fefb667afaf589128da66a6a08dfd064c39d9d4c8ed9e30512de2b75d6908c6a"
+        },
+        {
+          "path": "en/0aaf8b27-0013-4ae0-8935-91a089466874/001.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/7c07a7fecb2fe3868aa22aae2edf0e5a/2-42ced2fe027a854e2e75ea48e4daf0243448c79b605e19e2e944d6bff14ef0aa.png",
+          "width": 1250,
+          "height": 1800,
+          "sha256": "42ced2fe027a854e2e75ea48e4daf0243448c79b605e19e2e944d6bff14ef0aa"
+        },
+        {
+          "path": "en/0aaf8b27-0013-4ae0-8935-91a089466874/002.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/7c07a7fecb2fe3868aa22aae2edf0e5a/3-fb2d89c0a07a101bfd984e39dd5764f3e10214ad6f9cc65d3224dfe7944d948e.png",
+          "width": 1250,
+          "height": 1800,
+          "sha256": "fb2d89c0a07a101bfd984e39dd5764f3e10214ad6f9cc65d3224dfe7944d948e"
+        },
+        {
+          "path": "en/0aaf8b27-0013-4ae0-8935-91a089466874/003.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/7c07a7fecb2fe3868aa22aae2edf0e5a/4-fe4d4ca1d8b26bd7b7563cf4e1bc7b650742978a63bcaf343ab076165f905164.png",
+          "width": 1250,
+          "height": 1800,
+          "sha256": "fe4d4ca1d8b26bd7b7563cf4e1bc7b650742978a63bcaf343ab076165f905164"
+        },
+        {
+          "path": "en/0aaf8b27-0013-4ae0-8935-91a089466874/004.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/7c07a7fecb2fe3868aa22aae2edf0e5a/5-c43d10a75d8b0edc5e1d0b50ccb902005acb48f5fe81ec5c0d846da2de12ebea.png",
+          "width": 1250,
+          "height": 1800,
+          "sha256": "c43d10a75d8b0edc5e1d0b50ccb902005acb48f5fe81ec5c0d846da2de12ebea"
+        },
+        {
+          "path": "en/0aaf8b27-0013-4ae0-8935-91a089466874/005.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/7c07a7fecb2fe3868aa22aae2edf0e5a/6-f3f624ffdc6b980d8cc1fbd1574eb155ed5b70c1eea0e340e3e5d9978586f85c.png",
+          "width": 1250,
+          "height": 1800,
+          "sha256": "f3f624ffdc6b980d8cc1fbd1574eb155ed5b70c1eea0e340e3e5d9978586f85c"
+        },
+        {
+          "path": "en/0aaf8b27-0013-4ae0-8935-91a089466874/006.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/7c07a7fecb2fe3868aa22aae2edf0e5a/7-a19d0b13063c7df1746286e285c2a778f5888322a74229bd96f2b919c7653fa1.png",
+          "width": 1250,
+          "height": 1800,
+          "sha256": "a19d0b13063c7df1746286e285c2a778f5888322a74229bd96f2b919c7653fa1"
+        },
+        {
+          "path": "en/0aaf8b27-0013-4ae0-8935-91a089466874/007.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/7c07a7fecb2fe3868aa22aae2edf0e5a/8-010fc3fd3f7a7d49fdc29233b28206d2878a791655b252158959c9bcaa555157.png",
+          "width": 1250,
+          "height": 1800,
+          "sha256": "010fc3fd3f7a7d49fdc29233b28206d2878a791655b252158959c9bcaa555157"
+        },
+        {
+          "path": "en/0aaf8b27-0013-4ae0-8935-91a089466874/008.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/7c07a7fecb2fe3868aa22aae2edf0e5a/9-adcfaa45704b15e4d4db978560541cc6b1cf72fe86d305e242e45d2b3f8cb626.png",
+          "width": 1250,
+          "height": 1800,
+          "sha256": "adcfaa45704b15e4d4db978560541cc6b1cf72fe86d305e242e45d2b3f8cb626"
+        },
+        {
+          "path": "en/0aaf8b27-0013-4ae0-8935-91a089466874/009.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/7c07a7fecb2fe3868aa22aae2edf0e5a/10-27d1f64fed2a4e5f3a497e18958157e6e0c6ae828e7c73026b69e177787d44ba.png",
+          "width": 1250,
+          "height": 1800,
+          "sha256": "27d1f64fed2a4e5f3a497e18958157e6e0c6ae828e7c73026b69e177787d44ba"
+        },
+        {
+          "path": "en/0aaf8b27-0013-4ae0-8935-91a089466874/010.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/7c07a7fecb2fe3868aa22aae2edf0e5a/11-89b260bd0e19f20bd2102ad38364df6a97c876de2516c6f7584b9390c3eecce5.png",
+          "width": 1250,
+          "height": 1800,
+          "sha256": "89b260bd0e19f20bd2102ad38364df6a97c876de2516c6f7584b9390c3eecce5"
+        },
+        {
+          "path": "en/0aaf8b27-0013-4ae0-8935-91a089466874/011.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/7c07a7fecb2fe3868aa22aae2edf0e5a/12-db66b124554439a65892897dbb4a3bcc4545589053ffc322762d265038ca5019.png",
+          "width": 1250,
+          "height": 1800,
+          "sha256": "db66b124554439a65892897dbb4a3bcc4545589053ffc322762d265038ca5019"
+        },
+        {
+          "path": "en/0aaf8b27-0013-4ae0-8935-91a089466874/012.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/7c07a7fecb2fe3868aa22aae2edf0e5a/13-2b8f891ef68877c0f4f24966b831532611fea7a283e4ac0b35fdd7d5c30c626d.png",
+          "width": 1250,
+          "height": 1800,
+          "sha256": "2b8f891ef68877c0f4f24966b831532611fea7a283e4ac0b35fdd7d5c30c626d"
+        },
+        {
+          "path": "en/0aaf8b27-0013-4ae0-8935-91a089466874/013.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/7c07a7fecb2fe3868aa22aae2edf0e5a/14-c2aa2364e63af78f2c40e387f5850b17ca79b5b08d7a64faf1c389285fdb1a0f.png",
+          "width": 1250,
+          "height": 1800,
+          "sha256": "c2aa2364e63af78f2c40e387f5850b17ca79b5b08d7a64faf1c389285fdb1a0f"
+        },
+        {
+          "path": "en/0aaf8b27-0013-4ae0-8935-91a089466874/014.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/7c07a7fecb2fe3868aa22aae2edf0e5a/15-d9ee4b7f25d0dc28b651096c3c01f25a51b98b40c48d424792103fc59a7850f4.png",
+          "width": 1250,
+          "height": 1800,
+          "sha256": "d9ee4b7f25d0dc28b651096c3c01f25a51b98b40c48d424792103fc59a7850f4"
+        }
+      ]
+    },
+    {
+      "id": "d186aaeb-3968-4d9f-b6f9-d49b40bda193",
+      "manga": "ed7bcfac-fc7e-4c63-9809-f551cbeca429",
+      "language": "en",
+      "title": "Oneshot",
+      "chapter": null,
+      "split": "holdout",
+      "source": "https://mangadex.org/chapter/d186aaeb-3968-4d9f-b6f9-d49b40bda193",
+      "pages": [
+        {
+          "path": "en/d186aaeb-3968-4d9f-b6f9-d49b40bda193/000.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/7dfb81e88b4a4de85979532e7d9da655/1-2deabcefb22e784ecd61f5eb20ca4bc976a51547c9cb768b07080cc54c71e9b2.png",
+          "width": 1415,
+          "height": 2000,
+          "sha256": "2deabcefb22e784ecd61f5eb20ca4bc976a51547c9cb768b07080cc54c71e9b2"
+        },
+        {
+          "path": "en/d186aaeb-3968-4d9f-b6f9-d49b40bda193/001.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/7dfb81e88b4a4de85979532e7d9da655/2-f26cf69cc7c41414837ab5862da31f66adca00a55a88135c2063a9aef1f611c5.png",
+          "width": 1415,
+          "height": 2000,
+          "sha256": "f26cf69cc7c41414837ab5862da31f66adca00a55a88135c2063a9aef1f611c5"
+        },
+        {
+          "path": "en/d186aaeb-3968-4d9f-b6f9-d49b40bda193/002.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/7dfb81e88b4a4de85979532e7d9da655/3-ac8bcee547bcd2c3710c925628622829a5af3e0f709eab3cc35508b221880e6e.png",
+          "width": 1415,
+          "height": 2000,
+          "sha256": "ac8bcee547bcd2c3710c925628622829a5af3e0f709eab3cc35508b221880e6e"
+        },
+        {
+          "path": "en/d186aaeb-3968-4d9f-b6f9-d49b40bda193/003.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/7dfb81e88b4a4de85979532e7d9da655/4-5f52c95e86780def0de9f3ab7c7d6b634b297793d52ece3f5b282d63b51f6952.png",
+          "width": 1415,
+          "height": 2000,
+          "sha256": "5f52c95e86780def0de9f3ab7c7d6b634b297793d52ece3f5b282d63b51f6952"
+        },
+        {
+          "path": "en/d186aaeb-3968-4d9f-b6f9-d49b40bda193/004.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/7dfb81e88b4a4de85979532e7d9da655/5-bd5045964d4f5bebe00c632af93a856ee7fb4b51bcd0f37ba6f23c0a09c37ea7.png",
+          "width": 1415,
+          "height": 2000,
+          "sha256": "bd5045964d4f5bebe00c632af93a856ee7fb4b51bcd0f37ba6f23c0a09c37ea7"
+        },
+        {
+          "path": "en/d186aaeb-3968-4d9f-b6f9-d49b40bda193/005.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/7dfb81e88b4a4de85979532e7d9da655/6-b452da6557fa96b61e713baae7ba10cc7dac4f90bcd4596303c0a038044a6232.png",
+          "width": 1415,
+          "height": 2000,
+          "sha256": "b452da6557fa96b61e713baae7ba10cc7dac4f90bcd4596303c0a038044a6232"
+        },
+        {
+          "path": "en/d186aaeb-3968-4d9f-b6f9-d49b40bda193/006.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/7dfb81e88b4a4de85979532e7d9da655/7-811dc829181e00285f37112f116b7d2bc467bd29c1e8f646f656f64a76c73313.png",
+          "width": 1415,
+          "height": 2000,
+          "sha256": "811dc829181e00285f37112f116b7d2bc467bd29c1e8f646f656f64a76c73313"
+        },
+        {
+          "path": "en/d186aaeb-3968-4d9f-b6f9-d49b40bda193/007.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/7dfb81e88b4a4de85979532e7d9da655/8-7978d399aaedda784c2f75064ea6cdd729394f4d8b0c873ec708f9210e12d7c1.png",
+          "width": 1415,
+          "height": 2000,
+          "sha256": "7978d399aaedda784c2f75064ea6cdd729394f4d8b0c873ec708f9210e12d7c1"
+        },
+        {
+          "path": "en/d186aaeb-3968-4d9f-b6f9-d49b40bda193/008.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/7dfb81e88b4a4de85979532e7d9da655/9-074a86b880e43a084a989b5affa1ccd5a2d52ee36b215fede504684059381ce2.png",
+          "width": 1415,
+          "height": 2000,
+          "sha256": "074a86b880e43a084a989b5affa1ccd5a2d52ee36b215fede504684059381ce2"
+        },
+        {
+          "path": "en/d186aaeb-3968-4d9f-b6f9-d49b40bda193/009.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/7dfb81e88b4a4de85979532e7d9da655/10-5cd4daec788187b640b36aa4d67bc803be48c0ebdf12f8607d33b22dcad40a3a.png",
+          "width": 1415,
+          "height": 2000,
+          "sha256": "5cd4daec788187b640b36aa4d67bc803be48c0ebdf12f8607d33b22dcad40a3a"
+        },
+        {
+          "path": "en/d186aaeb-3968-4d9f-b6f9-d49b40bda193/010.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/7dfb81e88b4a4de85979532e7d9da655/11-a0521d2e39bb531b47b1cca7b172a7c78dc5830450f0f0d2868d2744f74ac382.png",
+          "width": 1415,
+          "height": 2000,
+          "sha256": "a0521d2e39bb531b47b1cca7b172a7c78dc5830450f0f0d2868d2744f74ac382"
+        },
+        {
+          "path": "en/d186aaeb-3968-4d9f-b6f9-d49b40bda193/011.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/7dfb81e88b4a4de85979532e7d9da655/12-50562826fe36734cc0575007249b2759c5c77241617f1284e9c0a3aebb62a7bd.png",
+          "width": 1415,
+          "height": 2000,
+          "sha256": "50562826fe36734cc0575007249b2759c5c77241617f1284e9c0a3aebb62a7bd"
+        },
+        {
+          "path": "en/d186aaeb-3968-4d9f-b6f9-d49b40bda193/012.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/7dfb81e88b4a4de85979532e7d9da655/13-0905310f1ac80d2406226d088267c662ea2237ae5a312de2e09b72807693bccf.png",
+          "width": 1415,
+          "height": 2000,
+          "sha256": "0905310f1ac80d2406226d088267c662ea2237ae5a312de2e09b72807693bccf"
+        },
+        {
+          "path": "en/d186aaeb-3968-4d9f-b6f9-d49b40bda193/013.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/7dfb81e88b4a4de85979532e7d9da655/14-0d3e033c6e3bff9bcae7843c2be1638811b1b6a7b5e80536b1a7a855ea2d242b.png",
+          "width": 1415,
+          "height": 2000,
+          "sha256": "0d3e033c6e3bff9bcae7843c2be1638811b1b6a7b5e80536b1a7a855ea2d242b"
+        },
+        {
+          "path": "en/d186aaeb-3968-4d9f-b6f9-d49b40bda193/014.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/7dfb81e88b4a4de85979532e7d9da655/15-4132f5d031c089bc5f2095a1b0d088521ad6ea607438f02cd8253a3beae55f61.png",
+          "width": 1415,
+          "height": 2000,
+          "sha256": "4132f5d031c089bc5f2095a1b0d088521ad6ea607438f02cd8253a3beae55f61"
+        },
+        {
+          "path": "en/d186aaeb-3968-4d9f-b6f9-d49b40bda193/015.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/7dfb81e88b4a4de85979532e7d9da655/16-b2ffc4e06129ae94562a78f11c7b81c269ca09ce79ab627850bf15f94a97bcf0.png",
+          "width": 1415,
+          "height": 2000,
+          "sha256": "b2ffc4e06129ae94562a78f11c7b81c269ca09ce79ab627850bf15f94a97bcf0"
+        },
+        {
+          "path": "en/d186aaeb-3968-4d9f-b6f9-d49b40bda193/016.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/7dfb81e88b4a4de85979532e7d9da655/17-03ddee7157a0a1fff1a2696db3b8062bb13206617f3b2434265721abe15e2003.png",
+          "width": 1415,
+          "height": 2000,
+          "sha256": "03ddee7157a0a1fff1a2696db3b8062bb13206617f3b2434265721abe15e2003"
+        },
+        {
+          "path": "en/d186aaeb-3968-4d9f-b6f9-d49b40bda193/017.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/7dfb81e88b4a4de85979532e7d9da655/18-7a2ce7face6f8c388649dca689135b09c550bcc453bab3257c52693ae23e6150.png",
+          "width": 1415,
+          "height": 2000,
+          "sha256": "7a2ce7face6f8c388649dca689135b09c550bcc453bab3257c52693ae23e6150"
+        },
+        {
+          "path": "en/d186aaeb-3968-4d9f-b6f9-d49b40bda193/018.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/7dfb81e88b4a4de85979532e7d9da655/19-21c4ea31b006ab85b4605a3739ccca4d7b32b5508375ee56fdc7851f05b86564.png",
+          "width": 1415,
+          "height": 2000,
+          "sha256": "21c4ea31b006ab85b4605a3739ccca4d7b32b5508375ee56fdc7851f05b86564"
+        },
+        {
+          "path": "en/d186aaeb-3968-4d9f-b6f9-d49b40bda193/019.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/7dfb81e88b4a4de85979532e7d9da655/20-85ac40e00d17911d927e3ac420af677af6124321c860bdae6d48e62f181821dd.png",
+          "width": 1415,
+          "height": 2000,
+          "sha256": "85ac40e00d17911d927e3ac420af677af6124321c860bdae6d48e62f181821dd"
+        },
+        {
+          "path": "en/d186aaeb-3968-4d9f-b6f9-d49b40bda193/020.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/7dfb81e88b4a4de85979532e7d9da655/21-a171d02973da80cae7d954cf0a55d945cea020c43c6a85ab8fb567e6f48abed1.png",
+          "width": 1415,
+          "height": 2000,
+          "sha256": "a171d02973da80cae7d954cf0a55d945cea020c43c6a85ab8fb567e6f48abed1"
+        },
+        {
+          "path": "en/d186aaeb-3968-4d9f-b6f9-d49b40bda193/021.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/7dfb81e88b4a4de85979532e7d9da655/22-88706ebcff5f48f4609cf61f3ff7fe0d064b08374695963d4c8cddbcf6364358.png",
+          "width": 1415,
+          "height": 2000,
+          "sha256": "88706ebcff5f48f4609cf61f3ff7fe0d064b08374695963d4c8cddbcf6364358"
+        }
+      ]
+    },
+    {
+      "id": "ad6defe1-80da-46a9-aca2-2464fb991d3f",
+      "manga": "f79dee3c-fe45-4b80-bed6-04768be1c1fc",
+      "language": "ja",
+      "title": "最後の祭りが風太郎と三玖の場合① - By PINQ",
+      "chapter": "114",
+      "split": "calibration",
+      "source": "https://mangadex.org/chapter/ad6defe1-80da-46a9-aca2-2464fb991d3f",
+      "pages": [
+        {
+          "path": "ja/ad6defe1-80da-46a9-aca2-2464fb991d3f/000.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/d460501b864d228075912770aa8844ca/m1-b2570f4142a94f36a18f87d9e8ba7136a4e20e9364d66d88c24a91124aacafcc.png",
+          "width": 1518,
+          "height": 2150,
+          "sha256": "b2570f4142a94f36a18f87d9e8ba7136a4e20e9364d66d88c24a91124aacafcc"
+        },
+        {
+          "path": "ja/ad6defe1-80da-46a9-aca2-2464fb991d3f/001.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/d460501b864d228075912770aa8844ca/m2-a5669834ff1a36dafc082d8812fbd407ad1c4caccd6dbf92d3ba322fd0a71199.png",
+          "width": 1518,
+          "height": 2150,
+          "sha256": "a5669834ff1a36dafc082d8812fbd407ad1c4caccd6dbf92d3ba322fd0a71199"
+        },
+        {
+          "path": "ja/ad6defe1-80da-46a9-aca2-2464fb991d3f/002.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/d460501b864d228075912770aa8844ca/m3-de9f7598e9b6cbca4cc34b954dde199ba3d3e659b0b720b59de9ed97ff22ad08.png",
+          "width": 1518,
+          "height": 2150,
+          "sha256": "de9f7598e9b6cbca4cc34b954dde199ba3d3e659b0b720b59de9ed97ff22ad08"
+        },
+        {
+          "path": "ja/ad6defe1-80da-46a9-aca2-2464fb991d3f/003.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/d460501b864d228075912770aa8844ca/m4-bf614e77e81e27edb4f6c3b801b8e2e0a2343e5b7f4476fcddcf204cd620ce07.png",
+          "width": 3035,
+          "height": 2150,
+          "sha256": "bf614e77e81e27edb4f6c3b801b8e2e0a2343e5b7f4476fcddcf204cd620ce07"
+        },
+        {
+          "path": "ja/ad6defe1-80da-46a9-aca2-2464fb991d3f/004.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/d460501b864d228075912770aa8844ca/m5-a7bfc278f77c253e18a2293d43ad62030a74594aba9a2779031fea29557c0707.png",
+          "width": 847,
+          "height": 1200,
+          "sha256": "a7bfc278f77c253e18a2293d43ad62030a74594aba9a2779031fea29557c0707"
+        },
+        {
+          "path": "ja/ad6defe1-80da-46a9-aca2-2464fb991d3f/005.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/d460501b864d228075912770aa8844ca/m6-864a959e24b1e185f0d8d1375069bc24ce0cdf7633f39d6ca83afdf27f8445a0.png",
+          "width": 1200,
+          "height": 850,
+          "sha256": "864a959e24b1e185f0d8d1375069bc24ce0cdf7633f39d6ca83afdf27f8445a0"
+        },
+        {
+          "path": "ja/ad6defe1-80da-46a9-aca2-2464fb991d3f/006.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/d460501b864d228075912770aa8844ca/m7-975438490f77ea8ae49aa52965110c7ea32d891134e2d1ceff60aa8a3e212a1b.png",
+          "width": 847,
+          "height": 1200,
+          "sha256": "975438490f77ea8ae49aa52965110c7ea32d891134e2d1ceff60aa8a3e212a1b"
+        },
+        {
+          "path": "ja/ad6defe1-80da-46a9-aca2-2464fb991d3f/007.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/d460501b864d228075912770aa8844ca/m8-41c3a959c80ef2d785743c57aa530aa3ffa76ce1c5b08d067cf2e98877cb8ea2.png",
+          "width": 847,
+          "height": 1200,
+          "sha256": "41c3a959c80ef2d785743c57aa530aa3ffa76ce1c5b08d067cf2e98877cb8ea2"
+        },
+        {
+          "path": "ja/ad6defe1-80da-46a9-aca2-2464fb991d3f/008.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/d460501b864d228075912770aa8844ca/m9-9a6ab4c162d0f7c2f1ecc62d0c7fec727f1ef4b329a8babace202e72966bab18.png",
+          "width": 847,
+          "height": 1200,
+          "sha256": "9a6ab4c162d0f7c2f1ecc62d0c7fec727f1ef4b329a8babace202e72966bab18"
+        },
+        {
+          "path": "ja/ad6defe1-80da-46a9-aca2-2464fb991d3f/009.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/d460501b864d228075912770aa8844ca/m10-ad2c14f4a5644965be0b9be391ca6ebf4db5d0ee7c79e5928d85abca6de4f817.png",
+          "width": 847,
+          "height": 1200,
+          "sha256": "ad2c14f4a5644965be0b9be391ca6ebf4db5d0ee7c79e5928d85abca6de4f817"
+        },
+        {
+          "path": "ja/ad6defe1-80da-46a9-aca2-2464fb991d3f/010.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/d460501b864d228075912770aa8844ca/m11-9cbdad2484235157399d498d1ea07419a52ff8e679e570b021f962c3fc71f036.png",
+          "width": 847,
+          "height": 1200,
+          "sha256": "9cbdad2484235157399d498d1ea07419a52ff8e679e570b021f962c3fc71f036"
+        },
+        {
+          "path": "ja/ad6defe1-80da-46a9-aca2-2464fb991d3f/011.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/d460501b864d228075912770aa8844ca/m12-2e7a0643c5ca5f87e6cb79d7d1ad7942f225563dd64c7b035b0cbc2a3b4923df.png",
+          "width": 847,
+          "height": 1200,
+          "sha256": "2e7a0643c5ca5f87e6cb79d7d1ad7942f225563dd64c7b035b0cbc2a3b4923df"
+        },
+        {
+          "path": "ja/ad6defe1-80da-46a9-aca2-2464fb991d3f/012.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/d460501b864d228075912770aa8844ca/m13-8425af4303ac18c35e095a1304f8d964e8fa4a9c306a9f2be1f23991cb9dc980.png",
+          "width": 847,
+          "height": 1200,
+          "sha256": "8425af4303ac18c35e095a1304f8d964e8fa4a9c306a9f2be1f23991cb9dc980"
+        },
+        {
+          "path": "ja/ad6defe1-80da-46a9-aca2-2464fb991d3f/013.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/d460501b864d228075912770aa8844ca/m14-9a021ab73f8ead65827ad2f214eb49f64a3620122388f10eb2b8144aa01db97d.png",
+          "width": 1200,
+          "height": 850,
+          "sha256": "9a021ab73f8ead65827ad2f214eb49f64a3620122388f10eb2b8144aa01db97d"
+        },
+        {
+          "path": "ja/ad6defe1-80da-46a9-aca2-2464fb991d3f/014.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/d460501b864d228075912770aa8844ca/m15-59afe4e24019a3db6907353879b1139a8b34bc9d38c4b0c117cddc9c159a74b7.png",
+          "width": 847,
+          "height": 1200,
+          "sha256": "59afe4e24019a3db6907353879b1139a8b34bc9d38c4b0c117cddc9c159a74b7"
+        },
+        {
+          "path": "ja/ad6defe1-80da-46a9-aca2-2464fb991d3f/015.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/d460501b864d228075912770aa8844ca/m16-bdc2a8a39616f78da0cd3e211cfd8f0f2a229c5ce7e7956159105de4afc89abf.png",
+          "width": 847,
+          "height": 1200,
+          "sha256": "bdc2a8a39616f78da0cd3e211cfd8f0f2a229c5ce7e7956159105de4afc89abf"
+        }
+      ]
+    },
+    {
+      "id": "9708bf5a-3512-4e47-923c-8c14e705232e",
+      "manga": "3ee3b476-0682-4563-96da-7018ff5e4bf7",
+      "language": "ja",
+      "title": "Chapter 2 (Japanese)",
+      "chapter": "2",
+      "split": "holdout",
+      "source": "https://mangadex.org/chapter/9708bf5a-3512-4e47-923c-8c14e705232e",
+      "pages": [
+        {
+          "path": "ja/9708bf5a-3512-4e47-923c-8c14e705232e/000.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/78bf121023255cfa91badc7a64baa3dc/B1-61a3978fbf1631f3823559e607e70fa0348b59e9a8f9e06f5b3721bc4d12024e.jpg",
+          "width": 1061,
+          "height": 1500,
+          "sha256": "61a3978fbf1631f3823559e607e70fa0348b59e9a8f9e06f5b3721bc4d12024e"
+        },
+        {
+          "path": "ja/9708bf5a-3512-4e47-923c-8c14e705232e/001.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/78bf121023255cfa91badc7a64baa3dc/B2-a103ad44e28b466bf36eb67b9ff310ff3d560e89d86bfd248b341bc334ca4436.jpg",
+          "width": 1061,
+          "height": 1500,
+          "sha256": "a103ad44e28b466bf36eb67b9ff310ff3d560e89d86bfd248b341bc334ca4436"
+        },
+        {
+          "path": "ja/9708bf5a-3512-4e47-923c-8c14e705232e/002.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/78bf121023255cfa91badc7a64baa3dc/B3-dd774f69a11ee553d4d1906391a9a9dd116172825c2e2d2dae986594a3bdc73c.jpg",
+          "width": 1061,
+          "height": 1500,
+          "sha256": "dd774f69a11ee553d4d1906391a9a9dd116172825c2e2d2dae986594a3bdc73c"
+        },
+        {
+          "path": "ja/9708bf5a-3512-4e47-923c-8c14e705232e/003.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/78bf121023255cfa91badc7a64baa3dc/B4-c4257a0ea83723cd6248c6b11f7b389acacf8dbb44870cc84afa4758b9c45999.jpg",
+          "width": 1061,
+          "height": 1500,
+          "sha256": "c4257a0ea83723cd6248c6b11f7b389acacf8dbb44870cc84afa4758b9c45999"
+        },
+        {
+          "path": "ja/9708bf5a-3512-4e47-923c-8c14e705232e/004.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/78bf121023255cfa91badc7a64baa3dc/B5-2f14183b1425a7eaa02c348ca06b537644794cea5af5527bf0a170cdb3b2194d.jpg",
+          "width": 1061,
+          "height": 1500,
+          "sha256": "2f14183b1425a7eaa02c348ca06b537644794cea5af5527bf0a170cdb3b2194d"
+        },
+        {
+          "path": "ja/9708bf5a-3512-4e47-923c-8c14e705232e/005.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/78bf121023255cfa91badc7a64baa3dc/B6-0bb438abd1c96dd90242d87dd3b50031ae776649e9ee9ae3e5a844601204a6cd.jpg",
+          "width": 1061,
+          "height": 1500,
+          "sha256": "0bb438abd1c96dd90242d87dd3b50031ae776649e9ee9ae3e5a844601204a6cd"
+        },
+        {
+          "path": "ja/9708bf5a-3512-4e47-923c-8c14e705232e/006.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/78bf121023255cfa91badc7a64baa3dc/B7-fe1bbb6f2e36af3d7249ca969b6dfc308320d34f30e098c32ef07c1c6a145d24.jpg",
+          "width": 1061,
+          "height": 1500,
+          "sha256": "fe1bbb6f2e36af3d7249ca969b6dfc308320d34f30e098c32ef07c1c6a145d24"
+        },
+        {
+          "path": "ja/9708bf5a-3512-4e47-923c-8c14e705232e/007.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/78bf121023255cfa91badc7a64baa3dc/B8-bdcc9cd229993b54140c639bf9e6482ff9d6af99f0b4a381c8a936eea2e893e4.jpg",
+          "width": 1061,
+          "height": 1500,
+          "sha256": "bdcc9cd229993b54140c639bf9e6482ff9d6af99f0b4a381c8a936eea2e893e4"
+        },
+        {
+          "path": "ja/9708bf5a-3512-4e47-923c-8c14e705232e/008.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/78bf121023255cfa91badc7a64baa3dc/B9-96d9d357311183a6657c06206fad6e8ba40232065895f2ae0a4aeaf8dcb2a492.jpg",
+          "width": 1061,
+          "height": 1500,
+          "sha256": "96d9d357311183a6657c06206fad6e8ba40232065895f2ae0a4aeaf8dcb2a492"
+        },
+        {
+          "path": "ja/9708bf5a-3512-4e47-923c-8c14e705232e/009.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/78bf121023255cfa91badc7a64baa3dc/B10-62ae51e5ef215cdfeb0daf6ad7e6d4e9700190bc95da8b475f6e2d951b4ef1d8.jpg",
+          "width": 1061,
+          "height": 1500,
+          "sha256": "62ae51e5ef215cdfeb0daf6ad7e6d4e9700190bc95da8b475f6e2d951b4ef1d8"
+        },
+        {
+          "path": "ja/9708bf5a-3512-4e47-923c-8c14e705232e/010.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/78bf121023255cfa91badc7a64baa3dc/B11-c8be3c12586b854fa14f3a90d48d0bf3ba3f319b579334c2470deb8a6a8a7081.jpg",
+          "width": 1061,
+          "height": 1500,
+          "sha256": "c8be3c12586b854fa14f3a90d48d0bf3ba3f319b579334c2470deb8a6a8a7081"
+        },
+        {
+          "path": "ja/9708bf5a-3512-4e47-923c-8c14e705232e/011.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/78bf121023255cfa91badc7a64baa3dc/B12-22c4a30cc61bd02ad620562d965455b8b0f84dc3f91742635596dfbf51f533cd.jpg",
+          "width": 1061,
+          "height": 1500,
+          "sha256": "22c4a30cc61bd02ad620562d965455b8b0f84dc3f91742635596dfbf51f533cd"
+        },
+        {
+          "path": "ja/9708bf5a-3512-4e47-923c-8c14e705232e/012.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/78bf121023255cfa91badc7a64baa3dc/B13-dede1256d2ce06c6936947e0adf710d7e49ddaa5f358335ff18ac63b59461524.jpg",
+          "width": 1061,
+          "height": 1500,
+          "sha256": "dede1256d2ce06c6936947e0adf710d7e49ddaa5f358335ff18ac63b59461524"
+        },
+        {
+          "path": "ja/9708bf5a-3512-4e47-923c-8c14e705232e/013.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/78bf121023255cfa91badc7a64baa3dc/B14-6ec1d2ef74eeff66c948d2cfd7d87c0db1456f601dba3c6d62a2609193362c6d.jpg",
+          "width": 1061,
+          "height": 1500,
+          "sha256": "6ec1d2ef74eeff66c948d2cfd7d87c0db1456f601dba3c6d62a2609193362c6d"
+        },
+        {
+          "path": "ja/9708bf5a-3512-4e47-923c-8c14e705232e/014.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/78bf121023255cfa91badc7a64baa3dc/B15-f87d60dcead16a583424499cfb8df98eb7c6e46b7a66818164a153ce2f719eb6.jpg",
+          "width": 1061,
+          "height": 1500,
+          "sha256": "f87d60dcead16a583424499cfb8df98eb7c6e46b7a66818164a153ce2f719eb6"
+        },
+        {
+          "path": "ja/9708bf5a-3512-4e47-923c-8c14e705232e/015.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/78bf121023255cfa91badc7a64baa3dc/B16-9ab077739d0b0565992c316b6a01356320310161fe3368f2b8a43a3685486a1e.jpg",
+          "width": 1061,
+          "height": 1500,
+          "sha256": "9ab077739d0b0565992c316b6a01356320310161fe3368f2b8a43a3685486a1e"
+        },
+        {
+          "path": "ja/9708bf5a-3512-4e47-923c-8c14e705232e/016.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/78bf121023255cfa91badc7a64baa3dc/B17-e76956185071ae61a2570519e7887687167ff2049b081637fc7f4183ace3daf6.jpg",
+          "width": 1061,
+          "height": 1500,
+          "sha256": "e76956185071ae61a2570519e7887687167ff2049b081637fc7f4183ace3daf6"
+        },
+        {
+          "path": "ja/9708bf5a-3512-4e47-923c-8c14e705232e/017.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/78bf121023255cfa91badc7a64baa3dc/B18-f8695f8015f293a8a2f28912a2a51727048adca9ca178dafc89ee1bd7e40e326.jpg",
+          "width": 1061,
+          "height": 1500,
+          "sha256": "f8695f8015f293a8a2f28912a2a51727048adca9ca178dafc89ee1bd7e40e326"
+        }
+      ]
+    },
+    {
+      "id": "7d0c0550-3a83-4107-b6ea-918ebe820309",
+      "manga": "59f63d46-8f81-4c08-88fb-2e6de97823c7",
+      "language": "ko",
+      "title": "Oneshot",
+      "chapter": null,
+      "split": "calibration",
+      "source": "https://mangadex.org/chapter/7d0c0550-3a83-4107-b6ea-918ebe820309",
+      "pages": [
+        {
+          "path": "ko/7d0c0550-3a83-4107-b6ea-918ebe820309/000.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/e4a5f367a332c508f5c217348d55ef21/c1-29203e3850ffcfc8d2c3d184fcfdd6e66feb7a23e041aab3f2b475cb49142c78.jpg",
+          "width": 800,
+          "height": 1130,
+          "sha256": "29203e3850ffcfc8d2c3d184fcfdd6e66feb7a23e041aab3f2b475cb49142c78"
+        },
+        {
+          "path": "ko/7d0c0550-3a83-4107-b6ea-918ebe820309/001.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/e4a5f367a332c508f5c217348d55ef21/c2-54fb7789f6aefd47275adb49d4d6959cfef26962791c203802c5f70c113cee6a.jpg",
+          "width": 800,
+          "height": 1130,
+          "sha256": "54fb7789f6aefd47275adb49d4d6959cfef26962791c203802c5f70c113cee6a"
+        },
+        {
+          "path": "ko/7d0c0550-3a83-4107-b6ea-918ebe820309/002.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/e4a5f367a332c508f5c217348d55ef21/c3-98dc3fbb1d592c5a9adb439ac4bc040b1934152ec035f488fc3877d5b9d24d73.jpg",
+          "width": 800,
+          "height": 1130,
+          "sha256": "98dc3fbb1d592c5a9adb439ac4bc040b1934152ec035f488fc3877d5b9d24d73"
+        },
+        {
+          "path": "ko/7d0c0550-3a83-4107-b6ea-918ebe820309/003.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/e4a5f367a332c508f5c217348d55ef21/c4-8693d578629fc0969ab1e92d5bfcf2a9ecf21d8bbd9651d9a43367050dbf92c2.jpg",
+          "width": 800,
+          "height": 1130,
+          "sha256": "8693d578629fc0969ab1e92d5bfcf2a9ecf21d8bbd9651d9a43367050dbf92c2"
+        },
+        {
+          "path": "ko/7d0c0550-3a83-4107-b6ea-918ebe820309/004.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/e4a5f367a332c508f5c217348d55ef21/c5-628b6c9f4a78d44415ab9535a05bcb6b5a7b72766b196af1bdf97207510156e0.jpg",
+          "width": 800,
+          "height": 1130,
+          "sha256": "628b6c9f4a78d44415ab9535a05bcb6b5a7b72766b196af1bdf97207510156e0"
+        },
+        {
+          "path": "ko/7d0c0550-3a83-4107-b6ea-918ebe820309/005.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/e4a5f367a332c508f5c217348d55ef21/c6-389bb778d558246213e0f0ec1d9d283ad6fd9b41dc360f661c1212adb4865a5e.jpg",
+          "width": 800,
+          "height": 1130,
+          "sha256": "389bb778d558246213e0f0ec1d9d283ad6fd9b41dc360f661c1212adb4865a5e"
+        },
+        {
+          "path": "ko/7d0c0550-3a83-4107-b6ea-918ebe820309/006.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/e4a5f367a332c508f5c217348d55ef21/c7-cf6238aa487cfcbfbf98e203cb01163a6a70a827b2cef172ec9c2ab20a8c39ea.jpg",
+          "width": 800,
+          "height": 1130,
+          "sha256": "cf6238aa487cfcbfbf98e203cb01163a6a70a827b2cef172ec9c2ab20a8c39ea"
+        },
+        {
+          "path": "ko/7d0c0550-3a83-4107-b6ea-918ebe820309/007.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/e4a5f367a332c508f5c217348d55ef21/c8-bdfeeb68e292da91d3a8e779559c7cc6b35b42c43a0252e3e165c318b3a1eda2.jpg",
+          "width": 800,
+          "height": 1130,
+          "sha256": "bdfeeb68e292da91d3a8e779559c7cc6b35b42c43a0252e3e165c318b3a1eda2"
+        },
+        {
+          "path": "ko/7d0c0550-3a83-4107-b6ea-918ebe820309/008.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/e4a5f367a332c508f5c217348d55ef21/c9-3f0b941fa32d86909bfa9b20f02fd7611b0c54fc725049dca6895e7537c8326c.jpg",
+          "width": 800,
+          "height": 1130,
+          "sha256": "3f0b941fa32d86909bfa9b20f02fd7611b0c54fc725049dca6895e7537c8326c"
+        },
+        {
+          "path": "ko/7d0c0550-3a83-4107-b6ea-918ebe820309/009.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/e4a5f367a332c508f5c217348d55ef21/c10-f889ab5dd7853a9fd2bb56139d3fa0fc51320c5cdacaf640565bac31c9a7252c.jpg",
+          "width": 800,
+          "height": 1130,
+          "sha256": "f889ab5dd7853a9fd2bb56139d3fa0fc51320c5cdacaf640565bac31c9a7252c"
+        },
+        {
+          "path": "ko/7d0c0550-3a83-4107-b6ea-918ebe820309/010.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/e4a5f367a332c508f5c217348d55ef21/c11-adf8bb3bdfc3f44f9fc10a507fd38522966e86bddfe78f208aa9237cf35e5c55.jpg",
+          "width": 800,
+          "height": 1130,
+          "sha256": "adf8bb3bdfc3f44f9fc10a507fd38522966e86bddfe78f208aa9237cf35e5c55"
+        },
+        {
+          "path": "ko/7d0c0550-3a83-4107-b6ea-918ebe820309/011.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/e4a5f367a332c508f5c217348d55ef21/c12-0e060c5bc777a2425f1cd26fe1821baf7c95877fc9234992101571f479f09ab4.jpg",
+          "width": 800,
+          "height": 1130,
+          "sha256": "0e060c5bc777a2425f1cd26fe1821baf7c95877fc9234992101571f479f09ab4"
+        },
+        {
+          "path": "ko/7d0c0550-3a83-4107-b6ea-918ebe820309/012.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/e4a5f367a332c508f5c217348d55ef21/c13-8682f285421000a07355d6f21c25f54fd28c18e902410d8f2f1d3c7dcb1942e5.jpg",
+          "width": 800,
+          "height": 1130,
+          "sha256": "8682f285421000a07355d6f21c25f54fd28c18e902410d8f2f1d3c7dcb1942e5"
+        },
+        {
+          "path": "ko/7d0c0550-3a83-4107-b6ea-918ebe820309/013.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/e4a5f367a332c508f5c217348d55ef21/c14-6a9a4058d28010a761ab9cc5d070b5a3679541f79134a7335eea57c610c4b89d.jpg",
+          "width": 800,
+          "height": 1130,
+          "sha256": "6a9a4058d28010a761ab9cc5d070b5a3679541f79134a7335eea57c610c4b89d"
+        },
+        {
+          "path": "ko/7d0c0550-3a83-4107-b6ea-918ebe820309/014.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/e4a5f367a332c508f5c217348d55ef21/c15-15caa4628cacc9c47880835ccee65aa88211ffae3e15ec65c08fa9be33f2290f.jpg",
+          "width": 800,
+          "height": 1130,
+          "sha256": "15caa4628cacc9c47880835ccee65aa88211ffae3e15ec65c08fa9be33f2290f"
+        },
+        {
+          "path": "ko/7d0c0550-3a83-4107-b6ea-918ebe820309/015.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/e4a5f367a332c508f5c217348d55ef21/c16-e60a09ccab57dc256a18b37ccfd2ace714d44155e1842abf345d9257c81581bb.jpg",
+          "width": 800,
+          "height": 1130,
+          "sha256": "e60a09ccab57dc256a18b37ccfd2ace714d44155e1842abf345d9257c81581bb"
+        },
+        {
+          "path": "ko/7d0c0550-3a83-4107-b6ea-918ebe820309/016.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/e4a5f367a332c508f5c217348d55ef21/c17-d703d628cf2b230ac5eccd0eb816716dccc93860df7b7151774160f8a1580400.jpg",
+          "width": 800,
+          "height": 1130,
+          "sha256": "d703d628cf2b230ac5eccd0eb816716dccc93860df7b7151774160f8a1580400"
+        },
+        {
+          "path": "ko/7d0c0550-3a83-4107-b6ea-918ebe820309/017.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/e4a5f367a332c508f5c217348d55ef21/c18-7ee046c9ac81f67a81fec4bc717dfbc14116f2c3b4a783158aca2f686a2af463.jpg",
+          "width": 800,
+          "height": 1130,
+          "sha256": "7ee046c9ac81f67a81fec4bc717dfbc14116f2c3b4a783158aca2f686a2af463"
+        },
+        {
+          "path": "ko/7d0c0550-3a83-4107-b6ea-918ebe820309/018.png",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/e4a5f367a332c508f5c217348d55ef21/c19-73f5cb463f0e09fd45092236c14ae0d47dde32a89ed67c13f7a19e0c4439072e.png",
+          "width": 800,
+          "height": 1130,
+          "sha256": "73f5cb463f0e09fd45092236c14ae0d47dde32a89ed67c13f7a19e0c4439072e"
+        }
+      ]
+    },
+    {
+      "id": "82c68de5-b06f-4088-8197-16c56634f745",
+      "manga": "80a6118c-7caf-4e33-a926-694e617f8019",
+      "language": "ko",
+      "title": "",
+      "chapter": "1",
+      "split": "holdout",
+      "source": "https://mangadex.org/chapter/82c68de5-b06f-4088-8197-16c56634f745",
+      "pages": [
+        {
+          "path": "ko/82c68de5-b06f-4088-8197-16c56634f745/000.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/198f48965d69a3b761f67edaeca7c8d0/1-20357cf8833c3dbe35e7299ffed9e0afb85f17d16f58162bda7f56887081ffff.jpg",
+          "width": 755,
+          "height": 1079,
+          "sha256": "20357cf8833c3dbe35e7299ffed9e0afb85f17d16f58162bda7f56887081ffff"
+        },
+        {
+          "path": "ko/82c68de5-b06f-4088-8197-16c56634f745/001.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/198f48965d69a3b761f67edaeca7c8d0/2-61c249c4ac19f29b9483abe471c5026f2361cd2dcbcf12ad0ca760cc482d8886.jpg",
+          "width": 755,
+          "height": 1079,
+          "sha256": "61c249c4ac19f29b9483abe471c5026f2361cd2dcbcf12ad0ca760cc482d8886"
+        },
+        {
+          "path": "ko/82c68de5-b06f-4088-8197-16c56634f745/002.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/198f48965d69a3b761f67edaeca7c8d0/3-6ec76f3cc97e796b35e76340fcaa151591f676e4c538ef5c8e7e9ac501929d59.jpg",
+          "width": 755,
+          "height": 1079,
+          "sha256": "6ec76f3cc97e796b35e76340fcaa151591f676e4c538ef5c8e7e9ac501929d59"
+        },
+        {
+          "path": "ko/82c68de5-b06f-4088-8197-16c56634f745/003.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/198f48965d69a3b761f67edaeca7c8d0/4-57b6835520f90456bf3f2e48cca058b51827437d862a328e9e25459a8b2073d3.jpg",
+          "width": 755,
+          "height": 1079,
+          "sha256": "57b6835520f90456bf3f2e48cca058b51827437d862a328e9e25459a8b2073d3"
+        },
+        {
+          "path": "ko/82c68de5-b06f-4088-8197-16c56634f745/004.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/198f48965d69a3b761f67edaeca7c8d0/5-64ecff00df55e91fe003959283c8fa1a954d6302be2d9812c51363aae3afeebd.jpg",
+          "width": 755,
+          "height": 1079,
+          "sha256": "64ecff00df55e91fe003959283c8fa1a954d6302be2d9812c51363aae3afeebd"
+        },
+        {
+          "path": "ko/82c68de5-b06f-4088-8197-16c56634f745/005.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/198f48965d69a3b761f67edaeca7c8d0/6-0ae7c091817494b0012ed763680f9a9f95557d4b40fe4ef811718842a13ebba5.jpg",
+          "width": 755,
+          "height": 1079,
+          "sha256": "0ae7c091817494b0012ed763680f9a9f95557d4b40fe4ef811718842a13ebba5"
+        }
+      ]
+    },
+    {
+      "id": "496bd311-6ef9-4301-8dbc-2d589a1b78f7",
+      "manga": "f95a8d87-9bb4-4d67-98c9-d190a422c66f",
+      "language": "zh",
+      "title": "",
+      "chapter": null,
+      "split": "calibration",
+      "source": "https://mangadex.org/chapter/496bd311-6ef9-4301-8dbc-2d589a1b78f7",
+      "pages": [
+        {
+          "path": "zh/496bd311-6ef9-4301-8dbc-2d589a1b78f7/000.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/41c7a40007c6ff8439b89e4c8605bcbb/G1-93858b9a159f0578c1306588428dd344fd3452e95665f83dfc30b03793ee1cc6.jpg",
+          "width": 2125,
+          "height": 3000,
+          "sha256": "93858b9a159f0578c1306588428dd344fd3452e95665f83dfc30b03793ee1cc6"
+        },
+        {
+          "path": "zh/496bd311-6ef9-4301-8dbc-2d589a1b78f7/001.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/41c7a40007c6ff8439b89e4c8605bcbb/G2-aeafbbb4d8b5699e924a792f4660250695776243fadf4d8c5ce82ea3f9b0ad38.jpg",
+          "width": 2084,
+          "height": 3000,
+          "sha256": "aeafbbb4d8b5699e924a792f4660250695776243fadf4d8c5ce82ea3f9b0ad38"
+        },
+        {
+          "path": "zh/496bd311-6ef9-4301-8dbc-2d589a1b78f7/002.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/41c7a40007c6ff8439b89e4c8605bcbb/G3-ca806ef950f24c5903182f790b5f3d3c3925ea764ff6c72fe8cacd365d9c6af2.jpg",
+          "width": 2136,
+          "height": 3000,
+          "sha256": "ca806ef950f24c5903182f790b5f3d3c3925ea764ff6c72fe8cacd365d9c6af2"
+        },
+        {
+          "path": "zh/496bd311-6ef9-4301-8dbc-2d589a1b78f7/003.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/41c7a40007c6ff8439b89e4c8605bcbb/G4-2d056a815f4ff5cd0c97906d74ce03019f3ea5ef5d0b156d96df19f79c10e12d.jpg",
+          "width": 2092,
+          "height": 3000,
+          "sha256": "2d056a815f4ff5cd0c97906d74ce03019f3ea5ef5d0b156d96df19f79c10e12d"
+        },
+        {
+          "path": "zh/496bd311-6ef9-4301-8dbc-2d589a1b78f7/004.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/41c7a40007c6ff8439b89e4c8605bcbb/G5-8601d80222fc9468b05258b5457253154d1f711422836a126fa00159c06cdac1.jpg",
+          "width": 2136,
+          "height": 3000,
+          "sha256": "8601d80222fc9468b05258b5457253154d1f711422836a126fa00159c06cdac1"
+        },
+        {
+          "path": "zh/496bd311-6ef9-4301-8dbc-2d589a1b78f7/005.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/41c7a40007c6ff8439b89e4c8605bcbb/G6-e19671ef06dd450c32a6eb27278a495f23328c6ccf5cdcc754d6942a1c5c31aa.jpg",
+          "width": 2089,
+          "height": 3000,
+          "sha256": "e19671ef06dd450c32a6eb27278a495f23328c6ccf5cdcc754d6942a1c5c31aa"
+        },
+        {
+          "path": "zh/496bd311-6ef9-4301-8dbc-2d589a1b78f7/006.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/41c7a40007c6ff8439b89e4c8605bcbb/G7-6c3cf707a71e812da355ed05f9e7da4ed9deee23b35f4add1035a8a7d08a1cc6.jpg",
+          "width": 2136,
+          "height": 3000,
+          "sha256": "6c3cf707a71e812da355ed05f9e7da4ed9deee23b35f4add1035a8a7d08a1cc6"
+        },
+        {
+          "path": "zh/496bd311-6ef9-4301-8dbc-2d589a1b78f7/007.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/41c7a40007c6ff8439b89e4c8605bcbb/G8-e29910e261859c71589c1ebf703cdb63b2e487a5a59dbbc793dcb89f370adfe3.jpg",
+          "width": 2112,
+          "height": 3000,
+          "sha256": "e29910e261859c71589c1ebf703cdb63b2e487a5a59dbbc793dcb89f370adfe3"
+        },
+        {
+          "path": "zh/496bd311-6ef9-4301-8dbc-2d589a1b78f7/008.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/41c7a40007c6ff8439b89e4c8605bcbb/G9-30207acaadf1c473170b819b281c2d9957b0a34dac37ffa241a497732b70e8b2.jpg",
+          "width": 2104,
+          "height": 3000,
+          "sha256": "30207acaadf1c473170b819b281c2d9957b0a34dac37ffa241a497732b70e8b2"
+        },
+        {
+          "path": "zh/496bd311-6ef9-4301-8dbc-2d589a1b78f7/009.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/41c7a40007c6ff8439b89e4c8605bcbb/G10-ffadc5a6c0e6080feebff11aa72813161f92f7276f01376d4ce47eedf8412060.jpg",
+          "width": 2107,
+          "height": 3000,
+          "sha256": "ffadc5a6c0e6080feebff11aa72813161f92f7276f01376d4ce47eedf8412060"
+        },
+        {
+          "path": "zh/496bd311-6ef9-4301-8dbc-2d589a1b78f7/010.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/41c7a40007c6ff8439b89e4c8605bcbb/G11-9ae79615653071cf60f2b4052a085a2d8defb394245c6ad6c155e8df173088e5.jpg",
+          "width": 2096,
+          "height": 3000,
+          "sha256": "9ae79615653071cf60f2b4052a085a2d8defb394245c6ad6c155e8df173088e5"
+        },
+        {
+          "path": "zh/496bd311-6ef9-4301-8dbc-2d589a1b78f7/011.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/41c7a40007c6ff8439b89e4c8605bcbb/G12-43a79491a6d7c7a1be4b83164a073201ad86bca06c2e9c7b1a07798925ac463b.jpg",
+          "width": 2077,
+          "height": 3000,
+          "sha256": "43a79491a6d7c7a1be4b83164a073201ad86bca06c2e9c7b1a07798925ac463b"
+        },
+        {
+          "path": "zh/496bd311-6ef9-4301-8dbc-2d589a1b78f7/012.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/41c7a40007c6ff8439b89e4c8605bcbb/G13-21081f1e87f15442384204a9d683323ed5b02b7d9baf717f7f50df98002376f9.jpg",
+          "width": 2136,
+          "height": 3000,
+          "sha256": "21081f1e87f15442384204a9d683323ed5b02b7d9baf717f7f50df98002376f9"
+        },
+        {
+          "path": "zh/496bd311-6ef9-4301-8dbc-2d589a1b78f7/013.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/41c7a40007c6ff8439b89e4c8605bcbb/G14-84976a8547ca7c923d06a6fd33c24baf7500b3982ec47ef8b6c03ebcec503194.jpg",
+          "width": 2110,
+          "height": 3000,
+          "sha256": "84976a8547ca7c923d06a6fd33c24baf7500b3982ec47ef8b6c03ebcec503194"
+        },
+        {
+          "path": "zh/496bd311-6ef9-4301-8dbc-2d589a1b78f7/014.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/41c7a40007c6ff8439b89e4c8605bcbb/G15-a14b962b26ee4c5863ebb6b129b3570ec4d9d9f5d4a2027fc3ed693ba97b0235.jpg",
+          "width": 2136,
+          "height": 3000,
+          "sha256": "a14b962b26ee4c5863ebb6b129b3570ec4d9d9f5d4a2027fc3ed693ba97b0235"
+        },
+        {
+          "path": "zh/496bd311-6ef9-4301-8dbc-2d589a1b78f7/015.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/41c7a40007c6ff8439b89e4c8605bcbb/G16-41ac4e9dacea89a66a75d17fd469c1a5e831e8a43f6659d0a0cc4f5cc8d3b513.jpg",
+          "width": 2100,
+          "height": 3000,
+          "sha256": "41ac4e9dacea89a66a75d17fd469c1a5e831e8a43f6659d0a0cc4f5cc8d3b513"
+        },
+        {
+          "path": "zh/496bd311-6ef9-4301-8dbc-2d589a1b78f7/016.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/41c7a40007c6ff8439b89e4c8605bcbb/G17-a15bda2ceb4b686e68901867381043c1d9790c81ff82da960b7b7a447663d0e2.jpg",
+          "width": 2136,
+          "height": 3000,
+          "sha256": "a15bda2ceb4b686e68901867381043c1d9790c81ff82da960b7b7a447663d0e2"
+        },
+        {
+          "path": "zh/496bd311-6ef9-4301-8dbc-2d589a1b78f7/017.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/41c7a40007c6ff8439b89e4c8605bcbb/G18-eb70d7df24df3108feb7ab21382d524355976162a632bf65a391e5525c8ac5d9.jpg",
+          "width": 2110,
+          "height": 3000,
+          "sha256": "eb70d7df24df3108feb7ab21382d524355976162a632bf65a391e5525c8ac5d9"
+        },
+        {
+          "path": "zh/496bd311-6ef9-4301-8dbc-2d589a1b78f7/018.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/41c7a40007c6ff8439b89e4c8605bcbb/G19-5c89c9618d22851fa592bb6aff2c711128b64da79487885440d8def17f164df7.jpg",
+          "width": 2136,
+          "height": 3000,
+          "sha256": "5c89c9618d22851fa592bb6aff2c711128b64da79487885440d8def17f164df7"
+        },
+        {
+          "path": "zh/496bd311-6ef9-4301-8dbc-2d589a1b78f7/019.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/41c7a40007c6ff8439b89e4c8605bcbb/G20-b8eb36890c2f6adbd124d137cdd8f7d837ca16909ba167b33576341dccb5a362.jpg",
+          "width": 2104,
+          "height": 3000,
+          "sha256": "b8eb36890c2f6adbd124d137cdd8f7d837ca16909ba167b33576341dccb5a362"
+        },
+        {
+          "path": "zh/496bd311-6ef9-4301-8dbc-2d589a1b78f7/020.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/41c7a40007c6ff8439b89e4c8605bcbb/G21-3e127cf7264a6a744de26fc16c591fe354602eb4a0e10e1c61fe27a1944e6af6.jpg",
+          "width": 2107,
+          "height": 3000,
+          "sha256": "3e127cf7264a6a744de26fc16c591fe354602eb4a0e10e1c61fe27a1944e6af6"
+        },
+        {
+          "path": "zh/496bd311-6ef9-4301-8dbc-2d589a1b78f7/021.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/41c7a40007c6ff8439b89e4c8605bcbb/G22-d6ce2d501bd386a11f2b27863d4cb7866cb389f2c6218cf4d1eeee9b5308443d.jpg",
+          "width": 2104,
+          "height": 3000,
+          "sha256": "d6ce2d501bd386a11f2b27863d4cb7866cb389f2c6218cf4d1eeee9b5308443d"
+        },
+        {
+          "path": "zh/496bd311-6ef9-4301-8dbc-2d589a1b78f7/022.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/41c7a40007c6ff8439b89e4c8605bcbb/G23-035377f3bbab9a24d82fa643a82981d5d54915c9147f5a9ea7c2880e5a0a8dd0.jpg",
+          "width": 2136,
+          "height": 3000,
+          "sha256": "035377f3bbab9a24d82fa643a82981d5d54915c9147f5a9ea7c2880e5a0a8dd0"
+        },
+        {
+          "path": "zh/496bd311-6ef9-4301-8dbc-2d589a1b78f7/023.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/41c7a40007c6ff8439b89e4c8605bcbb/G24-0dd359d9c36eda9c4ae1b47bc2a362c72e8040ece908fecb23360f6efb25d72c.jpg",
+          "width": 2104,
+          "height": 3000,
+          "sha256": "0dd359d9c36eda9c4ae1b47bc2a362c72e8040ece908fecb23360f6efb25d72c"
+        },
+        {
+          "path": "zh/496bd311-6ef9-4301-8dbc-2d589a1b78f7/024.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/41c7a40007c6ff8439b89e4c8605bcbb/G25-c48977d66b403dc9ff281308bd98fd939ca56aeb7b45ade456c0ec9f0493f8c7.jpg",
+          "width": 2136,
+          "height": 3000,
+          "sha256": "c48977d66b403dc9ff281308bd98fd939ca56aeb7b45ade456c0ec9f0493f8c7"
+        },
+        {
+          "path": "zh/496bd311-6ef9-4301-8dbc-2d589a1b78f7/025.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/41c7a40007c6ff8439b89e4c8605bcbb/G26-8c545bac81b3ce6682d18c4a0d63ffe5a6e2bda4d8b40884596bf6fc111d644c.jpg",
+          "width": 2112,
+          "height": 3000,
+          "sha256": "8c545bac81b3ce6682d18c4a0d63ffe5a6e2bda4d8b40884596bf6fc111d644c"
+        },
+        {
+          "path": "zh/496bd311-6ef9-4301-8dbc-2d589a1b78f7/026.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/41c7a40007c6ff8439b89e4c8605bcbb/G27-70f919395c02ff4fb80f936ccb18a1d7a31638c559ea32c55930193c2d3ce3d9.jpg",
+          "width": 2136,
+          "height": 3000,
+          "sha256": "70f919395c02ff4fb80f936ccb18a1d7a31638c559ea32c55930193c2d3ce3d9"
+        },
+        {
+          "path": "zh/496bd311-6ef9-4301-8dbc-2d589a1b78f7/027.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/41c7a40007c6ff8439b89e4c8605bcbb/G28-3bb8afaf3351f181d7468b7ad5961f66690f850e820d596ae23cf13d2d11dd93.jpg",
+          "width": 2112,
+          "height": 3000,
+          "sha256": "3bb8afaf3351f181d7468b7ad5961f66690f850e820d596ae23cf13d2d11dd93"
+        },
+        {
+          "path": "zh/496bd311-6ef9-4301-8dbc-2d589a1b78f7/028.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/41c7a40007c6ff8439b89e4c8605bcbb/G29-de7b4a61ccd96c4f1104417794cd60e031d6e8de07069e21d9787d5b5bec1efa.jpg",
+          "width": 2136,
+          "height": 3000,
+          "sha256": "de7b4a61ccd96c4f1104417794cd60e031d6e8de07069e21d9787d5b5bec1efa"
+        },
+        {
+          "path": "zh/496bd311-6ef9-4301-8dbc-2d589a1b78f7/029.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/41c7a40007c6ff8439b89e4c8605bcbb/G30-d6babdf0c366590f1ea4140ca1897fa7fc0c425948c83e57cac0fea851333439.jpg",
+          "width": 2136,
+          "height": 3000,
+          "sha256": "d6babdf0c366590f1ea4140ca1897fa7fc0c425948c83e57cac0fea851333439"
+        },
+        {
+          "path": "zh/496bd311-6ef9-4301-8dbc-2d589a1b78f7/030.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/41c7a40007c6ff8439b89e4c8605bcbb/G31-a25017716827999e2e026ebba834259cd9f2128844a640fdb8ffa7183fb4daf4.jpg",
+          "width": 2136,
+          "height": 3000,
+          "sha256": "a25017716827999e2e026ebba834259cd9f2128844a640fdb8ffa7183fb4daf4"
+        },
+        {
+          "path": "zh/496bd311-6ef9-4301-8dbc-2d589a1b78f7/031.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/41c7a40007c6ff8439b89e4c8605bcbb/G32-2f1870a59cb6641ed41bc2d97ee2ae8814a205b6996bd2fb1cb00ea5dc8b8c0d.jpg",
+          "width": 2136,
+          "height": 3000,
+          "sha256": "2f1870a59cb6641ed41bc2d97ee2ae8814a205b6996bd2fb1cb00ea5dc8b8c0d"
+        },
+        {
+          "path": "zh/496bd311-6ef9-4301-8dbc-2d589a1b78f7/032.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/41c7a40007c6ff8439b89e4c8605bcbb/G33-2bcc1c559552ba03a7c551e1e6432109fdff3af2a6e315081d5f872aab68aa53.jpg",
+          "width": 2136,
+          "height": 3000,
+          "sha256": "2bcc1c559552ba03a7c551e1e6432109fdff3af2a6e315081d5f872aab68aa53"
+        },
+        {
+          "path": "zh/496bd311-6ef9-4301-8dbc-2d589a1b78f7/033.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/41c7a40007c6ff8439b89e4c8605bcbb/G34-74a1346c825783fe2c8b82c134b3a07cba80f865f2e79111792fc88c052f2b51.jpg",
+          "width": 2136,
+          "height": 3000,
+          "sha256": "74a1346c825783fe2c8b82c134b3a07cba80f865f2e79111792fc88c052f2b51"
+        },
+        {
+          "path": "zh/496bd311-6ef9-4301-8dbc-2d589a1b78f7/034.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/41c7a40007c6ff8439b89e4c8605bcbb/G35-a355e5c9a2465f71c411181fca95ed393e77e21840556687b365367d98e35055.jpg",
+          "width": 2088,
+          "height": 3000,
+          "sha256": "a355e5c9a2465f71c411181fca95ed393e77e21840556687b365367d98e35055"
+        },
+        {
+          "path": "zh/496bd311-6ef9-4301-8dbc-2d589a1b78f7/035.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/41c7a40007c6ff8439b89e4c8605bcbb/G36-2883e81efc5e8dc0cbe873162ec55879877a01c191635b8ffff2fca7dfa166fa.jpg",
+          "width": 2118,
+          "height": 3000,
+          "sha256": "2883e81efc5e8dc0cbe873162ec55879877a01c191635b8ffff2fca7dfa166fa"
+        },
+        {
+          "path": "zh/496bd311-6ef9-4301-8dbc-2d589a1b78f7/036.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/41c7a40007c6ff8439b89e4c8605bcbb/G37-9803ae487259582dd834fd236262237099f24fb9de6cfc259b3bb17db5199dc5.jpg",
+          "width": 2125,
+          "height": 3000,
+          "sha256": "9803ae487259582dd834fd236262237099f24fb9de6cfc259b3bb17db5199dc5"
+        },
+        {
+          "path": "zh/496bd311-6ef9-4301-8dbc-2d589a1b78f7/037.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/41c7a40007c6ff8439b89e4c8605bcbb/G38-8955e912b70375b34706f524f75c6866d495b138f202f308c3eb08da92c93433.jpg",
+          "width": 2480,
+          "height": 3507,
+          "sha256": "8955e912b70375b34706f524f75c6866d495b138f202f308c3eb08da92c93433"
+        }
+      ]
+    },
+    {
+      "id": "22bc4eb8-75ec-48af-893e-3d0f108594f9",
+      "manga": "59f63d46-8f81-4c08-88fb-2e6de97823c7",
+      "language": "zh",
+      "title": "",
+      "chapter": null,
+      "split": "holdout",
+      "source": "https://mangadex.org/chapter/22bc4eb8-75ec-48af-893e-3d0f108594f9",
+      "pages": [
+        {
+          "path": "zh/22bc4eb8-75ec-48af-893e-3d0f108594f9/000.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/63124d6b5e11c2a81b027c6689c20bec/B1-16301fe771486b3d4f504e683506da765e9c5ffc8337e7d1dff0285651ce13a1.jpg",
+          "width": 800,
+          "height": 1130,
+          "sha256": "16301fe771486b3d4f504e683506da765e9c5ffc8337e7d1dff0285651ce13a1"
+        },
+        {
+          "path": "zh/22bc4eb8-75ec-48af-893e-3d0f108594f9/001.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/63124d6b5e11c2a81b027c6689c20bec/B2-43c66b560cf16d64886b103c01fc92f4f294f134b05f4fd2b62511be6bd43240.jpg",
+          "width": 800,
+          "height": 1130,
+          "sha256": "43c66b560cf16d64886b103c01fc92f4f294f134b05f4fd2b62511be6bd43240"
+        },
+        {
+          "path": "zh/22bc4eb8-75ec-48af-893e-3d0f108594f9/002.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/63124d6b5e11c2a81b027c6689c20bec/B3-dc78e14eb554ac2cf620bce520c315691dbe2d6d961c2580bfe6868dcc269713.jpg",
+          "width": 800,
+          "height": 1130,
+          "sha256": "dc78e14eb554ac2cf620bce520c315691dbe2d6d961c2580bfe6868dcc269713"
+        },
+        {
+          "path": "zh/22bc4eb8-75ec-48af-893e-3d0f108594f9/003.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/63124d6b5e11c2a81b027c6689c20bec/B4-627908e1009a7fe315267f4a1ea94f83f9da800e7d8bdbbb3ddf27da7bc6f3e1.jpg",
+          "width": 800,
+          "height": 1130,
+          "sha256": "627908e1009a7fe315267f4a1ea94f83f9da800e7d8bdbbb3ddf27da7bc6f3e1"
+        },
+        {
+          "path": "zh/22bc4eb8-75ec-48af-893e-3d0f108594f9/004.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/63124d6b5e11c2a81b027c6689c20bec/B5-e3ca1da08bd52b50a7f92885bfc4bc99286ae7185685e4c5ead0946eed7054fa.jpg",
+          "width": 800,
+          "height": 1130,
+          "sha256": "e3ca1da08bd52b50a7f92885bfc4bc99286ae7185685e4c5ead0946eed7054fa"
+        },
+        {
+          "path": "zh/22bc4eb8-75ec-48af-893e-3d0f108594f9/005.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/63124d6b5e11c2a81b027c6689c20bec/B6-decf8a4c3c3db1ec619b5b2b433c21143968023514676fd88e6e7c3a7aa3daf8.jpg",
+          "width": 800,
+          "height": 1130,
+          "sha256": "decf8a4c3c3db1ec619b5b2b433c21143968023514676fd88e6e7c3a7aa3daf8"
+        },
+        {
+          "path": "zh/22bc4eb8-75ec-48af-893e-3d0f108594f9/006.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/63124d6b5e11c2a81b027c6689c20bec/B7-a55aa45d267e17375fc7a3afafee896dd595473c388dbf52217d8385d342a058.jpg",
+          "width": 800,
+          "height": 1130,
+          "sha256": "a55aa45d267e17375fc7a3afafee896dd595473c388dbf52217d8385d342a058"
+        },
+        {
+          "path": "zh/22bc4eb8-75ec-48af-893e-3d0f108594f9/007.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/63124d6b5e11c2a81b027c6689c20bec/B8-c0754a1255c8b53f5b5b563b82fe9f1a2dcc4673d6ef4525713acb30a3e9fe77.jpg",
+          "width": 800,
+          "height": 1130,
+          "sha256": "c0754a1255c8b53f5b5b563b82fe9f1a2dcc4673d6ef4525713acb30a3e9fe77"
+        },
+        {
+          "path": "zh/22bc4eb8-75ec-48af-893e-3d0f108594f9/008.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/63124d6b5e11c2a81b027c6689c20bec/B9-e379854b75b907eca0027cd45b7cfbf684fcc825c0a9418435ea9e46e8ad0c4b.jpg",
+          "width": 800,
+          "height": 1130,
+          "sha256": "e379854b75b907eca0027cd45b7cfbf684fcc825c0a9418435ea9e46e8ad0c4b"
+        },
+        {
+          "path": "zh/22bc4eb8-75ec-48af-893e-3d0f108594f9/009.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/63124d6b5e11c2a81b027c6689c20bec/B10-420bf99b0c6921788e2833c9caaca1eccb31614098684858b45e059697ab75d3.jpg",
+          "width": 800,
+          "height": 1130,
+          "sha256": "420bf99b0c6921788e2833c9caaca1eccb31614098684858b45e059697ab75d3"
+        },
+        {
+          "path": "zh/22bc4eb8-75ec-48af-893e-3d0f108594f9/010.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/63124d6b5e11c2a81b027c6689c20bec/B11-e8376f63244ecbbc60c98f4b91ada2695f8070d00b7048a605fd72d834646b56.jpg",
+          "width": 800,
+          "height": 1130,
+          "sha256": "e8376f63244ecbbc60c98f4b91ada2695f8070d00b7048a605fd72d834646b56"
+        },
+        {
+          "path": "zh/22bc4eb8-75ec-48af-893e-3d0f108594f9/011.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/63124d6b5e11c2a81b027c6689c20bec/B12-ea1522c6d0908b886a9590673a34c7f0d512eb8fd5532ca7702968320ed09d00.jpg",
+          "width": 800,
+          "height": 1130,
+          "sha256": "ea1522c6d0908b886a9590673a34c7f0d512eb8fd5532ca7702968320ed09d00"
+        },
+        {
+          "path": "zh/22bc4eb8-75ec-48af-893e-3d0f108594f9/012.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/63124d6b5e11c2a81b027c6689c20bec/B13-667944dc907a7c48e5062907237c6183b7b15348558138cb398e38b09df325a8.jpg",
+          "width": 800,
+          "height": 1130,
+          "sha256": "667944dc907a7c48e5062907237c6183b7b15348558138cb398e38b09df325a8"
+        },
+        {
+          "path": "zh/22bc4eb8-75ec-48af-893e-3d0f108594f9/013.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/63124d6b5e11c2a81b027c6689c20bec/B14-8c32afa06efab5073d0aa01d8cf01bd0caba6ef51bf22802841773aab43ab0bb.jpg",
+          "width": 800,
+          "height": 1130,
+          "sha256": "8c32afa06efab5073d0aa01d8cf01bd0caba6ef51bf22802841773aab43ab0bb"
+        },
+        {
+          "path": "zh/22bc4eb8-75ec-48af-893e-3d0f108594f9/014.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/63124d6b5e11c2a81b027c6689c20bec/B15-4d14e9279d57dc532ee9193d7585b198e709e6cca0d406fedb04fc3b59b3c4ac.jpg",
+          "width": 800,
+          "height": 1130,
+          "sha256": "4d14e9279d57dc532ee9193d7585b198e709e6cca0d406fedb04fc3b59b3c4ac"
+        },
+        {
+          "path": "zh/22bc4eb8-75ec-48af-893e-3d0f108594f9/015.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/63124d6b5e11c2a81b027c6689c20bec/B16-0c9f3685e5cdbf0e7a2da60796ad666998e66cc9086869cafaba061b8cd08fdf.jpg",
+          "width": 800,
+          "height": 1130,
+          "sha256": "0c9f3685e5cdbf0e7a2da60796ad666998e66cc9086869cafaba061b8cd08fdf"
+        },
+        {
+          "path": "zh/22bc4eb8-75ec-48af-893e-3d0f108594f9/016.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/63124d6b5e11c2a81b027c6689c20bec/B17-9bf6f4f248830694d5ac3edf4ee0b0908c957e427e9ce55452272376383171b4.jpg",
+          "width": 800,
+          "height": 1130,
+          "sha256": "9bf6f4f248830694d5ac3edf4ee0b0908c957e427e9ce55452272376383171b4"
+        },
+        {
+          "path": "zh/22bc4eb8-75ec-48af-893e-3d0f108594f9/017.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/63124d6b5e11c2a81b027c6689c20bec/B18-1b05c1a3aac9e64002155473427b4b20d293546b2c70af886320ee961002c7ec.jpg",
+          "width": 800,
+          "height": 1130,
+          "sha256": "1b05c1a3aac9e64002155473427b4b20d293546b2c70af886320ee961002c7ec"
+        },
+        {
+          "path": "zh/22bc4eb8-75ec-48af-893e-3d0f108594f9/018.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/63124d6b5e11c2a81b027c6689c20bec/B19-12ab8ef1c09be2b9bc5bd27abe503600226187668e2a1f42ecff435bd5afaf58.jpg",
+          "width": 800,
+          "height": 1130,
+          "sha256": "12ab8ef1c09be2b9bc5bd27abe503600226187668e2a1f42ecff435bd5afaf58"
+        }
+      ]
+    },
+    {
+      "id": "e11b2b83-e344-4949-ac48-302c5737a828",
+      "manga": "b41bef1e-7df9-4255-bd82-ecf570fec566",
+      "language": "ar",
+      "title": "",
+      "chapter": "1",
+      "split": "calibration",
+      "source": "https://mangadex.org/chapter/e11b2b83-e344-4949-ac48-302c5737a828",
+      "pages": [
+        {
+          "path": "ar/e11b2b83-e344-4949-ac48-302c5737a828/000.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/1240f4cf165a41931d586e629bb3801c/c1-79ad9515499022d621067550dd0eed7db2999276a0e1a8a1aab0485d160b7da3.jpg",
+          "width": 728,
+          "height": 1085,
+          "sha256": "79ad9515499022d621067550dd0eed7db2999276a0e1a8a1aab0485d160b7da3"
+        },
+        {
+          "path": "ar/e11b2b83-e344-4949-ac48-302c5737a828/001.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/1240f4cf165a41931d586e629bb3801c/c2-353365245764110531a72093cc6fb7c2ca83d06f91a20b75f06fd0d386dcb5ca.jpg",
+          "width": 1456,
+          "height": 1125,
+          "sha256": "353365245764110531a72093cc6fb7c2ca83d06f91a20b75f06fd0d386dcb5ca"
+        },
+        {
+          "path": "ar/e11b2b83-e344-4949-ac48-302c5737a828/002.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/1240f4cf165a41931d586e629bb3801c/c3-cc8c4742eb51463588376adf965c7ad496ff8fc8858a88b1a26280c6e5e16f0e.jpg",
+          "width": 728,
+          "height": 1125,
+          "sha256": "cc8c4742eb51463588376adf965c7ad496ff8fc8858a88b1a26280c6e5e16f0e"
+        },
+        {
+          "path": "ar/e11b2b83-e344-4949-ac48-302c5737a828/003.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/1240f4cf165a41931d586e629bb3801c/c4-bb7ba683009264ddef1df2ce0e654dbb502ea85e62e874fe5e3558f92e74ca18.jpg",
+          "width": 728,
+          "height": 1105,
+          "sha256": "bb7ba683009264ddef1df2ce0e654dbb502ea85e62e874fe5e3558f92e74ca18"
+        },
+        {
+          "path": "ar/e11b2b83-e344-4949-ac48-302c5737a828/004.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/1240f4cf165a41931d586e629bb3801c/c5-4e69a222030e9cb91bc65ae16ea806f46c514f3ed08300b2900d090c59c2105a.jpg",
+          "width": 728,
+          "height": 1085,
+          "sha256": "4e69a222030e9cb91bc65ae16ea806f46c514f3ed08300b2900d090c59c2105a"
+        },
+        {
+          "path": "ar/e11b2b83-e344-4949-ac48-302c5737a828/005.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/1240f4cf165a41931d586e629bb3801c/c6-faaefe81c4f2cf1e201120076aad6c51d691f6ede2514f69a146e83c31af0a70.jpg",
+          "width": 728,
+          "height": 1125,
+          "sha256": "faaefe81c4f2cf1e201120076aad6c51d691f6ede2514f69a146e83c31af0a70"
+        },
+        {
+          "path": "ar/e11b2b83-e344-4949-ac48-302c5737a828/006.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/1240f4cf165a41931d586e629bb3801c/c7-051fdc7a5106ece9df5640dff5db4e001fa3f167697d500e64002fe38a81ed6d.jpg",
+          "width": 728,
+          "height": 1105,
+          "sha256": "051fdc7a5106ece9df5640dff5db4e001fa3f167697d500e64002fe38a81ed6d"
+        },
+        {
+          "path": "ar/e11b2b83-e344-4949-ac48-302c5737a828/007.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/1240f4cf165a41931d586e629bb3801c/c8-0ba4860b6ff24126a6dffc7ad4aea7802eeb52d44ddf518485df63429d387d1e.jpg",
+          "width": 728,
+          "height": 1105,
+          "sha256": "0ba4860b6ff24126a6dffc7ad4aea7802eeb52d44ddf518485df63429d387d1e"
+        },
+        {
+          "path": "ar/e11b2b83-e344-4949-ac48-302c5737a828/008.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/1240f4cf165a41931d586e629bb3801c/c9-a28ed4f2b391d538a96b8fc4008f995461ae9d2ec42e5eb2938b6ffcffce3d3e.jpg",
+          "width": 728,
+          "height": 1125,
+          "sha256": "a28ed4f2b391d538a96b8fc4008f995461ae9d2ec42e5eb2938b6ffcffce3d3e"
+        },
+        {
+          "path": "ar/e11b2b83-e344-4949-ac48-302c5737a828/009.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/1240f4cf165a41931d586e629bb3801c/c10-fca44f8767f0a71dd1d99edfd099493e3c292a67e7c885e045702cc836e229c6.jpg",
+          "width": 728,
+          "height": 1085,
+          "sha256": "fca44f8767f0a71dd1d99edfd099493e3c292a67e7c885e045702cc836e229c6"
+        },
+        {
+          "path": "ar/e11b2b83-e344-4949-ac48-302c5737a828/010.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/1240f4cf165a41931d586e629bb3801c/c11-44a534fffc9c300ade18f8f014e80e70103f9c68c10d7aa300298d5349607aa3.jpg",
+          "width": 728,
+          "height": 1105,
+          "sha256": "44a534fffc9c300ade18f8f014e80e70103f9c68c10d7aa300298d5349607aa3"
+        },
+        {
+          "path": "ar/e11b2b83-e344-4949-ac48-302c5737a828/011.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/1240f4cf165a41931d586e629bb3801c/c12-d01c1a5a6a0590b0872645352856a1f25dcd5452343584ebca168202f34b5433.jpg",
+          "width": 728,
+          "height": 1105,
+          "sha256": "d01c1a5a6a0590b0872645352856a1f25dcd5452343584ebca168202f34b5433"
+        },
+        {
+          "path": "ar/e11b2b83-e344-4949-ac48-302c5737a828/012.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/1240f4cf165a41931d586e629bb3801c/c13-0f9c06a88513f23c81e539c91dde1aacce8e1ce53d2b59212753778b59e58347.jpg",
+          "width": 728,
+          "height": 1125,
+          "sha256": "0f9c06a88513f23c81e539c91dde1aacce8e1ce53d2b59212753778b59e58347"
+        },
+        {
+          "path": "ar/e11b2b83-e344-4949-ac48-302c5737a828/013.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/1240f4cf165a41931d586e629bb3801c/c14-14823881c111fa09509f2b7155181f08335229a63cc7a5c4e713d36292536232.jpg",
+          "width": 728,
+          "height": 1105,
+          "sha256": "14823881c111fa09509f2b7155181f08335229a63cc7a5c4e713d36292536232"
+        },
+        {
+          "path": "ar/e11b2b83-e344-4949-ac48-302c5737a828/014.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/1240f4cf165a41931d586e629bb3801c/c15-87098ac5ea97a71e5b74544d25830fdeb74efdc47dfb41b866a02e5772fe775b.jpg",
+          "width": 728,
+          "height": 1105,
+          "sha256": "87098ac5ea97a71e5b74544d25830fdeb74efdc47dfb41b866a02e5772fe775b"
+        },
+        {
+          "path": "ar/e11b2b83-e344-4949-ac48-302c5737a828/015.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/1240f4cf165a41931d586e629bb3801c/c16-1cdab7916f60fe2b3ca960b01a2244032a25a4bd3cb94ef2c9dd8554a0998db0.jpg",
+          "width": 728,
+          "height": 1125,
+          "sha256": "1cdab7916f60fe2b3ca960b01a2244032a25a4bd3cb94ef2c9dd8554a0998db0"
+        },
+        {
+          "path": "ar/e11b2b83-e344-4949-ac48-302c5737a828/016.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/1240f4cf165a41931d586e629bb3801c/c17-fe24c87d85205088512e1dc5785fee8fd69c6f665d8b836f19c34b0f9f242768.jpg",
+          "width": 728,
+          "height": 1105,
+          "sha256": "fe24c87d85205088512e1dc5785fee8fd69c6f665d8b836f19c34b0f9f242768"
+        },
+        {
+          "path": "ar/e11b2b83-e344-4949-ac48-302c5737a828/017.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/1240f4cf165a41931d586e629bb3801c/c18-1ae0d4dd5c3dd55dc21bb9879b6404421a8aa326ac086446d8a759f4fcfe0e46.jpg",
+          "width": 728,
+          "height": 1105,
+          "sha256": "1ae0d4dd5c3dd55dc21bb9879b6404421a8aa326ac086446d8a759f4fcfe0e46"
+        },
+        {
+          "path": "ar/e11b2b83-e344-4949-ac48-302c5737a828/018.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/1240f4cf165a41931d586e629bb3801c/c19-15a6501e561c89de642612144451b26dc55aac67b449676e0ce1a96d56286972.jpg",
+          "width": 728,
+          "height": 1105,
+          "sha256": "15a6501e561c89de642612144451b26dc55aac67b449676e0ce1a96d56286972"
+        },
+        {
+          "path": "ar/e11b2b83-e344-4949-ac48-302c5737a828/019.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/1240f4cf165a41931d586e629bb3801c/c20-e0e4b98645fa78cd5e0ce41b0cc165e2f1230ea750b2720db8a1dbb6b12288b0.jpg",
+          "width": 728,
+          "height": 1085,
+          "sha256": "e0e4b98645fa78cd5e0ce41b0cc165e2f1230ea750b2720db8a1dbb6b12288b0"
+        },
+        {
+          "path": "ar/e11b2b83-e344-4949-ac48-302c5737a828/020.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/1240f4cf165a41931d586e629bb3801c/c21-bc486d0d6b23dd31bb085c55185f4f74c502219d1d17a8a9351bcc8619f24e1d.jpg",
+          "width": 728,
+          "height": 1125,
+          "sha256": "bc486d0d6b23dd31bb085c55185f4f74c502219d1d17a8a9351bcc8619f24e1d"
+        },
+        {
+          "path": "ar/e11b2b83-e344-4949-ac48-302c5737a828/021.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/1240f4cf165a41931d586e629bb3801c/c22-a9311ad172cf0ecb037930c948033cc9f50123902bd7c7d31698dec8cbe0387f.jpg",
+          "width": 728,
+          "height": 1085,
+          "sha256": "a9311ad172cf0ecb037930c948033cc9f50123902bd7c7d31698dec8cbe0387f"
+        },
+        {
+          "path": "ar/e11b2b83-e344-4949-ac48-302c5737a828/022.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/1240f4cf165a41931d586e629bb3801c/c23-4acde74983a24e87117ce4c4929b9979c94a2b3a667602f6e6bcc557d6fb9b06.jpg",
+          "width": 728,
+          "height": 1125,
+          "sha256": "4acde74983a24e87117ce4c4929b9979c94a2b3a667602f6e6bcc557d6fb9b06"
+        },
+        {
+          "path": "ar/e11b2b83-e344-4949-ac48-302c5737a828/023.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/1240f4cf165a41931d586e629bb3801c/c24-0fa773109b4abe98605c4838cb73a9834a447b421d66ecbfb86e1d73d2200e41.jpg",
+          "width": 728,
+          "height": 1125,
+          "sha256": "0fa773109b4abe98605c4838cb73a9834a447b421d66ecbfb86e1d73d2200e41"
+        },
+        {
+          "path": "ar/e11b2b83-e344-4949-ac48-302c5737a828/024.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/1240f4cf165a41931d586e629bb3801c/c25-7e40e2193ac70d26071a2c433a4d662957301150df086d4962933e1e24248497.jpg",
+          "width": 728,
+          "height": 1085,
+          "sha256": "7e40e2193ac70d26071a2c433a4d662957301150df086d4962933e1e24248497"
+        },
+        {
+          "path": "ar/e11b2b83-e344-4949-ac48-302c5737a828/025.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/1240f4cf165a41931d586e629bb3801c/c26-9f928be0bd0c6cde2a0b04fc90226abf74eac30229b671e0e5b56be706a05505.jpg",
+          "width": 728,
+          "height": 1105,
+          "sha256": "9f928be0bd0c6cde2a0b04fc90226abf74eac30229b671e0e5b56be706a05505"
+        },
+        {
+          "path": "ar/e11b2b83-e344-4949-ac48-302c5737a828/026.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/1240f4cf165a41931d586e629bb3801c/c27-ef9daf3b82ac83a3dec9c0012fe92bcefc4e799eff317d44b49f306ffd00d70a.jpg",
+          "width": 728,
+          "height": 1105,
+          "sha256": "ef9daf3b82ac83a3dec9c0012fe92bcefc4e799eff317d44b49f306ffd00d70a"
+        },
+        {
+          "path": "ar/e11b2b83-e344-4949-ac48-302c5737a828/027.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/1240f4cf165a41931d586e629bb3801c/c28-4156acc797c54e66d64472a7211af439cb0326f59e108bdc5efb75f3ec9eb533.jpg",
+          "width": 728,
+          "height": 1105,
+          "sha256": "4156acc797c54e66d64472a7211af439cb0326f59e108bdc5efb75f3ec9eb533"
+        },
+        {
+          "path": "ar/e11b2b83-e344-4949-ac48-302c5737a828/028.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/1240f4cf165a41931d586e629bb3801c/c29-a46b9542d2c757d895b53c28be012ad4d64696c3cf147033cfbcade3b87e938e.jpg",
+          "width": 728,
+          "height": 1125,
+          "sha256": "a46b9542d2c757d895b53c28be012ad4d64696c3cf147033cfbcade3b87e938e"
+        }
+      ]
+    },
+    {
+      "id": "81355b0b-1146-40bf-887d-7d799275226d",
+      "manga": "f7418c7b-14ee-4889-85ae-b31fcb8b0857",
+      "language": "ar",
+      "title": "",
+      "chapter": "1",
+      "split": "holdout",
+      "source": "https://mangadex.org/chapter/81355b0b-1146-40bf-887d-7d799275226d",
+      "pages": [
+        {
+          "path": "ar/81355b0b-1146-40bf-887d-7d799275226d/000.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/c2d3f74b3bf4d48aa4a072a0b8414bba/R1-002ed04f2ed315de5a53150c7a833b7fca572df4f12fa23e9cc162f525ac59d2.jpg",
+          "width": 649,
+          "height": 960,
+          "sha256": "002ed04f2ed315de5a53150c7a833b7fca572df4f12fa23e9cc162f525ac59d2"
+        },
+        {
+          "path": "ar/81355b0b-1146-40bf-887d-7d799275226d/001.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/c2d3f74b3bf4d48aa4a072a0b8414bba/R2-1e6187674c85505445d721fc6407e25605b5d86108a1e7b13c00e787ff2b24fa.jpg",
+          "width": 728,
+          "height": 1040,
+          "sha256": "1e6187674c85505445d721fc6407e25605b5d86108a1e7b13c00e787ff2b24fa"
+        },
+        {
+          "path": "ar/81355b0b-1146-40bf-887d-7d799275226d/002.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/c2d3f74b3bf4d48aa4a072a0b8414bba/R3-905323425e3a6236023722c0a7bf11b1069f7723e26b3bb0ae9fad9db9f0f094.jpg",
+          "width": 1456,
+          "height": 1041,
+          "sha256": "905323425e3a6236023722c0a7bf11b1069f7723e26b3bb0ae9fad9db9f0f094"
+        },
+        {
+          "path": "ar/81355b0b-1146-40bf-887d-7d799275226d/003.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/c2d3f74b3bf4d48aa4a072a0b8414bba/R4-6af7a7b9ffeedd9cf5cd90a13b5f905d4564700d02b690cff2c36ffb9ecd1b1f.jpg",
+          "width": 728,
+          "height": 1041,
+          "sha256": "6af7a7b9ffeedd9cf5cd90a13b5f905d4564700d02b690cff2c36ffb9ecd1b1f"
+        },
+        {
+          "path": "ar/81355b0b-1146-40bf-887d-7d799275226d/004.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/c2d3f74b3bf4d48aa4a072a0b8414bba/R5-70f447504588d43211438090c5bcc41eab4b8b07e91c7cd0435b0f04795afd07.jpg",
+          "width": 728,
+          "height": 1040,
+          "sha256": "70f447504588d43211438090c5bcc41eab4b8b07e91c7cd0435b0f04795afd07"
+        },
+        {
+          "path": "ar/81355b0b-1146-40bf-887d-7d799275226d/005.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/c2d3f74b3bf4d48aa4a072a0b8414bba/R6-189a7346a00c558c8e14a07805d06829a7641acfb7ddeae07bc069cb1e4a597a.jpg",
+          "width": 728,
+          "height": 1041,
+          "sha256": "189a7346a00c558c8e14a07805d06829a7641acfb7ddeae07bc069cb1e4a597a"
+        },
+        {
+          "path": "ar/81355b0b-1146-40bf-887d-7d799275226d/006.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/c2d3f74b3bf4d48aa4a072a0b8414bba/R7-b1ebe533f21475ffbb49a8a36637a8c45f45a49d1966a7897617a663db355787.jpg",
+          "width": 728,
+          "height": 1042,
+          "sha256": "b1ebe533f21475ffbb49a8a36637a8c45f45a49d1966a7897617a663db355787"
+        },
+        {
+          "path": "ar/81355b0b-1146-40bf-887d-7d799275226d/007.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/c2d3f74b3bf4d48aa4a072a0b8414bba/R8-73d376430051607c0ec52c3655d6cea84458dc0721e9fa43dd45bda0164d053f.jpg",
+          "width": 728,
+          "height": 1041,
+          "sha256": "73d376430051607c0ec52c3655d6cea84458dc0721e9fa43dd45bda0164d053f"
+        },
+        {
+          "path": "ar/81355b0b-1146-40bf-887d-7d799275226d/008.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/c2d3f74b3bf4d48aa4a072a0b8414bba/R9-864674d33f497e499f7833a8903bc439eeea4e8ba247b9be4d13f13b2a2b3013.jpg",
+          "width": 728,
+          "height": 1040,
+          "sha256": "864674d33f497e499f7833a8903bc439eeea4e8ba247b9be4d13f13b2a2b3013"
+        },
+        {
+          "path": "ar/81355b0b-1146-40bf-887d-7d799275226d/009.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/c2d3f74b3bf4d48aa4a072a0b8414bba/R10-d44868e294141b0245ddc4e13e9e7f79eda7780b5eabfae11bc3fa305af16c03.jpg",
+          "width": 728,
+          "height": 1040,
+          "sha256": "d44868e294141b0245ddc4e13e9e7f79eda7780b5eabfae11bc3fa305af16c03"
+        },
+        {
+          "path": "ar/81355b0b-1146-40bf-887d-7d799275226d/010.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/c2d3f74b3bf4d48aa4a072a0b8414bba/R11-44f8501bc6dcd1b8f7c063d413509bd920c969d18355850f2288e9772d39a384.jpg",
+          "width": 728,
+          "height": 1041,
+          "sha256": "44f8501bc6dcd1b8f7c063d413509bd920c969d18355850f2288e9772d39a384"
+        },
+        {
+          "path": "ar/81355b0b-1146-40bf-887d-7d799275226d/011.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/c2d3f74b3bf4d48aa4a072a0b8414bba/R12-1b5982378ba8e05d87a22847717a77507c5fa5f5d08eb31f0394a80366139584.jpg",
+          "width": 728,
+          "height": 1040,
+          "sha256": "1b5982378ba8e05d87a22847717a77507c5fa5f5d08eb31f0394a80366139584"
+        },
+        {
+          "path": "ar/81355b0b-1146-40bf-887d-7d799275226d/012.jpg",
+          "url": "https://cmdxd98sb0x3yprd.mangadex.network/data/c2d3f74b3bf4d48aa4a072a0b8414bba/R13-bb6290b1dc319db8751b571d49c2e0d839e5a17cf42f0359b46ae05bf1a0803e.jpg",
+          "width": 728,
+          "height": 1041,
+          "sha256": "bb6290b1dc319db8751b571d49c2e0d839e5a17cf42f0359b46ae05bf1a0803e"
+        }
+      ]
+    },
+    {
+      "id": "comix-148",
+      "manga": "z0l20",
+      "language": "en",
+      "split": "calibration",
+      "source": "https://comix.to/title/z0l20-god-level-assassin-im-the-shadow/11531282-chapter-148",
+      "pages": [
+        {
+          "path": "en/comix-148/panel-00.png",
+          "url": "https://1xx.brianjournal.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4AjS5FIHyE",
+          "width": 800,
+          "height": 1429,
+          "sha256": "58ecd0a99eea4b911ab2e594dff164382711ac6ffc0ec9e8b69128498791d796"
+        },
+        {
+          "path": "en/comix-148/panel-01.png",
+          "url": "https://1xx.quietreflectionsblog.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4AgS5FIHyE",
+          "width": 800,
+          "height": 1429,
+          "sha256": "1c103b976d95a04ad346ad2fdd221116c02d82349e38baf7dfbfc6ba7edb27c7"
+        },
+        {
+          "path": "en/comix-148/panel-02.png",
+          "url": "https://1xx.warmhomemarket.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4AhS5FIHyE",
+          "width": 800,
+          "height": 1429,
+          "sha256": "5b5b9e27c3a4da61c9108a57097487bb372fe2bf1740b746369141cbba5e7e1a"
+        },
+        {
+          "path": "en/comix-148/panel-03.png",
+          "url": "https://1xx.quietluxuryshop.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4AmS5FIHyE",
+          "width": 800,
+          "height": 1429,
+          "sha256": "21b73b08575bb085ad4577e6062d4dcf9bc5abd4dd409d07501664f84d602e9f"
+        },
+        {
+          "path": "en/comix-148/panel-04.png",
+          "url": "https://1xx.softvisualstudio.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4AnS5FIHyE",
+          "width": 800,
+          "height": 1429,
+          "sha256": "b33e7b28592d7e6d99acdbc8ed80f16a3797faa15e97ea094aaac797ab7b499a"
+        },
+        {
+          "path": "en/comix-148/panel-05.png",
+          "url": "https://1xx.ryancorner.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4AkS5FIHyE",
+          "width": 800,
+          "height": 1429,
+          "sha256": "05bb592a85f49b3b8a114f577ccb07e55b1ae2b798d586bc8dbab035c0a8a212"
+        },
+        {
+          "path": "en/comix-148/panel-06.png",
+          "url": "https://1xx.softfabricstore.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4AlS5FIHyE",
+          "width": 800,
+          "height": 1426,
+          "sha256": "a8e56bdac4bf1ad6e0ff344043482d6ce7540be4f30f38acb8c9f52c4504324c"
+        },
+        {
+          "path": "en/comix-148/panel-07.png",
+          "url": "https://1xx.warmhomemarket.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4AqS5FIHyE",
+          "width": 800,
+          "height": 1579,
+          "sha256": "5fa1c0724af4b2c1aff3ccf948f041a9f5729bab09a5b3e302178fd910537e7d"
+        },
+        {
+          "path": "en/comix-148/panel-08.png",
+          "url": "https://1xx.myartandsoul.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4ArS5FIHyE",
+          "width": 800,
+          "height": 1579,
+          "sha256": "199eefd80eef221ba35a770e0bdea39685d39abed6f248e6ebf7d3af5bb2fe92"
+        },
+        {
+          "path": "en/comix-148/panel-09.png",
+          "url": "https://1xx.joshuanotes.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4EiS5FIHyE",
+          "width": 800,
+          "height": 1579,
+          "sha256": "b0a3cc705937d0a03d1981986c34683bc664648878c9529805000060e7b3b641"
+        },
+        {
+          "path": "en/comix-148/panel-10.png",
+          "url": "https://1xx.gentlelivingnotes.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4EjS5FIHyE",
+          "width": 800,
+          "height": 1577,
+          "sha256": "ab448554fb00bd13bff4632200c158af3471c7be808465712a99fd1c79f18ad4"
+        },
+        {
+          "path": "en/comix-148/panel-11.png",
+          "url": "https://1xx.lifeinpixels.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4EgS5FIHyE",
+          "width": 800,
+          "height": 1429,
+          "sha256": "bbe1a37885d027a7c1ca76dc76e57bd9af8dabbbe489681ca3f66226730cbf79"
+        },
+        {
+          "path": "en/comix-148/panel-12.png",
+          "url": "https://1xx.notesbyamber.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4EhS5FIHyE",
+          "width": 800,
+          "height": 1429,
+          "sha256": "d9668a0b47114e43a4acc80bfd28e0ecda26381b51df2956570878e86ac32d0c"
+        },
+        {
+          "path": "en/comix-148/panel-13.png",
+          "url": "https://1xx.mydailystories.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4EmS5FIHyE",
+          "width": 800,
+          "height": 1429,
+          "sha256": "2f9d68c59b62946ec0ad943cfda009a08f045eecb0bfd734a3bbbb7c668bcf60"
+        },
+        {
+          "path": "en/comix-148/panel-14.png",
+          "url": "https://1xx.markscorner.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4EnS5FIHyE",
+          "width": 800,
+          "height": 1429,
+          "sha256": "d16eb9ab49cebbbbb1d8958eb03540c92101f36a2a554deee5762ba8fdd876a5"
+        },
+        {
+          "path": "en/comix-148/panel-15.png",
+          "url": "https://1xx.thebrandonblog.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4EkS5FIHyE",
+          "width": 800,
+          "height": 1429,
+          "sha256": "4499e6afbe3c73320937c39d43f1886f42d1ed9b85f5287f28a4bf1667be0552"
+        },
+        {
+          "path": "en/comix-148/panel-16.png",
+          "url": "https://1xx.blogofanna.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4ElS5FIHyE",
+          "width": 800,
+          "height": 1429,
+          "sha256": "1301d6c3acd920de89d0104c3a05796545836d3b123d9e780f31423b05d2f2c2"
+        },
+        {
+          "path": "en/comix-148/panel-17.png",
+          "url": "https://1xx.thebrandonblog.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4EqS5FIHyE",
+          "width": 800,
+          "height": 1426,
+          "sha256": "fd51c34388e45045262db8ce3d53cefeda60e9473b5f547e51c162c0d0c71691"
+        },
+        {
+          "path": "en/comix-148/panel-18.png",
+          "url": "https://1xx.mydailystories.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4ErS5FIHyE",
+          "width": 800,
+          "height": 1483,
+          "sha256": "3980803099d604284e7b2e598e3aa925304ad2be48900e610700219875a120eb"
+        },
+        {
+          "path": "en/comix-148/panel-19.png",
+          "url": "https://1xx.adamjournal.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4IiS5FIHyE",
+          "width": 800,
+          "height": 1482,
+          "sha256": "8dd06ba12f409452d5407be9943dfbf8ad321950e4b59a6a88b599fbbf507d08"
+        },
+        {
+          "path": "en/comix-148/panel-20.png",
+          "url": "https://1xx.simplelivingshop.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4IjS5FIHyE",
+          "width": 800,
+          "height": 1429,
+          "sha256": "c5c05fa1e99e062f8df293cc1b107fa97233dc731c6b5b2273bf442f239404c9"
+        },
+        {
+          "path": "en/comix-148/panel-21.png",
+          "url": "https://1xx.homeandheartshop.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4IgS5FIHyE",
+          "width": 800,
+          "height": 1429,
+          "sha256": "f74e21643605e5c0f8390ea2f7220960f49d6284c9a3e29cc1557c6372acbdc9"
+        },
+        {
+          "path": "en/comix-148/panel-22.png",
+          "url": "https://1xx.ryancorner.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4IhS5FIHyE",
+          "width": 800,
+          "height": 1429,
+          "sha256": "768d5eb5a814d4bcaebafafe2b802a8aa6c9ed45f52e6599c1e2fac649ab82ad"
+        },
+        {
+          "path": "en/comix-148/panel-23.png",
+          "url": "https://1xx.softtouchgoods.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4ImS5FIHyE",
+          "width": 800,
+          "height": 1429,
+          "sha256": "03deda43b95e2a7681c50ab9774d7bb78d0c1d0c7bcd84fd88d217ae75f7cb5a"
+        },
+        {
+          "path": "en/comix-148/panel-24.png",
+          "url": "https://1xx.markscorner.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4InS5FIHyE",
+          "width": 800,
+          "height": 1429,
+          "sha256": "82b454ab416f81e9dc63978465f3238a4c296490adc877fa556fbbfc12a0d5ce"
+        },
+        {
+          "path": "en/comix-148/panel-25.png",
+          "url": "https://1xx.gentlelivingnotes.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4IkS5FIHyE",
+          "width": 800,
+          "height": 1429,
+          "sha256": "a6ef4a7b099003fc812d2316256e8f50bd8b8bf9c231d353dcd82783f8e4f78f"
+        },
+        {
+          "path": "en/comix-148/panel-26.png",
+          "url": "https://1xx.gentlegoodsstore.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4IlS5FIHyE",
+          "width": 800,
+          "height": 1426,
+          "sha256": "e109be1ade3f155e74e7466c10e5093146e96a279aa93981fa8224144d4796a7"
+        },
+        {
+          "path": "en/comix-148/panel-27.png",
+          "url": "https://1xx.coffeeandthoughts.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4IqS5FIHyE",
+          "width": 800,
+          "height": 1567,
+          "sha256": "ae9f1e2a9dcdc19da4d4f7c331ad739cb45b34aa3077494d87c4803dbbdc9f27"
+        },
+        {
+          "path": "en/comix-148/panel-28.png",
+          "url": "https://1xx.lisascorner.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4IrS5FIHyE",
+          "width": 800,
+          "height": 1567,
+          "sha256": "9953b393baa8433b5d01d8223b864a1411796ff32cc6ea3c16d1527418795fad"
+        },
+        {
+          "path": "en/comix-148/panel-29.png",
+          "url": "https://1xx.sophiejournal.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4MiS5FIHyE",
+          "width": 800,
+          "height": 1566,
+          "sha256": "4de0b551e7ee36477c6b5ace928af0c8c53c49af5973b71310c33f32e93a98d3"
+        },
+        {
+          "path": "en/comix-148/panel-30.png",
+          "url": "https://1xx.thechrisblog.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4MjS5FIHyE",
+          "width": 800,
+          "height": 1429,
+          "sha256": "866224e59390ee8e2089229eb090fe144b7a677c007a743f91e67488db7edd87"
+        },
+        {
+          "path": "en/comix-148/panel-31.png",
+          "url": "https://1xx.softtouchgoods.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4MgS5FIHyE",
+          "width": 800,
+          "height": 1429,
+          "sha256": "92f276075cf729598f1280a159a1962c261ffc0937be17466bcae2e31009191a"
+        },
+        {
+          "path": "en/comix-148/panel-32.png",
+          "url": "https://1xx.nickslog.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4MhS5FIHyE",
+          "width": 800,
+          "height": 1429,
+          "sha256": "5d2ba6f2e4eb8d8080941915dca36d4dc51d266fee0882a2d26335c11732fbc0"
+        },
+        {
+          "path": "en/comix-148/panel-33.png",
+          "url": "https://1xx.brittanyswrites.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4MmS5FIHyE",
+          "width": 800,
+          "height": 1429,
+          "sha256": "b3a7f22c0bdeff7ddb7b8b1d6bdaa496f69e3f13f52ecb1a6fc5855b5ae4f9ef"
+        },
+        {
+          "path": "en/comix-148/panel-34.png",
+          "url": "https://1xx.pureandsimpleshop.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4MnS5FIHyE",
+          "width": 800,
+          "height": 1429,
+          "sha256": "60aa7555fce3836fe205dad7a586f707c247823047e2d4fb3764a1d5849108ac"
+        },
+        {
+          "path": "en/comix-148/panel-35.png",
+          "url": "https://1xx.simplelivingdiary.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4MkS5FIHyE",
+          "width": 800,
+          "height": 1429,
+          "sha256": "141c260146444be47c363e8a873d8cdf985bd8198b6b824c19751efc7a759530"
+        },
+        {
+          "path": "en/comix-148/panel-36.png",
+          "url": "https://1xx.simplelivingshop.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4MlS5FIHyE",
+          "width": 800,
+          "height": 1426,
+          "sha256": "acce6756e32e513e2d82c2e429dfbff2dd9f487823b83e9661d1bc4a42108aca"
+        },
+        {
+          "path": "en/comix-148/panel-37.png",
+          "url": "https://1xx.softfabricstore.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4MqS5FIHyE",
+          "width": 800,
+          "height": 1217,
+          "sha256": "0ff0a49b903f50b523aff48c315e7b51597090b9f975a013be88b130ae994823"
+        },
+        {
+          "path": "en/comix-148/panel-38.png",
+          "url": "https://1xx.everydaylittlemoments.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4MrS5FIHyE",
+          "width": 800,
+          "height": 1217,
+          "sha256": "30e9e37730622045ef02cc9055a9668bf1e36d5068c813afe636b5e2f80ad3d0"
+        },
+        {
+          "path": "en/comix-148/panel-39.png",
+          "url": "https://1xx.homeandheartshop.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4QiS5FIHyE",
+          "width": 800,
+          "height": 1217,
+          "sha256": "b8b35822702b1386ffc62d32abf6a66326eb9e6dd93e63d8bca28b8e2098edf2"
+        },
+        {
+          "path": "en/comix-148/panel-40.png",
+          "url": "https://1xx.andrewsnotes.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4QjS5FIHyE",
+          "width": 800,
+          "height": 1214,
+          "sha256": "d2204aac038ab0b72d82a782fcb19142776a48f6cb8021757629c52367520606"
+        },
+        {
+          "path": "en/comix-148/panel-41.png",
+          "url": "https://1xx.softheartstories.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4QgS5FIHyE",
+          "width": 800,
+          "height": 1429,
+          "sha256": "5cd88ed5008949059a94a9414e579a7819c90f975f9c2f995c1b931fb3458db4"
+        },
+        {
+          "path": "en/comix-148/panel-42.png",
+          "url": "https://1xx.ryancorner.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4QhS5FIHyE",
+          "width": 800,
+          "height": 1429,
+          "sha256": "6cfdd71ddd5012156654637e4a69c0de8a0107969ab8fb886468f9da02bb9d79"
+        },
+        {
+          "path": "en/comix-148/panel-43.png",
+          "url": "https://1xx.softfabricstore.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4QmS5FIHyE",
+          "width": 800,
+          "height": 1429,
+          "sha256": "9b952378bd0e6a749de982dcd50728881bfa76ec04dbfb1aab867c4484575157"
+        },
+        {
+          "path": "en/comix-148/panel-44.png",
+          "url": "https://1xx.dailyinspirationhub.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4QnS5FIHyE",
+          "width": 800,
+          "height": 1429,
+          "sha256": "81f704d318b9564e57caa8438782a01e017e1f24d3805b72b33f989524785aec"
+        },
+        {
+          "path": "en/comix-148/panel-45.png",
+          "url": "https://1xx.sophiejournal.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4QkS5FIHyE",
+          "width": 800,
+          "height": 1429,
+          "sha256": "2297ffea8a6dd0d60e9a12d3f76aefb01d61ca41c7ce6590642d6c18ac53441d"
+        },
+        {
+          "path": "en/comix-148/panel-46.png",
+          "url": "https://1xx.madisonscorner.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4QlS5FIHyE",
+          "width": 800,
+          "height": 1429,
+          "sha256": "3728a06a2ac8157ccd56eb300899c1e0c8c87c44f9c92f296ecd38175a90808c"
+        },
+        {
+          "path": "en/comix-148/panel-47.png",
+          "url": "https://1xx.lifeinpixels.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4QqS5FIHyE",
+          "width": 800,
+          "height": 1426,
+          "sha256": "785cb30f745f89a68a9196a6b4015d0bddb6e6f98f97f9772c82ac9e7ad7f47c"
+        },
+        {
+          "path": "en/comix-148/panel-48.png",
+          "url": "https://1xx.notesfromemma.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4QrS5FIHyE",
+          "width": 800,
+          "height": 1374,
+          "sha256": "5f7b7a05e7950078efe4e97a7525292e2c42782e786d39f5abd6f53e4e7660fb"
+        },
+        {
+          "path": "en/comix-148/panel-49.png",
+          "url": "https://1xx.everydayessentialsco.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4UiS5FIHyE",
+          "width": 800,
+          "height": 1374,
+          "sha256": "b991ba9c5ded55c346cb45dbfba893447f5b5805309d03cbfc439c1a3d43c428"
+        },
+        {
+          "path": "en/comix-148/panel-50.png",
+          "url": "https://1xx.tylerspace.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4UjS5FIHyE",
+          "width": 800,
+          "height": 1372,
+          "sha256": "79f3a4d4931306c8fa324ef979e161773ebf1ac2c23741a2e68b326d3837b4f0"
+        },
+        {
+          "path": "en/comix-148/panel-51.png",
+          "url": "https://1xx.gentlelivingnotes.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4UgS5FIHyE",
+          "width": 800,
+          "height": 1376,
+          "sha256": "447fa56f55a690634cb5baf7c152ef6989f3bdd00f15a9e8f4cd753b5a7790f2"
+        },
+        {
+          "path": "en/comix-148/panel-52.png",
+          "url": "https://1xx.designwithheart.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4UhS5FIHyE",
+          "width": 800,
+          "height": 1376,
+          "sha256": "c748af38f7a0905ac6d9e6ed364ef580964f750c2dc0dd1afd962fefc2bb3646"
+        },
+        {
+          "path": "en/comix-148/panel-53.png",
+          "url": "https://1xx.puregoodsmarket.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4UmS5FIHyE",
+          "width": 800,
+          "height": 1376,
+          "sha256": "fed07fb770291597e8c4ebdac646aabbd421d74549418931716fea31b8d64760"
+        },
+        {
+          "path": "en/comix-148/panel-54.png",
+          "url": "https://1xx.digitalsoulstudio.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4UnS5FIHyE",
+          "width": 800,
+          "height": 1376,
+          "sha256": "e1688068f4208dc6d0c2bc6069800f2c8a6c8f2954fde80d7c1b8029e7b71695"
+        },
+        {
+          "path": "en/comix-148/panel-55.png",
+          "url": "https://1xx.andrewsnotes.site/hi/bEqPbYfoKT0GmxXlNk6foD5U2rUtfvKi3R0VvqLI6y4UkS5FIHyE",
+          "width": 800,
+          "height": 1373,
+          "sha256": "9bec3d0c5b8f232c6940d249e52ae787735a562222997dfc8ab070456b5b388b"
+        }
+      ]
+    }
+  ]
+}

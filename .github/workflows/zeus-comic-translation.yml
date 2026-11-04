@@ -1,8 +1,8 @@
 name: ZEUS comic image translation
 on:
   push:
-    branches: [main, edition/ascent-parity-20261101, feature/zeus-manhwa-translation-20261101]
-    paths: ['ZEUSNext/**', 'Native/ComicRuntime/**', '.zeus-ci/**', '.openminis/Host/NativeComicTranslationTests.swift', '.github/workflows/zeus-comic-translation.yml']
+    branches: [fix/comic-translation-reliability,main, edition/ascent-parity-20261101, feature/zeus-manhwa-translation-20261101]
+    paths: ['ZEUSNext/**', 'Native/ComicRuntime/**', '.zeus-ci/**', '.openminis/Host/NativeComicTranslationTests.swift', '.openminis/Host/NativeCloudAccountTests.swift', '.github/workflows/zeus-comic-translation.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -19,6 +19,8 @@ jobs:
       - run: npm ci --prefix .zeus-ci/comic
       - run: node --test .zeus-ci/comic/bridge.test.mjs
       - run: python3 .zeus-ci/comic/compare_test.py
+      - run: python3 .zeus-ci/comic/evidence_test.py
+      - run: python3 .zeus-ci/comic/boot_simulator_test.py
   decoder:
     runs-on: ubuntu-latest
     steps:
@@ -28,6 +30,7 @@ jobs:
       - run: g++ -std=c++17 -shared -fPIC Native/ComicRuntime/ComicRegionDecoder.cpp -o /tmp/libcomicdecoder.so $(pkg-config --cflags --libs libjpeg libpng libwebp)
       - run: python3 .zeus-ci/comic/decoder.test.py /tmp/libcomicdecoder.so
   ios:
+    needs: [bridge, decoder]
     runs-on: macos-15
     timeout-minutes: 65
     strategy:
@@ -69,12 +72,13 @@ jobs:
           assert choices
           with open(os.environ['GITHUB_ENV'],'a') as f:f.write('COMIC_SIMULATOR='+choices[0]['udid']+'\n')
           PY
-      - name: Boot selected simulator before tests
+      - name: Boot selected simulator with bounded failover
         if: matrix.sdk == 'iphonesimulator'
-        timeout-minutes: 6
-        run: |
-          xcrun simctl boot "$COMIC_SIMULATOR" || true
-          xcrun simctl bootstatus "$COMIC_SIMULATOR" -b
+        timeout-minutes: 15
+        run: python3 .zeus-ci/comic/boot_simulator.py "$COMIC_SIMULATOR"
+      - name: Download the exact Violet chapter pixels
+        if: matrix.sdk == 'iphonesimulator'
+        run: python3 .zeus-ci/comic/prepare_violet.py
       - name: Start deterministic provider fixture
         if: matrix.sdk == 'iphonesimulator'
         run: |
@@ -85,7 +89,7 @@ jobs:
         if: matrix.sdk == 'iphonesimulator'
         run: |
           set -o pipefail
-          xcodebuild -project ZEUSNext.xcodeproj -scheme ZEUSNext -sdk iphonesimulator -destination "platform=iOS Simulator,id=$COMIC_SIMULATOR" -derivedDataPath "$RUNNER_TEMP/ZeusComicSim" -resultBundlePath results/comic.xcresult -only-testing:ZEUSNextTests/NativeComicTranslationTests -parallel-testing-enabled NO -test-timeouts-enabled YES -default-test-execution-time-allowance 90 -maximum-test-execution-time-allowance 120 test CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- 2>&1 | tee results/simulator.log
+          xcodebuild -project ZEUSNext.xcodeproj -scheme ZEUSNext -sdk iphonesimulator -destination "platform=iOS Simulator,id=$COMIC_SIMULATOR" -derivedDataPath "$RUNNER_TEMP/ZeusComicSim" -resultBundlePath results/comic.xcresult -only-testing:ZEUSNextTests/NativeComicTranslationTests -only-testing:ZEUSNextTests/NativeCloudAccountTests -parallel-testing-enabled NO -test-timeouts-enabled YES -default-test-execution-time-allowance 90 -maximum-test-execution-time-allowance 120 test CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- 2>&1 | tee results/simulator.log
       - name: Collect simulator diagnostics
         if: always() && matrix.sdk == 'iphonesimulator'
         timeout-minutes: 2
@@ -101,6 +105,7 @@ jobs:
           git rev-parse HEAD > results/source-commit.txt
           if [ -f results/comic.xcresult/Info.plist ]; then
             xcrun xcresulttool get test-results summary --path results/comic.xcresult > results/summary.json
+            xcrun xcresulttool export attachments --path results/comic.xcresult --output-path results/screenshots
           fi
       - uses: actions/upload-artifact@v4
         if: always()

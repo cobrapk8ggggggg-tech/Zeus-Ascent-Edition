@@ -1,0 +1,143 @@
+{
+  "app_source_commit": "0ffbd9b3adf228d96bb64ab04a666ea0d05db86b",
+  "kernel_source_commit": "42ccdb40d19593b572bff9ff8700d6aaa736438e",
+  "kernel_sha256": "d1d023f00c3313461d96af2b8233142595e68ca1c5998a2aae0c66ae3f10e4cc",
+  "executed": {
+    "bridge": {
+      "passed": 23,
+      "failed": 0
+    },
+    "independent_masks": {
+      "passed": 27,
+      "failed": 0
+    },
+    "upstream_embedding": {
+      "passed": 2,
+      "failed": 0
+    },
+    "linux_mask_diagnostics": {
+      "chapters": 12,
+      "pages": 273,
+      "regions": 480,
+      "languages": [
+        "ar",
+        "en",
+        "ja",
+        "ko",
+        "zh"
+      ],
+      "outside_mask_changes": 0,
+      "layout_probe_fits": 387,
+      "neural_restored": 68,
+      "light_restored": 166,
+      "flat_restored": 133,
+      "cleanup_gate_accepted": 234,
+      "cleanup_gate_abstained": 246,
+      "manually_reviewed": 0,
+      "quality_acceptance_proven": false,
+      "native_kernel_sha256": "d3064cebeed9fb3f3c009be9c794229713b99b0f3caa58a4438e571d09d8c945",
+      "protocol": "adaptive-v13: bounded source-line neural masks; near-frame ownership; inscribed lettering; upright CJK; post-clean glyph gate",
+      "peak_rss_kib": 1330724,
+      "unique_pages_actually_scanned": 132,
+      "gold_quality_proven": false,
+      "native_ocr_parity": false,
+      "compared_to_baseline_same_480_crops": true,
+      "new_gate_acceptances": 9,
+      "visual_findings": "visual-observations.json records incomplete OCR/residual/layout cases; no visual acceptance rate claimed"
+    },
+    "mask_optimization": {
+      "samples": 30,
+      "languages": [
+        "en",
+        "ar",
+        "ja",
+        "ko",
+        "zh"
+      ],
+      "O0_seconds": 8.139030081030796,
+      "O3_seconds": 0.6021515799802728,
+      "kernel_speed_ratio": 13.51658012970329,
+      "differing_outputs": [],
+      "scope": "Linux shared mask code only; not device or chapter speed"
+    },
+    "O3_independent_mask_tests": {
+      "passed": 27,
+      "failed": 0
+    },
+    "native_matrix": {
+      "comic_passed": 67,
+      "account_passed": 12,
+      "failed": 0,
+      "device_compile": true,
+      "workflow_run": 41811030455
+    },
+    "parity": {
+      "comic_passed": 67,
+      "ui_passed": 7,
+      "failed": 0,
+      "workflow_run": 41811030394
+    },
+    "asura": {
+      "detected": 210,
+      "error": "",
+      "first_paint_seconds": 17.3658390045166,
+      "mode": "fastest, restoration on, Google Arabic",
+      "notice": "احتُفظ ببعض النصوص الأصلية لعدم اكتمال تنظيفها أو ملاءمة خطها.",
+      "ocr_runs": 66,
+      "phase": "partial",
+      "phase_seconds": {
+        "fetching": 101.27835500240326,
+        "recognizing": 693.8446563482285,
+        "rendering": 110.8853896856308,
+        "translating": 12.233483791351318
+      },
+      "ready": 141,
+      "regions": 63,
+      "scroll": 0,
+      "seconds": 936.6804429292679,
+      "source": "Asura chapter 2, 27 SHA-pinned originals",
+      "workflow_run": 41811030407,
+      "source_language": "auto",
+      "origin": "localhost fixture preserving actual chapter image order/data-page-index; 27 SHA-pinned originals downloaded from Asura",
+      "physical_device": false,
+      "complete_translation": false
+    },
+    "ipa": {
+      "source_commit": "0ffbd9b3adf228d96bb64ab04a666ea0d05db86b",
+      "source_ref": "fix/comic-translation-reliability",
+      "bridge_verified": true,
+      "evidence_checks_verified": true,
+      "physical_device_quality_measured": false,
+      "sha256": "2f10206d48d348cb9a38f1fb7668e12cff03acc31784fa942786f7978a081e11",
+      "bytes": 73031980,
+      "file": "/workspace/outputs/ZEUS-image-translation-0ffbd9b.ipa"
+    }
+  },
+  "pending": [],
+  "physical_device_tested": false,
+  "gold_annotations_complete": false,
+  "quality_acceptance_proven": false,
+  "previous_verified": {
+    "app_source_commit": "5324a32d5c22845c28eb7c7774f8de5068088f63",
+    "native_comic_passed": 67,
+    "account_passed": 12,
+    "ui_passed": 7,
+    "device_compile": true,
+    "asura_tests_passed": 2,
+    "asura_detected": 209,
+    "asura_ready": 141,
+    "asura_seconds": 735.7748140096664,
+    "asura_first_paint_seconds": 9.206537008285522,
+    "asura_source_language": "en",
+    "asura_phase": "partial",
+    "ipa_sha256": "3bf4effddbfab923a09e98edb56c6771c8d04a7dd418592968df298684903d6d"
+  },
+  "current_runs": {
+    "matrix": 41811030455,
+    "parity": 41811030394,
+    "asura": 41811030407,
+    "ipa": 41811030568
+  },
+  "current_verification_pending": false,
+  "comparison_limit": "5324 used explicit English; 0ff uses automatic language. Different runners/configuration prevent a controlled whole-chapter speedup claim."
+}

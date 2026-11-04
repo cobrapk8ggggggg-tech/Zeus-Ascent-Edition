@@ -63,3 +63,85 @@ extern "C" unsigned char *zeus_comic_decode_region(const unsigned char *bytes,un
     return nullptr;
 }
 extern "C" void zeus_comic_free_pixels(unsigned char *pixels){std::free(pixels);}
+
+#include "ComicInpaint.h"
+extern "C" void zeus_comic_inpaint(unsigned char *pixels, int width, int height, int left, int top, int right, int bottom) {
+    comic_inpaint(pixels,width,height,left,top,right,bottom);
+}
+
+extern "C" void zeus_comic_text_mask(const unsigned char *pixels, unsigned char *mask, int width, int height, int left, int top, int right, int bottom) {
+    comic_inpaint(const_cast<unsigned char *>(pixels),width,height,left,top,right,bottom,mask,false);
+}
+
+extern "C" void zeus_comic_inpaint_from_source(const unsigned char *source, unsigned char *pixels, int width, int height, int left, int top, int right, int bottom) {
+    comic_inpaint(pixels,width,height,left,top,right,bottom,nullptr,true,source);
+}
+extern "C" float zeus_comic_mask_coverage(const unsigned char *pixels,const unsigned char *mask,int width,int height,int left,int top,int right,int bottom){
+    return comic_mask_coverage(pixels,mask,width,height,left,top,right,bottom);
+}
+extern "C" void zeus_comic_refine_text_mask(const unsigned char *pixels,const unsigned char *hints,unsigned char *mask,int width,int height,int left,int top,int right,int bottom){
+    comic_refine_text_mask(pixels,hints,mask,width,height,left,top,right,bottom);
+}
+extern "C" void zeus_comic_inpaint_mask(const unsigned char *source,unsigned char *pixels,const unsigned char *mask,int width,int height,int left,int top,int right,int bottom){
+    comic_inpaint(pixels,width,height,left,top,right,bottom,nullptr,true,source,mask);
+}
+extern "C" int zeus_comic_simple_background(const unsigned char *pixels,const unsigned char *mask,int width,int height,int left,int top,int right,int bottom){return comic_simple_background(pixels,mask,width,height,left,top,right,bottom)?1:0;}
+#ifdef __APPLE__
+#include <os/proc.h>
+#include <TargetConditionals.h>
+#if TARGET_OS_SIMULATOR
+#include <mach/mach.h>
+#endif
+#endif
+extern "C" unsigned long long zeus_comic_available_memory(){
+#if defined(__APPLE__) && TARGET_OS_SIMULATOR
+    // The iOS process-budget API returns zero in Simulator. Its process runs
+    // on the host; use conservative host free + inactive pages instead. Do not
+    // double-count purgeable/speculative pages or change the device guard.
+    mach_port_t host = mach_host_self();
+    vm_size_t page = 0;
+    vm_statistics64_data_t stats = {};
+    mach_msg_type_number_t count = HOST_VM_INFO64_COUNT;
+    const auto status = host_statistics64(host, HOST_VM_INFO64, (host_info64_t)&stats, &count);
+    const auto page_status = host_page_size(host, &page);
+    mach_port_deallocate(mach_task_self(), host);
+    return status == KERN_SUCCESS && page_status == KERN_SUCCESS
+        ? ((unsigned long long)stats.free_count + stats.inactive_count) * page : 0;
+#elif defined(__APPLE__)
+    return os_proc_available_memory();
+#else
+    return 0;
+#endif
+}
+
+extern "C" int zeus_comic_neural_mask_valid(const unsigned char *pixels,const unsigned char *hints,const unsigned char *mask,int width,int height,int left,int top,int right,int bottom){return comic_neural_mask_valid(pixels,hints,mask,width,height,left,top,right,bottom)?1:0;}
+extern "C" int zeus_comic_mask_owned(const unsigned char *mask,int width,int height,int left,int top,int right,int bottom,const int *boxes,int count){return comic_mask_owned(mask,width,height,left,top,right,bottom,boxes,count)?1:0;}
+
+extern "C" int zeus_comic_balloon_lobes(const unsigned char*m,int w,int h,const int*b,int n,int*o,int*r){return comic_balloon_lobes(m,w,h,b,n,o,r);}
+
+extern "C" float zeus_comic_ink_style(const unsigned char*p,int w,int h,const int*b,int n,float*o){return comic_ink_style(p,w,h,b,n,o);}
+
+extern "C" int zeus_comic_flat_balloon_mask(const unsigned char*p,unsigned char*m,int w,int h,int l,int t,int r,int b,const int*boxes,int n){return comic_flat_balloon_mask(p,m,w,h,l,t,r,b,boxes,n);}
+
+extern "C" int zeus_comic_plate_has_edge(const unsigned char*p,int iw,int ih,const unsigned char*m,int w,int h,int x,int y,const int*b,int n){return comic_plate_has_edge(p,iw,ih,m,w,h,x,y,b,n);}
+extern "C" void zeus_comic_grow_text_mask(unsigned char*m,int w,int h,int l,int t,int r,int b,int radius){comic_grow_text_mask(m,w,h,l,t,r,b,radius);}
+extern "C" float zeus_comic_ink_residue(const unsigned char*s,const unsigned char*c,const unsigned char*m,int w,int h,int l,int t,int r,int b){return comic_ink_residue(s,c,m,w,h,l,t,r,b);}
+
+extern "C" int zeus_comic_plate_color(const unsigned char*p,int iw,int ih,const unsigned char*m,int w,int h,int x,int y,unsigned char*c){return comic_plate_color(p,iw,ih,m,w,h,x,y,c);}
+
+extern "C" int zeus_comic_lettering_box(const unsigned char*p,int w,int h,int l,int t,int r,int b,const int*boxes,int n,int*out){return comic_lettering_box(p,w,h,l,t,r,b,boxes,n,out);}
+
+#include <zlib.h>
+unsigned long zeus_comic_deflate(const unsigned char *input,unsigned long size,unsigned char *output,unsigned long capacity){
+    if(!input||!output||size>16777216)return 0;
+    uLongf count=capacity;
+    return compress2(output,&count,input,size,1)==Z_OK?count:0;
+}
+int zeus_comic_inflate(const unsigned char *input,unsigned long size,unsigned char *output,unsigned long expected){
+    if(!input||!output||size>16777216||expected>16777216)return 0;
+    z_stream stream{};stream.next_in=const_cast<Bytef*>(input);stream.avail_in=static_cast<uInt>(size);stream.next_out=output;stream.avail_out=static_cast<uInt>(expected);
+    if(inflateInit(&stream)!=Z_OK)return 0;
+    int result=inflate(&stream,Z_FINISH);
+    bool valid=result==Z_STREAM_END&&stream.total_out==expected&&stream.avail_in==0;
+    inflateEnd(&stream);return valid?1:0;
+}

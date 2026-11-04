@@ -127,6 +127,9 @@ struct CloudSnapshotHead: Codable {
     private var stateURL: URL? { browser?.profiles.root.appendingPathComponent("cloud-sync-state.json") }
 
     func prepare() async {
+        // Guest access must not mark cloud restoration complete. Signing in
+        // later still needs to initialize transport and restore the account.
+        guard CloudAccount.shared.phase != .guest else{return}
         guard !prepared, !busy else { return }
         guard let browser, CloudAccount.shared.phase == .ready, let id = CloudAccount.shared.identity?.id else { prepared = true; return }
         busy = true; issue = nil

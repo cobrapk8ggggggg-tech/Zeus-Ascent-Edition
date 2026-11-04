@@ -43,6 +43,25 @@ actor ComicPaddle {
             dictionary=try Self.dictionary(String(contentsOf:file,encoding:.utf8));dictionaries=[name:dictionary]
         }
         let maxPixels:Double=ProcessInfo.processInfo.physicalMemory<5*1024*1024*1024 ? 700_000:2_000_000
+        // In careful mode use native-resolution tiles directly. The previous
+        // reduced global pass plus two reduced halves repeated work and still
+        // lost small/outlined captions on 16,000px chapter images.
+        if careful && Double(image.width*image.height)>maxPixels{
+            let tileWidth=min(image.width,1024),tileHeight=max(256,min(1536,Int(maxPixels)/tileWidth))
+            var result:[ComicLine]=[]
+            for y in stride(from:0,to:image.height,by:max(128,tileHeight-96)){
+                for x in stride(from:0,to:image.width,by:max(128,tileWidth-96)){
+                    try Task.checkCancellation()
+                    let area=CGRect(x:x,y:y,width:min(tileWidth,image.width-x),height:min(tileHeight,image.height-y))
+                    guard let cut=image.cropping(to:area)else{continue}
+                    let local=try await read(cut,source:source,careful:false).map{line -> ComicLine in
+                        var v=line;v.rect=v.rect.offsetBy(dx:area.minX,dy:area.minY);v.words=v.words?.map{ComicWord(text:$0.text,rect:$0.rect.offsetBy(dx:area.minX,dy:area.minY))};return v
+                    }
+                    result=ComicOCR.merge(result,accurate:local)
+                }
+            }
+            return result
+        }
         let factor=min(1,sqrt(maxPixels/Double(image.width*image.height)),4000/Double(max(image.width,image.height)))
         let width=max(32,Int((Double(image.width)*factor/32).rounded())*32),height=max(32,Int((Double(image.height)*factor/32).rounded())*32)
         let (probabilities,shape)=try infer(image,width:width,height:height,detector:true,session:detector)
@@ -61,18 +80,7 @@ actor ComicPaddle {
             guard s.count==3 else{throw ComicFailure.message("أبعاد خرج قارئ النص غير صالحة.")}
             let result=Self.ctc(logits,steps:s[1],classes:s[2],dictionary:dictionary)
             let text=name=="arabic" ? ComicBidi.logicalFromVisual(result.0):result.0
-            if !text.trimmingCharacters(in:CharacterSet.whitespacesAndNewlines).isEmpty{lines.append(ComicLine(text:text,confidence:result.1,rect:rect))}
-        }
-        // Careful mode re-detects at native-sized overlapping crops, retaining lines
-        // missed by a reduced global pass. The scheduler bounds image dimensions.
-        if careful && factor<0.75 {
-            let step=max(128,image.height/2)
-            for y in stride(from:0,to:image.height,by:step){
-                let rect=CGRect(x:0,y:max(0,y-64),width:image.width,height:min(image.height-max(0,y-64),step+128))
-                guard let part=image.cropping(to:rect)else{continue}
-                let additional=try await read(part,source:source,careful:false)
-                for var line in additional{line.rect.origin.y+=rect.minY;if !lines.contains(where:{$0.rect.intersection(line.rect).width>min($0.rect.width,line.rect.width)*0.6 && abs($0.rect.midY-line.rect.midY)<min($0.rect.height,line.rect.height)*0.6}){lines.append(line)}}
-            }
+            if result.1>=0.65 && text.contains(where:{$0.isLetter || $0.isNumber}){lines.append(ComicLine(text:text,confidence:result.1,rect:rect,glyphHeight:Double(min(rect.height,rect.width))*0.72,words:Self.words(logits,steps:s[1],classes:s[2],dictionary:dictionary,rect:rect,arabic:name=="arabic")))}
         }
         return lines
     }
@@ -90,6 +98,41 @@ actor ComicPaddle {
         for t in 0..<steps{let start=t*classes;var best=0;for c in 1..<classes where values[start+c]>values[start+best]{best=c};if best != 0 && best != last && best<dictionary.count{text+=dictionary[best];total+=values[start+best];count+=1};last=best}
         return(text,count==0 ? 0:total/Float(count))
     }
+    // CTC positions are measured on the recognizer crop. Keep real word spans
+    // for lines spanning two lobes; never divide a string by guessed character count.
+    static func words(_ values:[Float],steps:Int,classes:Int,dictionary:[String],rect:CGRect,arabic:Bool)->[ComicWord]?{
+        guard steps>0,classes>0,values.count>=steps*classes else{return nil}
+        var tokens:[(String,Int,Int)]=[],last=0
+        for t in 0..<steps{
+            let start=t*classes;var best=0
+            for c in 1..<classes where values[start+c]>values[start+best]{best=c}
+            if best != 0,best<dictionary.count{
+                if best==last,!tokens.isEmpty{tokens[tokens.count-1].2=t+1}
+                else{tokens.append((dictionary[best],t,t+1))}
+            }
+            last=best
+        }
+        var words:[ComicWord]=[],text="",begin=0,end=0
+        func append(){
+            guard !text.isEmpty else{return}
+            let a=max(0,CGFloat(begin)-0.5)/CGFloat(steps),b=min(CGFloat(steps),CGFloat(end)+0.5)/CGFloat(steps)
+            let box=rect.height>rect.width*1.5 ? CGRect(x:rect.minX,y:rect.minY+rect.height*a,width:rect.width,height:rect.height*(b-a)):CGRect(x:rect.minX+rect.width*a,y:rect.minY,width:rect.width*(b-a),height:rect.height)
+            words.append(ComicWord(text:arabic ? ComicBidi.logicalFromVisual(text):text,rect:box));text=""
+        }
+        for token in tokens{
+            if token.0.allSatisfy({$0.isWhitespace}){append()}
+            else{if text.isEmpty{begin=token.1};text+=token.0;end=token.2}
+        }
+        append()
+        if words.count<2,tokens.contains(where:{$0.0.unicodeScalars.contains{(0x3040...0x30ff).contains($0.value)||(0x4e00...0x9fff).contains($0.value)}}){
+            words=tokens.filter{!$0.0.allSatisfy{$0.isWhitespace}}.map{token in
+                let a=max(0,CGFloat(token.1)-0.5)/CGFloat(steps),b=min(CGFloat(steps),CGFloat(token.2)+0.5)/CGFloat(steps)
+                let box=rect.height>rect.width*1.5 ? CGRect(x:rect.minX,y:rect.minY+rect.height*a,width:rect.width,height:rect.height*(b-a)):CGRect(x:rect.minX+rect.width*a,y:rect.minY,width:rect.width*(b-a),height:rect.height)
+                return ComicWord(text:token.0,rect:box)
+            }
+        }
+        return words.count>1 ? words:nil
+    }
     static func boxes(_ map:[Float],width:Int,height:Int)->[CGRect]{
         guard width>0,height>0,map.count>=width*height else{return []}
         var seen=[UInt8](repeating:0,count:width*height),result:[CGRect]=[]
@@ -99,7 +142,7 @@ actor ComicPaddle {
             while head<queue.count{let i=queue[head];head+=1;score+=map[i];let x=i%width,y=i/width;minX=min(minX,x);maxX=max(maxX,x);minY=min(minY,y);maxY=max(maxY,y)
                 for (dx,dy)in [(-1,0),(1,0),(0,-1),(0,1)]{let nx=x+dx,ny=y+dy;if nx>=0&&nx<width&&ny>=0&&ny<height{let n=ny*width+nx;if seen[n]==0&&map[n]>0.3{seen[n]=1;queue.append(n)}}}
             }
-            if queue.count>=3 && score/Float(queue.count)>0.5{let rect=CGRect(x:minX,y:minY,width:maxX-minX+1,height:maxY-minY+1);let expansion=min(rect.width,rect.height)*0.25;result.append(rect.insetBy(dx:-expansion,dy:-expansion))}
+            if queue.count>=3 && score/Float(queue.count)>0.5{let rect=CGRect(x:minX,y:minY,width:maxX-minX+1,height:maxY-minY+1);let expansion=1.5*rect.width*rect.height/(2*(rect.width+rect.height));result.append(rect.insetBy(dx:-expansion,dy:-expansion))}
         }
         return result
     }

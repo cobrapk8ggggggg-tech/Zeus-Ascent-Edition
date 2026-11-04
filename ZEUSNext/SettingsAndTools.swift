@@ -20,7 +20,7 @@ struct ToolsSheet: View {
                 }
                 ThemedSection("الصفحة") {
                     Button("وضع القراءة", systemImage: "text.alignright") { afterDismiss { model.readerMode() } }
-                    Button("ترجمة الصور والمانهوا", systemImage: "character.viewfinder") { afterDismiss { model.current?.comicTranslation?.start() } }
+                    Button("ترجمة الصور والمانهوا", systemImage: "photo") { afterDismiss { model.current?.comicTranslation?.start() } }
                     Button("إعدادات ترجمة الصور", systemImage: "slider.horizontal.3") { imageTranslationSettings = true }.accessibilityIdentifier("imageTranslationButton")
                     Button("معرض صور الصفحة", systemImage: "photo.on.rectangle.angled") { afterDismiss { model.galleryMode() } }
                     Button("إضافة للمفضلة", systemImage: "bookmark") { model.bookmarkCurrent() }
@@ -62,14 +62,24 @@ extension BrowserModel {
     func resetApplication() async {
         guard profile.isAdmin else { notify(AccountError.permission.localizedDescription); return }
         FaviconMemory.purge()
-        _ = try? await BrowserDisk.clearLegacyImageCache()
-        URLCache.shared.removeAllCachedResponses()
+        let sharedInstallation = profiles.root.standardizedFileURL == BrowserDisk.applicationRoot.standardizedFileURL
+        if sharedInstallation{
+            for tab in tabs { tab.comicTranslation?.pause() }
+            await ComicOCR.shared.purge();await ComicPaddle.shared.purge();await ComicRestoration.shared.purge();await ComicLocalTranslator.shared.unload()
+            do{try await ComicModelStore.shared.removeAll();try await ComicMemory.shared.clearAll()}
+            catch{notify(error.localizedDescription);return}
+            _ = try? await BrowserDisk.clearLegacyImageCache()
+            URLCache.shared.removeAllCachedResponses()
+        }
         for tab in tabs { tab.dispose() }
         for item in profiles.profiles { shield.erase(item.id); downloads.removeAll(profileID: item.id) }
         do { try await profiles.resetAll() } catch { notify(error.localizedDescription); return }
-        await WKWebsiteDataStore.default().removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast)
-        for cookie in HTTPCookieStorage.shared.cookies ?? [] { HTTPCookieStorage.shared.deleteCookie(cookie) }
-        if let identifier = Bundle.main.bundleIdentifier { UserDefaults.standard.removePersistentDomain(forName: identifier) }
-        requiresUnlock = false; data = ProfileData(); closeAllTabs(); persist(); notify("مُسحت بيانات التطبيق وأُنشئ حساب رئيسي جديد.")
+        if sharedInstallation{
+            await WKWebsiteDataStore.default().removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast)
+            for cookie in HTTPCookieStorage.shared.cookies ?? [] { HTTPCookieStorage.shared.deleteCookie(cookie) }
+            if let identifier = Bundle.main.bundleIdentifier { UserDefaults.standard.removePersistentDomain(forName: identifier) }
+        }
+        requiresUnlock = false; data = ProfileData(); closeAllTabs(); persist()
+        notify(sharedInstallation ? "مُسحت بيانات التطبيق وأُنشئ حساب رئيسي جديد.":"مُسحت بيانات هذه المساحة فقط. بيانات الحساب الآخر محفوظة.")
     }
 }

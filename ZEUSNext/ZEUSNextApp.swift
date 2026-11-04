@@ -40,6 +40,11 @@ final class BrowserAppDelegate: NSObject, UIApplicationDelegate {
                 var prefs = TranslationPreferences(); prefs.suggestionDuration = CommandLine.arguments.contains("--timed-translation-suggestion") ? 1.5 : 0; prefs.engine = .ai; prefs.providerID = provider.id; prefs.automatic = CommandLine.arguments.contains("--automatic-translation")
                 model.data.settings.translation = prefs
             }
+            if CommandLine.arguments.contains("--comic-violet-fixture") {
+                var prefs=ComicPreferences();prefs.mode = .fastest;prefs.engine = .google;prefs.restorationEnabled=false;prefs.readAhead=false;prefs.showUntranslated=true
+                var translation=TranslationPreferences();translation.target="ar";prefs.translation=translation
+                model.data.settings.comicTranslation=prefs;model.data.settings.shieldsEnabled=false
+            }
             if CommandLine.arguments.contains("--tabs-polish-fixture") {
                 model.current?.title = "التبويب الأول — عنوان طويل لا يخفي أيقونة الموقع"
                 _ = model.newTab(); model.current?.title = "التبويب الثاني"

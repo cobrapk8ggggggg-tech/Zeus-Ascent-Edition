@@ -52,6 +52,7 @@ private enum ZEUSNativeHostBootstrap {
         NativeCloudAccountAPI.dataDelegate = ZeusCloudArchive.shared
         NativeCloudAccountAPI.browserFilesDidChange = { ZeusCloudArchive.shared.scheduleBackup() }
         NativeCloudAccountAPI.sharedFilesView = { AnyView(ZeusCloudFilesView(session: ZeusCloudRuntime.globalWorkspace)) }
+        NativeCloudAccountAPI.storageManagementView = { AnyView(StorageManagementView()) }
         let defaults = UserDefaults.standard
         if defaults.string(forKey: "appLanguage") != "ar" { defaults.set("ar", forKey: "appLanguage") }
         if defaults.string(forKey: "composerInputModePreference") != "text" { defaults.set("text", forKey: "composerInputModePreference") }
