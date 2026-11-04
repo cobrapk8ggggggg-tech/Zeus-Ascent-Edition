@@ -39,7 +39,7 @@ def paragraphs(rgb,lines,include_layout=False,engine=None,include_cleanup=False,
   elif (p[2]-p[0])*(p[3]-p[1])>max((plates[i][2]-plates[i][0])*(plates[i][3]-plates[i][1])for i in matches):plates[matches[0]]=p
  owned=[[]for _ in plates];unplated=[]
  for line in lines:
-  x,y,r,b=line['box'];matches=[i for i,p in enumerate(plates)if p[0]+2<=x and p[1]+2<=y and p[2]-2>=r and p[3]-2>=b]
+  x,y,r,b=line['box'];matches=[i for i,p in enumerate(plates)if p[0]<=x and p[1]<=y and p[2]>=r and p[3]>=b]
   if matches:owned[min(matches,key=lambda i:(plates[i][2]-plates[i][0])*(plates[i][3]-plates[i][1]))].append(line)
   else:unplated.append(line)
  result=[]

@@ -83,4 +83,14 @@ class BalloonsAndInk(unittest.TestCase):
   boxes=[[150,150,200,175],[180,195,240,220]];area=self.engine.lettering_box(paper,[1,1,399,399],boxes)
   self.assertIsNotNone(area);l,t,r,b=area;self.assertGreater((r-l)*(b-t),40000);self.assertTrue((paper[t:b,l:r]>0).all())
   for a,c,d,f in boxes:self.assertTrue(l<=(a+d)/2<r and t<=(c+f)/2<b)
+ def test_recognized_column_near_frame_keeps_its_balloon_width(self):
+  f=json.loads((pathlib.Path(__file__).parent/'fixtures/neural-near-frame-column.json').read_text())
+  rgb=np.array(Image.open(io.BytesIO(base64.b64decode(f['image']))).convert('RGB'))
+  lines=[dict(text=l['text'],confidence=1,box=[l['x'],l['y'],l['x']+l['width'],l['y']+l['height']])for l in f['lines']]
+  groups=paragraphs(rgb,lines,True,self.engine,True,True);self.assertEqual(len(groups),1)
+  rows,area,closed,flat,physical=groups[0];self.assertTrue(closed);self.assertGreater(area[2]-area[0],90)
+  self.assertTrue(flat['uniform']);self.assertTrue(flat['complete'])
+  clean,mask,accepted=self.engine.apply_flat_cleanup(rgb,[0,0],flat);self.assertTrue(accepted)
+  self.assertLessEqual(self.engine.ink_residue(rgb,clean,mask,[l['box']for l in rows]),.08)
+  self.assertEqual(np.count_nonzero(np.any(rgb!=clean,axis=2)&(mask==0)),0)
 if __name__=='__main__':unittest.main()

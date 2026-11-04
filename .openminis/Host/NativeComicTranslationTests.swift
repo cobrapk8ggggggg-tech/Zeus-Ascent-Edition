@@ -402,6 +402,21 @@ import UIKit
         XCTAssertTrue(output.unresolved.isEmpty,"All four recognized columns must be erased and lettered together")
         let attachment=XCTAttachment(image:UIImage(cgImage:output.image));attachment.name="All four original Japanese columns translated together";attachment.lifetime = .keepAlways;add(attachment)
     }
+    func testColumnOnePixelInsideFrameKeepsBalloonLayout()async throws{
+        struct Line:Decodable{var text:String;var x:Double;var y:Double;var width:Double;var height:Double;var glyphHeight:Double}
+        struct Fixture:Decodable{var image:String;var lines:[Line]}
+        let(data,_)=try await URLSession.shared.data(from:URL(string:"http://127.0.0.1:8765/comic-quality-fixtures?name=neural-near-frame-column.json")!)
+        let f=try JSONDecoder().decode(Fixture.self,from:data),image=try ComicPixels.decode(XCTUnwrap(Data(base64Encoded:f.image)))
+        let lines=f.lines.map{ComicLine(text:$0.text,confidence:1,rect:CGRect(x:$0.x,y:$0.y,width:$0.width,height:$0.height),glyphHeight:$0.glyphHeight)}
+        let speeches=ComicBalloons.speeches(lines,image:image,source:"ja"),speech=try XCTUnwrap(speeches.first)
+        XCTAssertEqual(speeches.count,1);XCTAssertTrue(speech.balloon);XCTAssertGreaterThan(speech.rect.width,90)
+        XCTAssertEqual(speech.flatCleanup?.uniform,true);XCTAssertEqual(speech.flatCleanup?.complete,true)
+        let plan=try XCTUnwrap(ComicPixels.planned(speech,text:"هل أنا الأخير؟",width:image.width,height:image.height,target:"ar",fontName:nil,fontScale:1,letterSpacing:0,requireReadable:true))
+        XCTAssertEqual(plan.1.theta,0)
+        let output=try ComicPixels.renderReport(image,speeches:speeches,translations:[TranslationSegment(id:speech.id,text:"هل أنا الأخير؟")],target:"ar",fontName:nil,fontScale:1,requireCleanSource:true)
+        XCTAssertTrue(output.unresolved.isEmpty)
+        let attachment=XCTAttachment(image:UIImage(cgImage:output.image));attachment.name="Near-frame source column - full balloon width and upright Arabic without LaMa";attachment.lifetime = .keepAlways;add(attachment)
+    }
     func testStaggeredConnectedBalloonsKeepSeparateProviderTexts()async throws{
         struct Line:Decodable{var text:String;var x:Double;var y:Double;var width:Double;var height:Double;var glyphHeight:Double}
         struct Fixture:Decodable{var image:String;var lines:[Line]}

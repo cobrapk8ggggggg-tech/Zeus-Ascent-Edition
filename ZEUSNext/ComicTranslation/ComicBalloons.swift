@@ -22,7 +22,11 @@ enum ComicBalloons {
         // flood-fill failed. Otherwise the balloon and an orphan line both draw.
         var owned=[[ComicLine]](repeating:[],count:plates.count),unplated:[ComicLine]=[]
         for line in lines{
-            let candidates=plates.indices.filter{plates[$0].rect.insetBy(dx:2,dy:2).contains(line.rect)}
+            // OCR boxes can sit one pixel inside a hand-drawn frame. Requiring
+            // another inset loses the whole paragraph and its balloon layout.
+            // Cleanup ownership and the inscribed lettering shape still gate
+            // erasure and drawing independently below.
+            let candidates=plates.indices.filter{plates[$0].rect.contains(line.rect)}
             if let index=candidates.min(by:{plates[$0].rect.width*plates[$0].rect.height<plates[$1].rect.width*plates[$1].rect.height}){owned[index].append(line)}else{unplated.append(line)}
         }
         var result:[ComicSpeech]=[]
