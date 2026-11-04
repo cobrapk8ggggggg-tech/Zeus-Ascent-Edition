@@ -12,6 +12,8 @@ actor ComicRestoration {
     private var current: ORTSession?
     private var currentName:String?
     private(set) var sessionLoads=0
+    private(set) var modelLoads:[String:Int]=[:]
+    private var deferredForMemory=false
     private var busy=false
     private var waiting:[UUID:CheckedContinuation<Void,Error>]=[:]
     private var minimumHeadroom:UInt64=1_200_000_000
@@ -39,13 +41,13 @@ actor ComicRestoration {
     private func session(_ name: String) async throws -> ORTSession {
         if currentName==name,let current{return current}
         current = nil;currentName=nil
-        if zeus_comic_available_memory()<(name=="lama.onnx" ? minimumHeadroom:minimumHeadroom/2){throw ComicFailure.message("لم تتوفر ذاكرة كافية لترميم الخلفية؛ بقي الأصل.")}
+        if zeus_comic_available_memory()<(name=="lama.onnx" ? minimumHeadroom:minimumHeadroom/2){deferredForMemory=true;throw ComicFailure.message("لم تتوفر ذاكرة كافية لترميم الخلفية؛ بقي الأصل.")}
         let url = try await ComicModelStore.shared.file(name, download: false)
         let options = try ORTSessionOptions()
         try options.setIntraOpNumThreads(2)
         try options.setGraphOptimizationLevel(.all)
         let value = try ORTSession(env: environment, modelPath: url.path, sessionOptions: options)
-        current = value;currentName=name;sessionLoads+=1
+        current = value;currentName=name;sessionLoads+=1;modelLoads[name,default:0]+=1
         return value
     }
     private func tensor(_ floats: [Float], shape: [NSNumber]) throws -> ORTValue {
@@ -164,7 +166,7 @@ actor ComicRestoration {
         return ids
     }
     func restore(_ image: CGImage, speeches: [ComicSpeech], requiredHeadroom:UInt64=1_200_000_000, onPreparing: (@Sendable (Bool) async -> Void)? = nil) async throws -> Result {
-        try await acquire();defer{release()};try Task.checkCancellation();minimumHeadroom=requiredHeadroom
+        try await acquire();defer{release()};try Task.checkCancellation();minimumHeadroom=requiredHeadroom;deferredForMemory=false
         guard let original = ComicPixels.rgba(image, width: image.width, height: image.height) else { throw ComicFailure.message("تعذّر تجهيز ترميم الخلفية.") }
         let candidates = speeches.filter { !ComicPixels.canClean(original, width: image.width, height: image.height, speech: $0) }
         if candidates.isEmpty { return Result(image: image, restored: [], notice: nil) }
@@ -252,6 +254,6 @@ actor ComicRestoration {
             jobs.append(MaskedCrop(id:speech.id,pixels:pixels,mask:mask,bounds:bounds,width:crop.width,height:crop.height,boxes:local.lines.map(\.rect),protected:protected,retryMargin:max(8,min(18,Int(ceil(glyph*0.4))))));pendingPixels+=crop.width*crop.height
         }
         if !jobs.isEmpty{ids.formUnion(try await paint(jobs,into:&result,imageWidth:image.width))}
-        return Result(image: try ComicPixels.fromRGBA(result,width:image.width,height:image.height), restored:ids, notice:ids.count<candidates.count ? "احتُفظ ببعض النصوص الأصلية لتعذّر ترميمها كاملًا.":nil)
+        return Result(image: try ComicPixels.fromRGBA(result,width:image.width,height:image.height), restored:ids, notice:deferredForMemory ? "لم تتوفر ذاكرة كافية لإكمال ترميم بعض الخلفيات؛ ستُعاد المحاولة.":ids.count<candidates.count ? "احتُفظ ببعض النصوص الأصلية لتعذّر ترميمها كاملًا.":nil,retryable:deferredForMemory)
     }
 }

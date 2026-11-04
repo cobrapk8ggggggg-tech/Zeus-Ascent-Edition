@@ -88,9 +88,26 @@ extern "C" void zeus_comic_inpaint_mask(const unsigned char *source,unsigned cha
 extern "C" int zeus_comic_simple_background(const unsigned char *pixels,const unsigned char *mask,int width,int height,int left,int top,int right,int bottom){return comic_simple_background(pixels,mask,width,height,left,top,right,bottom)?1:0;}
 #ifdef __APPLE__
 #include <os/proc.h>
+#include <TargetConditionals.h>
+#if TARGET_OS_SIMULATOR
+#include <mach/mach.h>
+#endif
 #endif
 extern "C" unsigned long long zeus_comic_available_memory(){
-#ifdef __APPLE__
+#if defined(__APPLE__) && TARGET_OS_SIMULATOR
+    // The iOS process-budget API returns zero in Simulator. Its process runs
+    // on the host; use conservative host free + inactive pages instead. Do not
+    // double-count purgeable/speculative pages or change the device guard.
+    mach_port_t host = mach_host_self();
+    vm_size_t page = 0;
+    vm_statistics64_data_t stats = {};
+    mach_msg_type_number_t count = HOST_VM_INFO64_COUNT;
+    const auto status = host_statistics64(host, HOST_VM_INFO64, (host_info64_t)&stats, &count);
+    const auto page_status = host_page_size(host, &page);
+    mach_port_deallocate(mach_task_self(), host);
+    return status == KERN_SUCCESS && page_status == KERN_SUCCESS
+        ? ((unsigned long long)stats.free_count + stats.inactive_count) * page : 0;
+#elif defined(__APPLE__)
     return os_proc_available_memory();
 #else
     return 0;

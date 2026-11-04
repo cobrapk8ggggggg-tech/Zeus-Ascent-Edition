@@ -55,7 +55,10 @@ import WebKit
         XCTAssertGreaterThan(session.detectedTexts,100,"The queue must discover dialogue far beyond the initial viewport")
         XCTAssertTrue(rows.contains{$0["index"]as? String=="25" && $0["painted"]as? Bool==true},"The last story image must be processed without a scroll")
         let restorationLoads=await ComicRestoration.shared.sessionLoads
-        let report:[String:Any]=["source":"Asura chapter 2, 27 SHA-pinned originals","mode":"fastest, restoration on, Google Arabic","scroll":scroll ?? -1,"seconds":Date().timeIntervalSince(began),"first_paint_seconds":firstPaint.map{$0 as Any} ?? NSNull(),"detected":session.detectedTexts,"ready":session.translatedTexts,"regions":session.completed,"ocr_runs":session.ocrRuns,"restoration_session_loads":restorationLoads,"phase_seconds":session.phaseSeconds,"region_audits":audits,"phase":session.phase.rawValue,"notice":session.contextNotice ?? "","error":session.error ?? "","images":rows]
+        let modelLoads=await ComicRestoration.shared.modelLoads
+        XCTAssertGreaterThan(modelLoads["ctd.onnx",default:0],0,"The chapter quality test must actually execute CTD")
+        XCTAssertGreaterThan(modelLoads["lama.onnx",default:0],0,"The chapter quality test must actually execute LaMa")
+        let report:[String:Any]=["source":"Asura chapter 2, 27 SHA-pinned originals","mode":"fastest, restoration on, Google Arabic","scroll":scroll ?? -1,"seconds":Date().timeIntervalSince(began),"first_paint_seconds":firstPaint.map{$0 as Any} ?? NSNull(),"detected":session.detectedTexts,"ready":session.translatedTexts,"regions":session.completed,"ocr_runs":session.ocrRuns,"restoration_model_loads":modelLoads,"restoration_session_loads":restorationLoads,"phase_seconds":session.phaseSeconds,"region_audits":audits,"phase":session.phase.rawValue,"notice":session.contextNotice ?? "","error":session.error ?? "","images":rows]
         let attachment=XCTAttachment(data:try JSONSerialization.data(withJSONObject:report,options:[.prettyPrinted,.sortedKeys]),uniformTypeIdentifier:"public.json");attachment.name="Asura entire chapter without scrolling measured results";attachment.lifetime = .keepAlways;add(attachment)
         for index in [1,2,3,5,9,17,25]{
             // Export the actual applied PNG patches, not a URL or early preview.

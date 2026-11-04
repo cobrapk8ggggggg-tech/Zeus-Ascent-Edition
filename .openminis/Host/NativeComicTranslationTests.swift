@@ -814,6 +814,9 @@ import UIKit
         XCTAssertEqual(Set(ComicGeometry.prioritized(all,candidate:c,scroll:0,viewport:800,readAhead:true).map(\.y)),Set(all.map(\.y)))
         XCTAssertTrue(ComicGeometry.prioritized(all,candidate:c,scroll:0,viewport:800,readAhead:false).isEmpty)
     }
+    func testRuntimeReportsAnAvailableMemoryBudget(){
+        XCTAssertGreaterThan(zeus_comic_available_memory(),0,"A zero Simulator process-budget result must not silently disable every neural restoration")
+    }
     func testTallLanguageProbeRetainsOriginalCoordinatesAndMixedArabic()async throws{
         let image=renderer(CGSize(width:800,height:4096)).image{context in
             UIColor.white.setFill();context.fill(CGRect(x:0,y:0,width:800,height:4096))
