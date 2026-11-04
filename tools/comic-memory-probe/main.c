@@ -12,8 +12,12 @@ int main(void) {
     // Purgeable/speculative pages can overlap these counts; do not add them.
     unsigned long long reclaimable = result == KERN_SUCCESS && size_result == KERN_SUCCESS
         ? ((unsigned long long)stats.free_count + stats.inactive_count) * page : 0;
-    printf("{\"simulator\":%d,\"proc_available_bytes\":%llu,\"host_free_and_inactive_bytes\":%llu,\"vm_status\":%d}\n",
-        TARGET_OS_SIMULATOR, (unsigned long long)os_proc_available_memory(), reclaimable, result);
+    unsigned long long process_available = 0;
+#if TARGET_OS_IOS
+    process_available = (unsigned long long)os_proc_available_memory();
+#endif
+    printf("{\"simulator\":%d,\"proc_api_supported\":%d,\"proc_available_bytes\":%llu,\"host_free_and_inactive_bytes\":%llu,\"vm_status\":%d}\n",
+        TARGET_OS_SIMULATOR, TARGET_OS_IOS, process_available, reclaimable, result);
     mach_port_deallocate(mach_task_self(), host);
     return 0;
 }
