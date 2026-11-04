@@ -151,7 +151,7 @@ class Engine:
             out=rgba.copy();self.lib.clean_mask(rgba,out,mask,w,h,*area);clean=out[:,:,:3]
             if self.ink_residue(rgb,clean,mask,boxes)<=.08:return clean
         return self.lama(rgb,mask)
-    def restore_neural(self,rgb,boxes,balloon=None):
+    def restore_neural(self,rgb,boxes,balloon=None,lettering_inside=None):
         h,w=rgb.shape[:2];bounds=balloon if balloon is not None else[min(q[0]for q in boxes),min(q[1]for q in boxes),max(q[2]for q in boxes),max(q[3]for q in boxes)]
         x=max(0,int(bounds[0])-48);y=max(0,int(bounds[1])-48);r=min(w,int(bounds[2])+48);b=min(h,int(bounds[3])+48)
         crop=np.ascontiguousarray(rgb[y:b,x:r]);local=[[a-x,c-y,d-x,e-y]for a,c,d,e in boxes]
@@ -164,6 +164,12 @@ class Engine:
         glyph=float(np.median([min(q[2]-q[0],q[3]-q[1])for q in local]));pad=max(8,min(18,glyph*.4))
         protected=owned if owned is not None else[max(1,min(q[0]for q in local)-pad),max(1,min(q[1]for q in local)-pad),min(crop.shape[1]-1,max(q[2]for q in local)+pad),min(crop.shape[0]-1,max(q[3]for q in local)+pad)]
         mask=self.grow_mask(mask,protected,2)
+        if lettering_inside is not None:
+            safe=[max(protected[0],lettering_inside[0]-x),max(protected[1],lettering_inside[1]-y),min(protected[2],lettering_inside[2]-x),min(protected[3],lettering_inside[3]-y)]
+            margin=max(8,min(18,int(np.ceil(glyph*.4))))
+            for a,c,d,f in local:
+                left=max(int(safe[0]),int(np.floor(a-margin)));top=max(int(safe[1]),int(np.floor(c-margin)));right=min(int(safe[2]),int(np.ceil(d+margin)));bottom=min(int(safe[3]),int(np.ceil(f+margin)))
+                if right>left and bottom>top:mask[top:bottom,left:right]=255
         restored=self.reconstruct(crop,mask,protected,local)
         if self.ink_residue(crop,restored,mask,local)>.08:
             margin=max(8,min(18,int(np.ceil(glyph*.4))))

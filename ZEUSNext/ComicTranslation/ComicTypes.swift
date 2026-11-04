@@ -84,7 +84,7 @@ struct ComicPreferences: Codable, Equatable {
     var letterCaseRaw: String?
     var letterSpacing: Double?
     var letterCase: ComicLetterCase { ComicLetterCase(rawValue: letterCaseRaw ?? "") ?? .original }
-    var renderIdentity: String { "render-v19|restoration:\(restorationEnabled ?? true)|\(fontName ?? "default")|\(fontScale)|\(textColor ?? "auto")|\(inkStyle.rawValue)|\(letterCase.rawValue)|\(letterSpacing ?? 0)" }
+    var renderIdentity: String { "render-v20|restoration:\(restorationEnabled ?? true)|\(fontName ?? "default")|\(fontScale)|\(textColor ?? "auto")|\(inkStyle.rawValue)|\(letterCase.rawValue)|\(letterSpacing ?? 0)" }
     var inkStyle: ComicInkStyle { get { ComicInkStyle(rawValue: inkStyleRaw ?? "") ?? .automatic } set { inkStyleRaw = newValue.rawValue } }
     var engine: ComicOnlineEngine = .existing
     var translation: TranslationPreferences?
@@ -156,6 +156,9 @@ struct ComicSpeech: Codable, Equatable {
     // Optional so cached results from older revisions keep decoding.
     var angle: Double? = nil
     var balloonBounds: CGRect? = nil
+    // True only when the whole lettering rectangle is inside the recovered
+    // paper shape. A fallback bounding box is not a safe restoration mask.
+    var letteringInsideBalloon: Bool? = nil
 }
 struct ComicReading: Codable { var lines: [ComicLine]; var speeches: [ComicSpeech]; var language: String; var runtime: String }
 struct ComicCachedResult: Codable { var version = 1; var reading: ComicReading; var translations: [TranslationSegment] }
@@ -170,7 +173,7 @@ enum ComicIdentity {
         hash(segments.map{$0.id+"\0"+$0.text}.joined(separator:"\n"))
     }
     static func settings(_ preferences: ComicPreferences, translation: TranslationPreferences, provider: AIProviderConfiguration?) -> String {
-        hash("comic-v29|fallback:\(preferences.allowOnlineFallback ?? false)|\(preferences.mode.rawValue)|\(preferences.source)|\(translation.target)|" + TranslationMemory.namespace(page: "comic://content", preferences: translation, provider: provider))
+        hash("comic-v30|fallback:\(preferences.allowOnlineFallback ?? false)|\(preferences.mode.rawValue)|\(preferences.source)|\(translation.target)|" + TranslationMemory.namespace(page: "comic://content", preferences: translation, provider: provider))
     }
 }
 enum ComicGeometry {

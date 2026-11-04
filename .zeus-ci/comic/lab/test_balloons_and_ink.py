@@ -93,4 +93,12 @@ class BalloonsAndInk(unittest.TestCase):
   clean,mask,accepted=self.engine.apply_flat_cleanup(rgb,[0,0],flat);self.assertTrue(accepted)
   self.assertLessEqual(self.engine.ink_residue(rgb,clean,mask,[l['box']for l in rows]),.08)
   self.assertEqual(np.count_nonzero(np.any(rgb!=clean,axis=2)&(mask==0)),0)
+ def test_only_a_recovered_balloon_certifies_expanded_neural_masks(self):
+  f=json.loads((pathlib.Path(__file__).parent/'fixtures/neural-near-frame-column.json').read_text());rgb=np.array(Image.open(io.BytesIO(base64.b64decode(f['image']))).convert('RGB'))
+  lines=[dict(text=l['text'],confidence=1,box=[l['x'],l['y'],l['x']+l['width'],l['y']+l['height']])for l in f['lines']]
+  self.assertTrue(paragraphs(rgb,lines,True,self.engine,True,True,True)[0][5])
+  open_caption=np.full((200,300,3),255,np.uint8)
+  lines=[dict(text='CAPTION',confidence=1,box=[80,70,220,110])]
+  group=paragraphs(open_caption,lines,True,self.engine,True,True,True)[0]
+  self.assertFalse(group[2]);self.assertFalse(group[5],'An open field must not authorize an expanded paper mask')
 if __name__=='__main__':unittest.main()

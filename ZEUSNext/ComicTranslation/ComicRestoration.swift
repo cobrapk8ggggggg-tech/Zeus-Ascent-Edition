@@ -214,6 +214,19 @@ actor ComicRestoration {
             let textBounds=local.lines.reduce(CGRect.null){$0.union($1.rect)}
             let protected=(local.balloon ? (local.balloonBounds ?? local.rect):textBounds.insetBy(dx:-max(8,min(18,glyph*0.4)),dy:-max(8,min(18,glyph*0.4)))).integral.intersection(CGRect(x:1,y:1,width:crop.width-2,height:crop.height-2))
             grow(&mask,width:crop.width,height:crop.height,area:protected,radius:2)
+            if local.letteringInsideBalloon == true{
+                // A thin glyph mask can leave a pale negative of the original
+                // word on translucent paper. Hide the entire owned line inside
+                // the proven paper rectangle; keep the existing glyph mask for
+                // source letters extending beyond that rectangle.
+                let safe=local.rect.integral.intersection(protected)
+                let margin=CGFloat(max(8,min(18,Int(ceil(glyph*0.4)))))
+                for box in local.lines.map(\.rect){
+                    let r=box.insetBy(dx:-margin,dy:-margin).integral.intersection(safe)
+                    guard !r.isNull else{continue}
+                    for y in Int(r.minY)..<Int(r.maxY){for x in Int(r.minX)..<Int(r.maxX){mask[y*crop.width+x]=255}}
+                }
+            }
             jobs.append(MaskedCrop(id:speech.id,pixels:pixels,mask:mask,bounds:bounds,width:crop.width,height:crop.height,boxes:local.lines.map(\.rect),protected:protected,retryMargin:max(8,min(18,Int(ceil(glyph*0.4))))));pendingPixels+=crop.width*crop.height
         }
         if !jobs.isEmpty{ids.formUnion(try await paint(jobs,into:&result,imageWidth:image.width))}

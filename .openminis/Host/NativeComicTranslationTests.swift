@@ -402,6 +402,40 @@ import UIKit
         XCTAssertTrue(output.unresolved.isEmpty,"All four recognized columns must be erased and lettered together")
         let attachment=XCTAttachment(image:UIImage(cgImage:output.image));attachment.name="All four original Japanese columns translated together";attachment.lifetime = .keepAlways;add(attachment)
     }
+    func testTranslucentVioletBalloonRemovesFaintLetterHalos()async throws{
+        struct Line:Decodable{var text:String;var x:Double;var y:Double;var width:Double;var height:Double;var glyphHeight:Double}
+        struct Fixture:Decodable{var image:String;var lines:[Line]}
+        let(data,_)=try await URLSession.shared.data(from:URL(string:"http://127.0.0.1:8765/comic-quality-fixtures?name=neural-violet-transparent.json")!)
+        let f=try JSONDecoder().decode(Fixture.self,from:data),image=try ComicPixels.decode(XCTUnwrap(Data(base64Encoded:f.image)))
+        let lines=f.lines.map{ComicLine(text:$0.text,confidence:1,rect:CGRect(x:$0.x,y:$0.y,width:$0.width,height:$0.height),glyphHeight:$0.glyphHeight)}
+        let speeches=ComicBalloons.speeches(lines,image:image,source:"en"),speech=try XCTUnwrap(speeches.first)
+        XCTAssertEqual(speeches.count,1);XCTAssertEqual(speech.letteringInsideBalloon,true)
+        let restored=try await ComicRestoration.shared.restore(image,speeches:speeches,requiredHeadroom:0)
+        XCTAssertTrue(restored.restored.contains(speech.id))
+        let before=try XCTUnwrap(ComicPixels.rgba(image,width:image.width,height:image.height)),after=try XCTUnwrap(ComicPixels.rgba(restored.image,width:image.width,height:image.height))
+        func gray(_ x:Int,_ y:Int)->Double{let i=(y*image.width+x)*4;return (Double(after[i])+Double(after[i+1])+Double(after[i+2]))/3}
+        // A pale negative of a word passes a high-contrast ink test. This crop's
+        // translucent paper is smooth: remaining glyph-shaped high frequencies
+        // independently expose that regression (old values exceed 3.3).
+        for line in lines{
+            var residual=0.0,count=0
+            for y in Int(line.rect.minY)+1..<Int(line.rect.maxY)-1{for x in Int(line.rect.minX)+1..<Int(line.rect.maxX)-1{
+                residual+=abs(gray(x-1,y)+gray(x+1,y)+gray(x,y-1)+gray(x,y+1)-4*gray(x,y));count+=1
+            }}
+            XCTAssertLessThan(residual/Double(max(1,count)),2.5,"Faint source-shaped halos must be removed as well as black ink")
+        }
+        var outsideChanges=0
+        for y in 0..<image.height{for x in 0..<image.width where !lines.contains(where:{$0.rect.insetBy(dx:-20,dy:-20).contains(CGPoint(x:x,y:y))}){
+            let i=(y*image.width+x)*4
+            if (0..<4).contains(where:{before[i+$0] != after[i+$0]}){outsideChanges+=1}
+        }}
+        XCTAssertEqual(outsideChanges,0,"The balloon frame and surrounding art must stay exact")
+        let output=try ComicPixels.renderReport(restored.image,speeches:speeches,translations:[TranslationSegment(id:speech.id,text:"صحيح أنني لست راهبة.")],target:"ar",fontName:nil,fontScale:1,requireCleanSource:true,precleanedIDs:restored.restored,styleSource:image)
+        XCTAssertTrue(output.unresolved.isEmpty)
+        for (name,cg) in [("Translucent Violet source",image),("Translucent Violet clean without pale glyph halos",restored.image),("Translucent Violet native Arabic",output.image)]{
+            let a=XCTAttachment(image:UIImage(cgImage:cg));a.name=name;a.lifetime = .keepAlways;add(a)
+        }
+    }
     func testColumnOnePixelInsideFrameKeepsBalloonLayout()async throws{
         struct Line:Decodable{var text:String;var x:Double;var y:Double;var width:Double;var height:Double;var glyphHeight:Double}
         struct Fixture:Decodable{var image:String;var lines:[Line]}

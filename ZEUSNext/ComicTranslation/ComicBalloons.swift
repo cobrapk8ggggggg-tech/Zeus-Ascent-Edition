@@ -37,20 +37,20 @@ enum ComicBalloons {
                 let vertical=lines.allSatisfy{$0.rect.height>$0.rect.width*1.5}
                 let ordered=ComicGeometry.orderedLines(lines,vertical:vertical)
                 let area=safeRectangle(lobe,plate:plate,lines:lines)
-                result.append(ComicSpeech(id:"",text:ordered.map(\.text).joined(separator:vertical ? "":" "),lines:ordered,rect:area,vertical:vertical,balloon:true,flatCleanup:flatCleanup(plate,lines:lines,lobe:lobe,pixels:pixels,width:image.width,height:image.height),angle:vertical ? nil:ComicGeometry.estimateAngle(lines),balloonBounds:lobe))
+                result.append(ComicSpeech(id:"",text:ordered.map(\.text).joined(separator:vertical ? "":" "),lines:ordered,rect:area.0,vertical:vertical,balloon:true,flatCleanup:flatCleanup(plate,lines:lines,lobe:lobe,pixels:pixels,width:image.width,height:image.height),angle:vertical ? nil:ComicGeometry.estimateAngle(lines),balloonBounds:lobe,letteringInsideBalloon:area.1))
             }
         }
         result+=ComicGeometry.group(unplated,source:source)
         result.sort{a,b in if abs(a.rect.minY-b.rect.minY)<min(a.rect.height,b.rect.height)*0.35{return source.hasPrefix("ja") ? a.rect.midX>b.rect.midX:a.rect.midX<b.rect.midX};return a.rect.minY<b.rect.minY}
         return result.enumerated().map{i,s in var s=s;s.id=String(i);return s}
     }
-    private static func safeRectangle(_ lobe:CGRect,plate:Plate,lines:[ComicLine])->CGRect{
+    private static func safeRectangle(_ lobe:CGRect,plate:Plate,lines:[ComicLine])->(CGRect,Bool){
         let origin=CGPoint(x:plate.rect.minX-1,y:plate.rect.minY-1),area=lobe.offsetBy(dx:-origin.x,dy:-origin.y).integral
         let boxes:[Int32]=lines.flatMap{line in let r=line.rect.offsetBy(dx:-origin.x,dy:-origin.y);return [Int32(floor(r.minX)),Int32(floor(r.minY)),Int32(ceil(r.maxX)),Int32(ceil(r.maxY))]}
         var output=[Int32](repeating:0,count:4)
         let valid=plate.mask.withUnsafeBufferPointer{p in boxes.withUnsafeBufferPointer{b in output.withUnsafeMutableBufferPointer{o in zeus_comic_lettering_box(p.baseAddress,Int32(plate.width),Int32(plate.height),Int32(area.minX),Int32(area.minY),Int32(area.maxX),Int32(area.maxY),b.baseAddress,Int32(lines.count),o.baseAddress) != 0}}}
-        if valid{return CGRect(x:CGFloat(output[0])+origin.x,y:CGFloat(output[1])+origin.y,width:CGFloat(output[2]-output[0]),height:CGFloat(output[3]-output[1]))}
-        return lines.reduce(CGRect.null){$0.union($1.rect)}.insetBy(dx:-3,dy:-3).intersection(lobe.insetBy(dx:2,dy:2))
+        if valid{return (CGRect(x:CGFloat(output[0])+origin.x,y:CGFloat(output[1])+origin.y,width:CGFloat(output[2]-output[0]),height:CGFloat(output[3]-output[1])),true)}
+        return (lines.reduce(CGRect.null){$0.union($1.rect)}.insetBy(dx:-3,dy:-3).intersection(lobe.insetBy(dx:2,dy:2)),false)
     }
     private static func overlap(_ a:CGRect,_ b:CGRect)->CGFloat{let intersection=a.intersection(b);guard !intersection.isNull else{return 0};return intersection.width*intersection.height/max(1,min(a.width*a.height,b.width*b.height))}
     private struct Plate{var rect:CGRect;var mask:[UInt8];var width:Int;var height:Int;var color:[UInt8];var uniform:Bool}

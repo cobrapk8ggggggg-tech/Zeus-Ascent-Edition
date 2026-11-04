@@ -82,8 +82,8 @@ def run(args):
         for page in pages:
             if count>=limit:break
             rgb=np.asarray(Image.open(root/page['path']).convert('RGB'));start=time.perf_counter();lines=engine.detect(rgb)
-            groups=paragraphs(rgb,lines,include_layout=True,engine=engine,include_cleanup=True,include_bounds=True);random.Random(0).shuffle(groups)
-            for paragraph,area,closed,flat,physical in groups[:per_page]:
+            groups=paragraphs(rgb,lines,include_layout=True,engine=engine,include_cleanup=True,include_bounds=True,include_inside=True);random.Random(0).shuffle(groups)
+            for paragraph,area,closed,flat,physical,inside in groups[:per_page]:
                 if count>=limit:break
                 boxes=[l['box'] for l in paragraph];x=min(b[0]for b in boxes);y=min(b[1]for b in boxes);r=max(b[2]for b in boxes);b=max(b[3]for b in boxes)
                 if r-x<15 or b-y<10 or (r-x)*(b-y)>750000:continue
@@ -114,7 +114,7 @@ def run(args):
                     if accepted and engine.ink_residue(crop,clean,mask,local)>.08:accepted=False
                     if accepted:route='flat'if flat is not None and flat['uniform']else'light'
                     elif args.neural:
-                        clean,mask,accepted=engine.restore_neural(crop,local,physical_local if closed else None)
+                        clean,mask,accepted=engine.restore_neural(crop,local,physical_local if closed else None,lettering_inside=area_local if inside else None)
                         if accepted:route='neural'
                 if not accepted:clean=crop.copy()
                 rendered=clean
@@ -122,7 +122,7 @@ def run(args):
                 outside=int(np.count_nonzero(np.any(clean!=crop,axis=2)&(mask==0)))
                 cid=f'{chapter["language"]}-{chapter["id"][:8]}-{chapter["split"]}-{count:03d}';dest=out/cid;dest.mkdir(exist_ok=True)
                 for name,a in [('original',crop),('mask',mask),('clean',clean),('rendered',rendered)]:Image.fromarray(a).save(dest/(name+'.png'))
-                case=dict(id=cid,language=chapter['language'],split=chapter['split'],chapter=chapter['id'],source=page['path'],source_sha256=page['sha256'],box=[cx,cy,cr,cb],layout_box=area_local,balloon_bounds=physical_local,lines=paragraph,balloon=closed,vertical_caption=vertical,ocr=recognized,ocr_confidence=confidence,source_readable=readable,outside_mask_changes=outside,fit=fit,restoration_route=route,cleanup_accepted=accepted,source_ink_style=source_style,annotation_status='unreviewed',translation='fixed Arabic layout probe',seconds=time.perf_counter()-start)
+                case=dict(id=cid,language=chapter['language'],split=chapter['split'],chapter=chapter['id'],source=page['path'],source_sha256=page['sha256'],box=[cx,cy,cr,cb],layout_box=area_local,balloon_bounds=physical_local,lettering_inside_balloon=inside,lines=paragraph,balloon=closed,vertical_caption=vertical,ocr=recognized,ocr_confidence=confidence,source_readable=readable,outside_mask_changes=outside,fit=fit,restoration_route=route,cleanup_accepted=accepted,source_ink_style=source_style,annotation_status='unreviewed',translation='fixed Arabic layout probe',seconds=time.perf_counter()-start)
                 cases.append(case);count+=1;start=time.perf_counter()
                 if args.lama and count<=args.lama:
                     restored=engine.lama(crop,mask);Image.fromarray(restored).save(dest/'lama.png')
@@ -130,7 +130,7 @@ def run(args):
             print(chapter['language'],chapter['split'],page['path'],'regions',count,flush=True)
         completed.append(chapter['id']);checkpoint()
     gallery(out,cases)
-    report=dict(chapters=len(corpus['chapters']),pages=sum(len(c['pages'])for c in corpus['chapters']),regions=len(cases),languages=sorted(set(c['language']for c in cases)),outside_mask_changes=sum(c['outside_mask_changes']for c in cases),layout_probe_fits=sum(c['fit']for c in cases),neural_restored=sum(c['restoration_route']=='neural'for c in cases),light_restored=sum(c['restoration_route']in['flat','light']for c in cases),flat_restored=sum(c['restoration_route']=='flat'for c in cases),cleanup_gate_accepted=sum(c['cleanup_accepted']for c in cases),cleanup_gate_abstained=sum(not c['cleanup_accepted']for c in cases),manually_reviewed=0,quality_acceptance_proven=False,native_kernel_sha256=engine.native_sha,protocol='adaptive-v12: inscribed lettering rectangles; separate cleanup bounds; upright CJK paragraph translation; post-clean glyph gate',peak_rss_kib=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
+    report=dict(chapters=len(corpus['chapters']),pages=sum(len(c['pages'])for c in corpus['chapters']),regions=len(cases),languages=sorted(set(c['language']for c in cases)),outside_mask_changes=sum(c['outside_mask_changes']for c in cases),layout_probe_fits=sum(c['fit']for c in cases),neural_restored=sum(c['restoration_route']=='neural'for c in cases),light_restored=sum(c['restoration_route']in['flat','light']for c in cases),flat_restored=sum(c['restoration_route']=='flat'for c in cases),cleanup_gate_accepted=sum(c['cleanup_accepted']for c in cases),cleanup_gate_abstained=sum(not c['cleanup_accepted']for c in cases),manually_reviewed=0,quality_acceptance_proven=False,native_kernel_sha256=engine.native_sha,protocol='adaptive-v13: bounded source-line neural masks; near-frame ownership; inscribed lettering; upright CJK; post-clean glyph gate',peak_rss_kib=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
     (out/'report.json').write_text(json.dumps(report,indent=2));print(json.dumps(report),flush=True)
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--corpus',required=True);p.add_argument('--models',required=True);p.add_argument('--output',required=True);p.add_argument('--regions',type=int,default=400);p.add_argument('--ocr',action='store_true');p.add_argument('--lama',type=int,default=0);p.add_argument('--neural',action='store_true');p.add_argument('--resume',action='store_true');run(p.parse_args())
