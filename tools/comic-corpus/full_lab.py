@@ -40,7 +40,8 @@ def main():
             if not np.array_equal(original,np.array(Image.open(directory/(phase+'.png')).convert('RGB'))):
                 identity_failures.append([case['id'],phase])
     assert not identity_failures,identity_failures
-    provenance=dict(app_source_commit=os.environ['APP_SOURCE'],harness_source_commit=os.environ['GITHUB_SHA'],
+    revision=subprocess.check_output(['git','rev-parse','HEAD'],cwd=REPO,text=True).strip()
+    provenance=dict(app_source_commit=os.environ.get('APP_SOURCE',revision),harness_source_commit=os.environ.get('GITHUB_SHA',revision),
         native_kernel_sha256=report['native_kernel_sha256'],corpus_sha256=hashlib.sha256((data/'corpus.json').read_bytes()).hexdigest(),
         downloaded_original_pages=sum(len(c['pages'])for c in corpus['chapters']),sampled_regions=len(cases),
         declined_output_identity_failures=0,quality_acceptance_proven=False,physical_device=False,

@@ -10,7 +10,7 @@ concurrency:
   group: zeus-full-comic-lab-${{ github.ref }}
   cancel-in-progress: true
 env:
-  APP_SOURCE: 5fcad8e3801ac5426688ff2ff74147b1d894f244
+  APP_SOURCE: 67acf8cb703e6da0a40f550a35ccba6630ab0131
 jobs:
   lab:
     runs-on: ubuntu-24.04

@@ -6,8 +6,8 @@ for c in cases:
  s=s.replace('<article id="'+c['id']+'">','<article id="'+c['id']+'" data-language="'+c['language']+'" data-route="'+c['restoration_route']+'">')
 s=re.sub(r'<img loading="lazy" src="([^"]+)"[^>]*>',lambda m:'<a target="_blank" rel="noopener" href="'+m[1]+'">'+m[0]+'</a>',s)
 filters='''<nav id="lab-filters" style="position:sticky;top:0;padding:12px;background:#282c34;z-index:10;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-<label>اللغة <select id="language-filter"><option value="">كل اللغات</option value="en">الإنجليزية</option><option value="ja">اليابانية</option><option value="ko">الكورية</option><option value="zh">الصينية</option><option value="ar">العربية</option></select></label>
-<label>المسار <select id="route-filter"><option value="">كل المسارات</option><option value="light">تنظيف خفيف</option><option value="neural">ترميم عصبي</option><option value="original">احتُفظ بالأصل</option></select></label><span id="visible-count"></span>
+<label>اللغة <select id="language-filter"><option value="">كل اللغات</option><option value="en">الإنجليزية</option><option value="ja">اليابانية</option><option value="ko">الكورية</option><option value="zh">الصينية</option><option value="ar">العربية</option></select></label>
+<label>المسار <select id="route-filter"><option value="">كل المسارات</option><option value="flat">خلفية سادة</option><option value="light">تنظيف خفيف</option><option value="neural">ترميم عصبي</option><option value="original">احتُفظ بالأصل</option></select></label><span id="visible-count"></span>
 <a style="color:#9cf" href="native-ios/index.html">صور iOS الفعلية</a><a style="color:#9cf" href="report.json">الأرقام التشخيصية</a></nav>
 <p dir="rtl">اضغط على أي صورة لعرض دقتها الأصلية. هذه مقترحات للفحص وليست مناطق معلّمة يدويًا؛ النصوص البديلة ثابتة لاختبار الرسم.</p>
 <script>

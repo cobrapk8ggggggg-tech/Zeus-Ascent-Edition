@@ -13,7 +13,7 @@ pip install -r .zeus-ci/comic/lab/requirements.txt
 python .zeus-ci/comic/lab/models.py .zeus-ci/comic/lab/models
 python .zeus-ci/comic/lab/acquire.py .zeus-ci/comic/lab/data
 python .zeus-ci/comic/lab/test_masks.py
-python .zeus-ci/comic/lab/run.py --corpus .zeus-ci/comic/lab/data --models .zeus-ci/comic/lab/models --output .zeus-ci/comic/lab/output/review --regions 440 --ocr --neural
+python .zeus-ci/comic/lab/run.py --corpus .zeus-ci/comic/lab/data --models .zeus-ci/comic/lab/models --output .zeus-ci/comic/lab/output/review --regions 480 --ocr --neural
 ```
 
 Use a fontconfig installation including `NotoNaskhArabic-Regular.ttf` (Ubuntu:
@@ -88,3 +88,5 @@ an unplaceable translation preserves original pixels. Arabic and Latin use
 separate Linux fonts. The script records kernel SHA and dependency versions.
 This diagnostic harness does not reproduce ML Kit/Vision or native balloon
 segmentation exactly; production behavior is verified by the native test suite.
+
+The full reproduction command (`verify.sh`) includes the reported Violet chapter, refreshes the pinned MangaDex download locations, checks original hashes and runs all 24 focused tests before the 480 diagnostic regions. Results separate fixed layout text on Linux from real Google/CoreText evidence on iOS.
