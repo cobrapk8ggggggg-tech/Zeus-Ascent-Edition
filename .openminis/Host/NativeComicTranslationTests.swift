@@ -815,6 +815,100 @@ import ZeusComicRuntime
         XCTAssertEqual(Set(ComicGeometry.prioritized(all,candidate:c,scroll:0,viewport:800,readAhead:true).map(\.y)),Set(all.map(\.y)))
         XCTAssertTrue(ComicGeometry.prioritized(all,candidate:c,scroll:0,viewport:800,readAhead:false).isEmpty)
     }
+    func testSlowRestorationPreparationDoesNotBlockNewOrdinaryImages()async throws{
+        let setup=try await stagedReader(),model=setup.0,view=setup.1,session=setup.2,window=setup.3
+        let gate=ComicRestorationPreparationGate()
+        defer{session.pause();window.isHidden=true;model.current?.dispose();Task{await gate.finish()}}
+        session.restorationReadinessOverride={await gate.isReady()}
+        session.restorationPreparationOverride={await gate.prepare()}
+        let(data,_)=try await URLSession.shared.data(from:URL(string:"http://127.0.0.1:8765/comic-quality-fixtures?name=neural-asura-glow.json")!)
+        struct Fixture:Decodable{var image:String};let encoded=try JSONDecoder().decode(Fixture.self,from:data).image
+        view.loadHTMLString("<img data-page-index='0' style='display:block;width:100%;height:auto' src='data:image/png;base64,\(encoded)'>",baseURL:URL(string:"http://127.0.0.1:8765/staged-reader"))
+        try await waitForReaderImages(view,count:1);session.start()
+        var deadline=Date().addingTimeInterval(25)
+        while Date()<deadline{
+            if await gate.hasStarted(),session.phase == .downloading{break}
+            try await Task.sleep(for:.milliseconds(100))
+        }
+        let began=await gate.hasStarted();XCTAssertTrue(began,"The colored panel must exercise background preparation")
+        XCTAssertTrue(session.running,"An unfinished package must not look like a finished chapter")
+        let ordinary=try ordinaryPanel("HELLO WORLD")
+        _ = try await view.callAsyncJavaScript("const i=document.createElement('img');i.dataset.pageIndex='1';i.style='display:block;width:100%;height:auto';i.src=source;document.body.append(i);",arguments:["source":ordinary],in:nil,contentWorld:ComicTranslation.world)
+        deadline=Date().addingTimeInterval(25)
+        var painted=false
+        while Date()<deadline{
+            painted=(try? await view.evaluateJavaScript("document.images.length===2 && document.images[1].src.startsWith('blob:')"))as? Bool == true
+            if painted && session.hasLetteredTranslation{break}
+            try await Task.sleep(for:.milliseconds(100))
+        }
+        XCTAssertTrue(painted,"A late ordinary page must render before the restoration package finishes")
+        XCTAssertTrue(session.hasLetteredTranslation)
+        let ready=await gate.isReady();XCTAssertFalse(ready,"The test must not accidentally release the delayed package")
+        await gate.finish();session.pause()
+    }
+    func testFirstHeavyPanelDoesNotPreemptTheNextOrdinaryPanel()async throws{
+        try await ComicRestoration.shared.prepare()
+        let setup=try await stagedReader(),model=setup.0,view=setup.1,session=setup.2,window=setup.3
+        defer{session.pause();window.isHidden=true;model.current?.dispose()}
+        let(data,_)=try await URLSession.shared.data(from:URL(string:"http://127.0.0.1:8765/comic-quality-fixtures?name=neural-asura-glow.json")!)
+        struct Fixture:Decodable{var image:String};let blue="data:image/png;base64,"+(try JSONDecoder().decode(Fixture.self,from:data).image)
+        let white=try ordinaryPanel("THIRD PANEL")
+        var ordinaryReady=false,neuralAttempted=false
+        session.onRegionAudit={reading,_,reasons,_ in if reading.speeches.contains(where:{$0.text.uppercased().contains("THIRD")}),reasons.isEmpty{ordinaryReady=true}}
+        session.onRestorationAttempt={_ in XCTAssertTrue(ordinaryReady,"The first heavy panel must not delay the next readable region");neuralAttempted=true}
+        view.loadHTMLString("<img data-page-index='0' style='display:block;width:100%;height:auto' src='\(blue)'><img data-page-index='1' style='display:block;width:100%;height:auto' src='\(white)'>",baseURL:URL(string:"http://127.0.0.1:8765/staged-reader"))
+        try await waitForReaderImages(view,count:2);session.start()
+        let deadline=Date().addingTimeInterval(45)
+        while Date()<deadline && !neuralAttempted{try await Task.sleep(for:.milliseconds(100))}
+        XCTAssertTrue(ordinaryReady);XCTAssertTrue(neuralAttempted)
+        let painted=(try await view.evaluateJavaScript("document.images[1].src.startsWith('blob:')"))as? Bool;XCTAssertEqual(painted,true)
+    }
+    func testOffscreenArtworkWaitsForOrdinaryChapterText()async throws{
+        try await ComicRestoration.shared.prepare()
+        let setup=try await stagedReader(),model=setup.0,view=setup.1,session=setup.2,window=setup.3
+        defer{session.pause();window.isHidden=true;model.current?.dispose()}
+        let(data,_)=try await URLSession.shared.data(from:URL(string:"http://127.0.0.1:8765/comic-quality-fixtures?name=neural-asura-glow.json")!)
+        struct Fixture:Decodable{var image:String};let blue="data:image/png;base64,"+(try JSONDecoder().decode(Fixture.self,from:data).image)
+        let sources=[try ordinaryPanel("HELLO WORLD"),blue,try ordinaryPanel("THIRD PANEL")]
+        let html=sources.enumerated().map{index,source in "<img data-page-index='\(index)' style='display:block;width:100%;height:auto;margin-top:\(index==0 ? 0:6000)px' src='\(source)'>"}.joined()
+        var thirdReady=false,neuralAttempted=false
+        session.onRegionAudit={reading,_,reasons,_ in if reading.speeches.contains(where:{$0.text.uppercased().contains("THIRD")}),reasons.isEmpty{thirdReady=true}}
+        session.onRestorationAttempt={_ in XCTAssertTrue(thirdReady,"Offscreen neural work must follow ordinary chapter text");neuralAttempted=true}
+        view.loadHTMLString(html,baseURL:URL(string:"http://127.0.0.1:8765/staged-reader"));try await waitForReaderImages(view,count:3);session.start()
+        let deadline=Date().addingTimeInterval(45)
+        while Date()<deadline && !neuralAttempted{try await Task.sleep(for:.milliseconds(100))}
+        XCTAssertTrue(thirdReady);XCTAssertTrue(neuralAttempted,"Deferred artwork must resume automatically")
+        let painted=(try await view.evaluateJavaScript("document.images[2].src.startsWith('blob:')"))as? Bool
+        XCTAssertEqual(painted,true)
+    }
+    private func ordinaryPanel(_ text:String)throws->String{
+        let image=renderer(CGSize(width:640,height:240)).image{context in
+            UIColor.white.setFill();context.fill(CGRect(x:0,y:0,width:640,height:240))
+            (text as NSString).draw(at:CGPoint(x:100,y:80),withAttributes:[.font:UIFont.systemFont(ofSize:48),.foregroundColor:UIColor.black])
+        }
+        return "data:image/png;base64,"+(try XCTUnwrap(image.pngData())).base64EncodedString()
+    }
+    private func waitForReaderImages(_ view:WKWebView,count:Int)async throws{
+        let deadline=Date().addingTimeInterval(15)
+        while Date()<deadline{
+            if (try? await view.evaluateJavaScript("document.images.length===\(count) && [...document.images].every(i=>i.complete)"))as? Bool==true{return}
+            try await Task.sleep(for:.milliseconds(100))
+        }
+        XCTFail("Reader images did not load")
+    }
+    private func stagedReader()async throws->(BrowserModel,WKWebView,ComicTranslation,UIWindow){
+        let root=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let model=BrowserModel(profiles:ProfileStore(root:root,downloadsRoot:root.appendingPathComponent("Downloads")),useBackgroundDownloads:false)
+        model.data.settings.shieldsEnabled=false
+        var provider=AIProviderConfiguration();provider.baseURL="http://127.0.0.1:8765/v1";provider.model="comic-"+UUID().uuidString;model.data.settings.aiProviders=[provider]
+        var prefs=ComicPreferences();prefs.mode = .fastest;prefs.source="en";prefs.engine = .existing;prefs.restorationEnabled=true;prefs.readAhead=true
+        var translation=TranslationPreferences();translation.engine = .ai;translation.providerID=provider.id;translation.target="ar";prefs.translation=translation;model.data.settings.comicTranslation=prefs
+        let tab=try XCTUnwrap(model.current);tab.url="http://127.0.0.1:8765/staged-reader"
+        let prepared=await model.prepare(tab),view=try XCTUnwrap(prepared),session=try XCTUnwrap(tab.comicTranslation)
+        let scene=try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap{$0 as? UIWindowScene}.first)
+        let window=UIWindow(windowScene:scene);window.frame=scene.screen.bounds;window.rootViewController=UIViewController();view.frame=window.bounds;window.rootViewController?.view.addSubview(view);window.makeKeyAndVisible()
+        return(model,view,session,window)
+    }
     func testRuntimeReportsAnAvailableMemoryBudget(){
         XCTAssertGreaterThan(zeus_comic_available_memory(),0,"A zero Simulator process-budget result must not silently disable every neural restoration")
     }
@@ -915,6 +1009,19 @@ import ZeusComicRuntime
         let found=await ComicMemory.shared.data(profile:first,layer:.reading,key:"same"),other=await ComicMemory.shared.data(profile:second,layer:.reading,key:"same"),translation=await ComicMemory.shared.data(profile:first,layer:.translation,key:"same")
         XCTAssertEqual(found,bytes);XCTAssertNil(other);XCTAssertNil(translation);try await ComicMemory.shared.clear(profile:first)
     }
+}
+
+private actor ComicRestorationPreparationGate{
+    private var ready=false,started=false
+    private var continuation:CheckedContinuation<Void,Never>?
+    func isReady()->Bool{ready}
+    func hasStarted()->Bool{started}
+    func prepare()async{
+        started=true
+        if ready{return}
+        await withCheckedContinuation{continuation=$0}
+    }
+    func finish(){ready=true;continuation?.resume();continuation=nil}
 }
 
 private final class ComicGoogleStub:URLProtocol{

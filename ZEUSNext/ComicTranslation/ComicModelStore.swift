@@ -47,6 +47,12 @@ actor ComicModelStore {
         guard try Self.valid(url,artifact:artifact)else{return false}
         verified[artifact.name]=modified;return true
     }
+    func isRestorationPrepared()->Bool{
+        ["ctd.onnx","lama.onnx"].allSatisfy{name in
+            guard let artifact=Self.catalog.first(where:{$0.name==name})else{return false}
+            return (try? validLocal(artifact)) == true
+        }
+    }
     func isPrepared(source:String) -> Bool {
         let name=Self.recognizer(source)
         return ["det.onnx",name+".onnx",name+".yml"].allSatisfy { file in
