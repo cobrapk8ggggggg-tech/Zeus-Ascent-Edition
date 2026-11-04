@@ -71,11 +71,15 @@ import CryptoKit
         var translations:[String:String]=[:],translationSource:[String:String]=[:]
         for target in ["ar","en"]{
             let subset=candidates.filter{($0.chapter.language.hasPrefix("ar") ? "en":"ar")==target}
-            for start in stride(from:0,to:subset.count,by:12){
-                let batch=Array(subset[start..<min(subset.count,start+12)])
+            // The browser sends the page's OCR language to the provider.
+            // Using provider-side "auto" here would hide a wrong language vote.
+            for source in Set(subset.map(\.language)).sorted(){
+              let selected=subset.filter{$0.language==source}
+              for start in stride(from:0,to:selected.count,by:12){
+                let batch=Array(selected[start..<min(selected.count,start+12)])
                 do{
                     var preferences=TranslationPreferences();preferences.target=target
-                    let result=try await ComicTextTranslator.translate(batch.map{TranslationSegment(id:$0.id,text:$0.speech.text)},source:"auto",target:target,preferences:preferences,provider:nil,secret:"",local:false,engine:.google)
+                    let result=try await ComicTextTranslator.translate(batch.map{TranslationSegment(id:$0.id,text:$0.speech.text)},source:source,target:target,preferences:preferences,provider:nil,secret:"",local:false,engine:.google)
                     for row in result{translations[row.id]=row.text;translationSource[row.id]="Google batch"}
                 }catch let partial as ComicPartialTranslation{
                     let success=Dictionary(uniqueKeysWithValues:partial.translated.map{($0.id,$0.text)})
@@ -84,6 +88,7 @@ import CryptoKit
                     for row in batch{translations[row.id]=row.speech.text;translationSource[row.id]="provider unavailable; original retained: \(error.localizedDescription)"}
                 }
                 try await Task.sleep(for:.seconds(1))
+              }
             }
         }
         var results:[Result]=[]
@@ -116,7 +121,7 @@ import CryptoKit
             print("CORPUS RENDER \(candidate.id) \(route)")
         }
         try jsonAttachment(results,"native-corpus-cases");try jsonAttachment(pageNotes,"native-corpus-pages")
-        try jsonAttachment(["app_source_commit":manifest.app_source_commit,"probe_source_commit":manifest.probe_source_commit,"memory_guard_bypassed":"simulator inference only","quality_acceptance_proven":"false","cases":String(results.count)],"native-corpus-provenance")
+        try jsonAttachment(["app_source_commit":manifest.app_source_commit,"probe_source_commit":manifest.probe_source_commit,"memory_guard_bypassed":"simulator inference only","source_language_policy":"page OCR language, matching browser pipeline","quality_acceptance_proven":"false","cases":String(results.count)],"native-corpus-provenance")
         await ComicRestoration.shared.purge();await ComicPaddle.shared.purge();await ComicOCR.shared.purge()
     }
 }
