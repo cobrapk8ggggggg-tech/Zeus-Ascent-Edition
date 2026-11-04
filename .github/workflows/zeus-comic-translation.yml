@@ -89,7 +89,7 @@ jobs:
         if: matrix.sdk == 'iphonesimulator'
         run: |
           set -o pipefail
-          xcodebuild -project ZEUSNext.xcodeproj -scheme ZEUSNext -sdk iphonesimulator -destination "platform=iOS Simulator,id=$COMIC_SIMULATOR" -derivedDataPath "$RUNNER_TEMP/ZeusComicSim" -resultBundlePath results/comic.xcresult -only-testing:ZEUSNextTests/NativeComicTranslationTests -only-testing:ZEUSNextTests/NativeCloudAccountTests/testFreshGuestNeedsNoAccountAndPersistsWithoutClaimingDevice -only-testing:ZEUSNextTests/NativeCloudAccountTests/testGuestCannotOpenOwnedAgentOrAuthorizeCloudRequests -parallel-testing-enabled NO -test-timeouts-enabled YES -default-test-execution-time-allowance 90 -maximum-test-execution-time-allowance 120 test CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- 2>&1 | tee results/simulator.log
+          xcodebuild -project ZEUSNext.xcodeproj -scheme ZEUSNext -sdk iphonesimulator -destination "platform=iOS Simulator,id=$COMIC_SIMULATOR" -derivedDataPath "$RUNNER_TEMP/ZeusComicSim" -resultBundlePath results/comic.xcresult -only-testing:ZEUSNextTests/NativeComicTranslationTests -only-testing:ZEUSNextTests/NativeCloudAccountTests -parallel-testing-enabled NO -test-timeouts-enabled YES -default-test-execution-time-allowance 90 -maximum-test-execution-time-allowance 120 test CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- 2>&1 | tee results/simulator.log
       - name: Collect simulator diagnostics
         if: always() && matrix.sdk == 'iphonesimulator'
         timeout-minutes: 2

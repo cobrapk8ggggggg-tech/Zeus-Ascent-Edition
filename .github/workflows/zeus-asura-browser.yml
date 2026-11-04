@@ -1,0 +1,70 @@
+name: Complete Asura chapter without scrolling
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/comic-translation-reliability]
+    paths: ['tools/asura-reader/**', '.github/workflows/zeus-asura-browser.yml', 'ZEUSNext/ComicTranslation/**', 'ZEUSNext/Resources/comic-images.js']
+permissions:
+  contents: read
+concurrency:
+  group: zeus-live-asura-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  live:
+    runs-on: macos-15
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: maxim-lobanov/setup-xcode@v1
+        with: {xcode-version: '26.3'}
+      - run: brew install xcodegen ninja cmake
+      - run: bash .zeus-ci/comic/build_runtime.sh iphonesimulator
+      - name: Prepare the actual browser test
+        run: |
+          mkdir -p results
+          cp tools/asura-reader/AsuraReaderProbe.swift .openminis/Host/NativeComicTranslationTests.swift
+          xcrun swiftc -frontend -parse .openminis/Host/NativeComicTranslationTests.swift
+          python3 .zeus-ci/project.py
+          xcodegen generate --spec zeus-project.json
+      - name: Initialize the simulator catalogue
+        timeout-minutes: 4
+        run: xcrun simctl list devices available -j > results/simulators.json
+      - name: Boot an available simulator
+        timeout-minutes: 15
+        run: python3 .zeus-ci/comic/boot_simulator.py
+      - name: Prepare all 27 pinned original chapter images
+        run: |
+          python3 tools/asura-reader/prepare.py
+          python3 -m http.server 8781 --directory tools/asura-reader > results/images.log 2>&1 &
+          curl --fail --max-time 5 --retry 10 --retry-connrefused http://127.0.0.1:8781/index.html > /dev/null
+      - name: Run actual WebKit, local OCR, restoration and Google on the whole chapter
+        timeout-minutes: 35
+        run: |
+          set -o pipefail
+          xcodebuild -project ZEUSNext.xcodeproj -scheme ZEUSNext -configuration Release -sdk iphonesimulator -destination "platform=iOS Simulator,id=$COMIC_SIMULATOR" -derivedDataPath "$RUNNER_TEMP/ZeusAsuraLive" -resultBundlePath results/asura.xcresult -only-testing:ZEUSNextTests/NativeComicTranslationTests -parallel-testing-enabled NO -test-timeouts-enabled YES -default-test-execution-time-allowance 1700 -maximum-test-execution-time-allowance 1800 test CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- ENABLE_TESTABILITY=YES ONLY_ACTIVE_ARCH=YES ARCHS=arm64 2>&1 | tee results/live.log
+      - name: Export evidence and skip status
+        if: always()
+        run: |
+          git rev-parse HEAD > results/probe-source-commit.txt
+          git rev-parse HEAD > results/app-source-commit.txt
+          if [ -f results/asura.xcresult/Info.plist ]; then
+            xcrun xcresulttool get test-results summary --path results/asura.xcresult > results/summary.json
+            xcrun xcresulttool export attachments --path results/asura.xcresult --output-path results/screenshots
+          fi
+      - name: Require an executed live reader test
+        if: always()
+        run: |
+          python3 - <<'PYCODE'
+          import json,pathlib
+          path=pathlib.Path('results/summary.json')
+          assert path.exists(), 'The live browser test did not execute'
+          summary=json.loads(path.read_text())
+          assert summary.get('passedTests')==2 and summary.get('skippedTests')==0 and summary.get('failedTests')==0, 'The live reader was not verified; inspect the evidence'
+          PYCODE
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: live-asura-reader-evidence
+          path: results
+          retention-days: 14

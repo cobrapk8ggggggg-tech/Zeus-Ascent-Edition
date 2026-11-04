@@ -6,7 +6,7 @@
   const documentID = uuid();
   const records = new Map(), ids = new WeakMap(), transfers = new Map();
   const outputs=new Map();
-  let sequence = 0, generation = 0, active = false, showingOriginal = false, sessionTicket = null, observerTimer, viewportTimer;
+  let sequence = 0, generation = 0, active = false, showingOriginal = false, sessionTicket = null, observerTimer, viewportTimer, prefetchTimer, wholeChapter = false;
   const lazyAttributes = ['data-src','data-lazy-src','data-original','data-lazy','data-url','data-echo','data-cfsrc','data-pagespeed-lazy-src','data-ks-lazyload'];
   const absolute = v => { try { return new URL(v, location.href).href; } catch { return ''; } };
   const css = (el,n) => [el.style.getPropertyValue(n),el.style.getPropertyPriority(n)];
@@ -72,7 +72,9 @@
     const best=[...groups.values()].filter(v=>v.length>=3).sort((a,b)=>b.length-a.length)[0];
     return new Set(best||[]);
   }
+  function wakeChapter(){clearTimeout(prefetchTimer);prefetchTimer=setTimeout(()=>{if(active&&wholeChapter&&!showingOriginal)scan(true)},50);}
   function scan(wake=true) {
+    wholeChapter=wake;
     const items=[], viewport=visualViewport?.height||innerHeight,chapter=wake ? chapterImages():new Set();
     let woken=0;
     for(const el of document.images) {
@@ -83,8 +85,8 @@
       let desired=''; for(const key of lazyAttributes){const value=el.getAttribute(key);if(value&&/^https?:/i.test(absolute(value))){desired=absolute(value);break;}}
       const source=sourceOf(r);
       const waiting=(!el.complete||!el.naturalWidth||!!desired&&desired!==source&&!r.original);
-      if(wake&&waiting&&(member||box.top<viewport*8)&&woken<4){if(el.loading==='lazy')el.loading='eager';if(desired&&r.woken!==desired){el.src=desired;r.woken=desired;}woken++;}
-      items.push({id:r.id,source:shortSource(sourceOf(r),r.id,r.revision),kind:r.kind,width:r.original?.width||el.naturalWidth||0,height:r.original?.height||el.naturalHeight||0,x:box.left+scrollX,y:box.top+scrollY,w:box.width,h:box.height,pending:waiting,revision:String(r.revision),referrerPolicy:policyOf(r)});
+      if(wake&&waiting&&!r.loadFailed&&(member||box.top<viewport*8)&&woken<4){if(el.loading==='lazy')el.loading='eager';if(desired&&r.woken!==desired){el.src=desired;r.woken=desired;}woken++;}
+      items.push({id:r.id,source:shortSource(sourceOf(r),r.id,r.revision),kind:r.kind,width:r.original?.width||el.naturalWidth||0,height:r.original?.height||el.naturalHeight||0,x:box.left+scrollX,y:box.top+scrollY,w:box.width,h:box.height,pending:waiting,loadFailed:!!r.loadFailed&&r.loadRetries>=2,revision:String(r.revision),referrerPolicy:policyOf(r)});
     }
     observer.takeRecords(); // Our lazy-source writes are not a new page revision.
     for(const el of document.querySelectorAll('canvas,[style*="background-image"]')) {
@@ -248,8 +250,18 @@
     if(external){clearTimeout(observerTimer);observerTimer=setTimeout(()=>notify('changed'),200);}
   });
   observer.observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['src','srcset','style']});
-  document.addEventListener('load',e=>{if(active&&e.target?.tagName==='IMG'&&!records.get(ids.get(e.target))?.original)notify('loaded');},true);
-  document.addEventListener('error',e=>{if(active&&e.target?.tagName==='IMG')notify('image-error');},true);
+  document.addEventListener('load',e=>{
+    const r=records.get(ids.get(e.target));
+    if(active&&e.target?.tagName==='IMG'&&!r?.original){if(r)r.loadFailed=false;notify('loaded');wakeChapter();}
+  },true);
+  document.addEventListener('error',e=>{
+    if(!active||e.target?.tagName!=='IMG')return;
+    const r=records.get(ids.get(e.target));notify('image-error');
+    if(!r||r.original)return;r.loadFailed=true;wakeChapter();
+    if((r.loadRetries||0)>=2)return;
+    const attempt=r.loadRetries=(r.loadRetries||0)+1;
+    setTimeout(()=>{if(!active||!r.el.isConnected||r.original)return;r.loadFailed=false;r.el.src=r.woken||sourceOf(r);observer.takeRecords();},attempt===1?2000:6000);
+  },true);
   addEventListener('resize',()=>{if(active)notify('viewport');},{passive:true});
   addEventListener('scroll',()=>{if(!active)return;clearTimeout(viewportTimer);viewportTimer=setTimeout(()=>notify('viewport'),120);},{passive:true});
   addEventListener('pageshow',e=>{if(e.persisted)restore();notify('ready');});

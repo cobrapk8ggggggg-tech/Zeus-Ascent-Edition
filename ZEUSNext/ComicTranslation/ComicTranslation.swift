@@ -179,7 +179,8 @@ import CoreGraphics
         let generation=try await call("return zeusComic.resume(mark,ticket)",args:["mark":mark,"ticket":ticket.uuidString],frame:frame)as? Int ?? 0
         let value=try await call("return zeusComic.scan(wake)",args:["wake":prefs.readAhead],frame:frame)
         let data=try JSONSerialization.data(withJSONObject:value),envelope=try JSONDecoder().decode(ComicEnvelope.self,from:data)
-        guard envelope.document==document else{return};documents[document]=envelope;sawImages = sawImages || !envelope.items.isEmpty;pendingImages = pendingImages || envelope.items.contains(where: \.pending)
+        guard envelope.document==document else{return};documents[document]=envelope;sawImages = sawImages || !envelope.items.isEmpty;pendingImages = pendingImages || envelope.items.contains(where: {$0.pending && $0.loadFailed != true})
+        if envelope.items.contains(where:{$0.loadFailed == true}){sweepFailure=true;contextNotice="تعذّر تحميل بعض صور الفصل بعد إعادة المحاولة. يمكنك إعادة المحاولة عند تحسن الاتصال."}
         let ordered=envelope.items.filter{!$0.pending&&$0.width>0&&$0.height>0}.sorted{a,b in
             let d1=max(0,a.y-envelope.scroll-envelope.viewport,envelope.scroll-a.y-a.h),d2=max(0,b.y-envelope.scroll-envelope.viewport,envelope.scroll-b.y-b.h);return d1<d2
         }

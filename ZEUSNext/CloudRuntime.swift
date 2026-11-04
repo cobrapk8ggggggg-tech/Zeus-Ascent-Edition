@@ -170,12 +170,14 @@ actor CloudCheckpointGate {
         try await commitExecutionChoice(value)
     }
     static func commitExecutionChoice(_ value:Bool)async throws{
-        guard usesCloud == value else{return}
+        guard usesCloud == value,let selectedOwner=ownerID else{return}
         try await prepareBrowserBackup?()
+        guard ownerID==selectedOwner,usesCloud==value else{throw CloudAccountError.wrongOwner}
         await CloudCheckpointGate.shared.enter()
         do {
             let api = try transport()
             guard let head = try await api.head() else { throw CloudAccountError.incomplete("لم تكتمل نسخة الحساب بعد.") }
+            guard ownerID==selectedOwner,usesCloud==value else{throw CloudAccountError.wrongOwner}
             var manifest = head.manifest; manifest.executionTarget = value ? "cloud" : "local"; manifest.executionChoiceVersion = 2
             if value { manifest.coverage = Array(Set(manifest.coverage + ["cloud_runtime"])) }
             _ = try await api.commit(manifest, expected: head.revision, operation: UUID())

@@ -107,6 +107,7 @@ struct ComicCandidate: Codable, Identifiable {
     var pending: Bool
     var revision: String
     var referrerPolicy: String?
+    var loadFailed:Bool? = nil
 }
 struct ComicEnvelope: Codable {
     var document: String

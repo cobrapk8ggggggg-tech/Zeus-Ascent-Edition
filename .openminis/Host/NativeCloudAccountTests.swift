@@ -1,5 +1,9 @@
 import XCTest
+#if canImport(ZEUSBrowser)
 @testable import ZEUSBrowser
+#else
+@testable import ZEUSNext
+#endif
 
 @MainActor final class NativeCloudAccountTests: XCTestCase {
     private func temporary() throws -> URL {

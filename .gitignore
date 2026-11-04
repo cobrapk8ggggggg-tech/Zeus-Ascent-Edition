@@ -27,3 +27,7 @@ __pycache__/
 .zeus-ci/comic/lab/data/
 .zeus-ci/comic/lab/output/
 .zeus-ci/comic/lab/models/
+
+# Reproducible Asura reader downloads.
+tools/asura-reader/images/
+tools/asura-reader/index.html
