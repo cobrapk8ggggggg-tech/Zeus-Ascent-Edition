@@ -38,7 +38,8 @@ import WebKit
         let defaults=UserDefaults.standard,legacy=defaults.data(forKey:"browser_saved_tabs_list")
         defer{if let legacy{defaults.set(legacy,forKey:"browser_saved_tabs_list")}else{defaults.removeObject(forKey:"browser_saved_tabs_list")}}
         var tab=SavedTab();tab.url="https://owner-private.example/";tab.title="Owner's legacy tab"
-        defaults.set(try JSONEncoder().encode([tab]),forKey:"browser_saved_tabs_list")
+        let legacyPayload=try JSONEncoder().encode([tab])
+        defaults.set(legacyPayload,forKey:"browser_saved_tabs_list")
         let root=try temporary(),guest=ProfileStore(root:root,downloadsRoot:root.appendingPathComponent("Downloads"),allowLegacyImport:false)
         XCTAssertEqual(guest.active.legacyWebsiteStore,false)
         XCTAssertFalse(guest.load(guest.active).tabs.contains{$0.url==tab.url})
@@ -50,7 +51,7 @@ import WebKit
         await model.resetApplication()
         let remaining=await withCheckedContinuation{c in ownerStore.getAllCookies{c.resume(returning:$0)}}
         XCTAssertTrue(remaining.contains{$0.name==cookie.name},"Resetting the guest must not erase owner's legacy cookies")
-        XCTAssertEqual(defaults.data(forKey:"browser_saved_tabs_list"),try JSONEncoder().encode([tab]),"Guest reset must not clear owner's legacy settings")
+        XCTAssertEqual(defaults.data(forKey:"browser_saved_tabs_list"),legacyPayload,"Guest reset must not clear owner's legacy settings")
         await withCheckedContinuation{(c:CheckedContinuation<Void,Never>)in ownerStore.delete(cookie){c.resume()}}
         XCTAssertFalse(cookies.contains{$0.name==cookie.name},"An owned legacy cookie store must not be reused by a guest")
     }
