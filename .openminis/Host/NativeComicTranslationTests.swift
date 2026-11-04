@@ -555,6 +555,10 @@ import ZeusComicRuntime
         var prefs=ComicPreferences();let original=prefs.renderIdentity;prefs.bypassQualityChecks=true
         XCTAssertNotEqual(original,prefs.renderIdentity,"Strict and unchecked output must never share cached images")
     }
+    func testImageTranslationButtonsUseAvailableSystemSymbols(){
+        XCTAssertNotNil(UIImage(systemName:BrowserAction.translateImages.symbol))
+        XCTAssertNotNil(UIImage(systemName:SettingsCategory.imageTranslation.symbol))
+    }
     func testCloudTensorTransportRoundTripsWithoutLosingFloatBits()throws{
         let values:[Float]=[0,1,-1,0.3,Float.leastNonzeroMagnitude,123.456]
         let decoded=try ComicCloudRestoration.unpack(ComicCloudRestoration.pack(values),count:values.count)

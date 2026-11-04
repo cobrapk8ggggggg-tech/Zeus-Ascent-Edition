@@ -45,7 +45,7 @@ struct ComicSettingsSheet: View {
         Form {
             Section {
                 VStack(alignment:.leading,spacing:12) {
-                    Label("الكلمات في مكانها",systemImage:"character.viewfinder").font(.title2.bold())
+                    Label("الكلمات في مكانها",systemImage:"photo").font(.title2.bold())
                     Text("ترجمة فقاعات الصور إلى لغتك، وأنت تقرأ.").font(.subheadline).foregroundStyle(.secondary)
                     Button { model.current?.comicTranslation?.start();dismiss() } label: {
                         Label("ترجمة الصور الآن",systemImage:"sparkles").frame(maxWidth:.infinity,minHeight:44)
@@ -318,7 +318,7 @@ struct ComicTranslationCard: View {
         Button { expanded.toggle() } label: {
             HStack(spacing:10) {
                 if session.running { ProgressView().controlSize(.small) }
-                else { Image(systemName:session.error == nil ? "character.viewfinder":"exclamationmark.circle").foregroundStyle(session.error == nil ? Color.accentColor:Color.orange) }
+                else { Image(systemName:session.error == nil ? "photo":"exclamationmark.circle").foregroundStyle(session.error == nil ? Color.accentColor:Color.orange) }
                 VStack(alignment:.leading,spacing:3) {
                     Text(session.showingOriginal ? "عرض الأصل":session.phase.title).font(.subheadline.weight(.semibold))
                     Text(session.detectedTexts == 0 && session.phase == .completed ? "لم يُعثر على نص في الصور المتاحة":"\(session.detectedTexts) نصوص مكتشفة · \(session.translatedTexts) مترجمة")
@@ -333,7 +333,7 @@ struct ComicTranslationCard: View {
             Button {
                 switching=true
                 Task { await session.toggleOriginal();switching=false }
-            } label: { Image(systemName:session.showingOriginal ? "character.viewfinder":"photo").frame(minWidth:44,minHeight:44) }
+            } label: { Image(systemName:session.showingOriginal ? "photo":"photo").frame(minWidth:44,minHeight:44) }
                 .disabled(switching).accessibilityLabel(session.showingOriginal ? "عرض الترجمة":"عرض الأصل")
                 .accessibilityIdentifier("imageTranslationOriginal")
             if session.running {

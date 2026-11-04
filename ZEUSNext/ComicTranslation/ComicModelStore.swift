@@ -75,6 +75,13 @@ actor ComicModelStore {
         await onProgress?(files.count,files.count)
     }
     static func recognizer(_ language:String)->String { if language.hasPrefix("ko"){return "korean"};if language.hasPrefix("ja")||language.hasPrefix("zh"){return "han"};if ["ar","fa","ur"].contains(where:language.hasPrefix){return "arabic"};if ["ru","uk","bg","sr"].contains(where:language.hasPrefix){return "cyrillic"};if language.hasPrefix("el"){return "greek"};if ["hi","mr","ne"].contains(where:language.hasPrefix){return "devanagari"};if language.hasPrefix("th"){return "thai"};if language.hasPrefix("ta"){return "tamil"};if language.hasPrefix("te"){return "telugu"};return "latin" }
+    func removeRestoration()throws{
+        generation=UUID();loading.values.forEach{$0.cancel()};loading.removeAll();verified.removeAll()
+        for name in ["ctd.onnx","lama.onnx","ctd.onnx.part","lama.onnx.part"]{
+            let url=Self.root.appendingPathComponent(name)
+            if FileManager.default.fileExists(atPath:url.path){try FileManager.default.removeItem(at:url)}
+        }
+    }
     func removeAll()throws{
         generation=UUID();loading.values.forEach{$0.cancel()};loading.removeAll();verified.removeAll()
         if FileManager.default.fileExists(atPath:Self.root.path){try FileManager.default.removeItem(at:Self.root)}

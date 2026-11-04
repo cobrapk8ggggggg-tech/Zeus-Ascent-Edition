@@ -400,7 +400,7 @@ import CoreGraphics
                                 restored=ComicRestoration.Result(image:next.image,restored:already.union(next.restored),notice:next.notice,retryable:next.retryable)
                                 try valid(ticket)
                                 if reading.repairUnavailable != true{try await saveCleanup(restored.image,ids:restored.restored,job:job)}
-                                if let notice=restored.notice{contextNotice=notice;sweepFailure=true;renderingPartial=true;retryPartial = retryPartial || restored.retryable}
+                                if let notice=restored.notice{contextNotice=notice;if !(prefs.bypassQualityChecks ?? false){sweepFailure=true;renderingPartial=true;retryPartial = retryPartial || restored.retryable}}
                             }
                         }else{restored=ComicRestoration.Result(image:image,restored:[],notice:nil)}
                         let result=try await Task.detached{let drawing=try ComicPixels.renderReport(restored.image,speeches:core,translations:lettering,target:translation.target,fontName:prefs.fontName,fontScale:prefs.fontScale,textColor:prefs.textColor,ink:prefs.inkStyle,letterSpacing:prefs.letterSpacing ?? 0,requireCleanSource:!(prefs.bypassQualityChecks ?? false),precleanedIDs:restored.restored,styleSource:image,allowEmpty:true)
