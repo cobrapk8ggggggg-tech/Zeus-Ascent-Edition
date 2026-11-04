@@ -284,7 +284,7 @@ enum BrowserDisk {
     func resetAll() async throws {
         guard active.isAdmin else { throw AccountError.permission }
         for profile in profiles { try await ComicMemory.shared.clear(profile: profile.id, deleting: true) }
-        try await ComicMemory.shared.clearAll()
+        if root.standardizedFileURL == BrowserDisk.applicationRoot.standardizedFileURL{try await ComicMemory.shared.clearAll()}
         await ComicLocalTranslator.shared.unload()
         let old = profiles
         for profile in old {

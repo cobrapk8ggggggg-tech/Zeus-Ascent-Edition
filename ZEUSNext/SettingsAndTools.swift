@@ -62,14 +62,20 @@ extension BrowserModel {
     func resetApplication() async {
         guard profile.isAdmin else { notify(AccountError.permission.localizedDescription); return }
         FaviconMemory.purge()
-        _ = try? await BrowserDisk.clearLegacyImageCache()
-        URLCache.shared.removeAllCachedResponses()
+        let sharedInstallation = profiles.root.standardizedFileURL == BrowserDisk.applicationRoot.standardizedFileURL
+        if sharedInstallation{
+            _ = try? await BrowserDisk.clearLegacyImageCache()
+            URLCache.shared.removeAllCachedResponses()
+        }
         for tab in tabs { tab.dispose() }
         for item in profiles.profiles { shield.erase(item.id); downloads.removeAll(profileID: item.id) }
         do { try await profiles.resetAll() } catch { notify(error.localizedDescription); return }
-        await WKWebsiteDataStore.default().removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast)
-        for cookie in HTTPCookieStorage.shared.cookies ?? [] { HTTPCookieStorage.shared.deleteCookie(cookie) }
-        if let identifier = Bundle.main.bundleIdentifier { UserDefaults.standard.removePersistentDomain(forName: identifier) }
-        requiresUnlock = false; data = ProfileData(); closeAllTabs(); persist(); notify("مُسحت بيانات التطبيق وأُنشئ حساب رئيسي جديد.")
+        if sharedInstallation{
+            await WKWebsiteDataStore.default().removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast)
+            for cookie in HTTPCookieStorage.shared.cookies ?? [] { HTTPCookieStorage.shared.deleteCookie(cookie) }
+            if let identifier = Bundle.main.bundleIdentifier { UserDefaults.standard.removePersistentDomain(forName: identifier) }
+        }
+        requiresUnlock = false; data = ProfileData(); closeAllTabs(); persist()
+        notify(sharedInstallation ? "مُسحت بيانات التطبيق وأُنشئ حساب رئيسي جديد.":"مُسحت بيانات هذه المساحة فقط. بيانات الحساب الآخر محفوظة.")
     }
 }

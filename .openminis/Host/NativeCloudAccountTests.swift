@@ -46,6 +46,11 @@ import WebKit
         let ownerStore=WKWebsiteDataStore.default().httpCookieStore
         await withCheckedContinuation{(c:CheckedContinuation<Void,Never>)in ownerStore.setCookie(cookie){c.resume()}}
         let cookies=await withCheckedContinuation{c in guest.websiteDataStore(for:guest.active).httpCookieStore.getAllCookies{c.resume(returning:$0)}}
+        let model=BrowserModel(profiles:guest,useBackgroundDownloads:false)
+        await model.resetApplication()
+        let remaining=await withCheckedContinuation{c in ownerStore.getAllCookies{c.resume(returning:$0)}}
+        XCTAssertTrue(remaining.contains{$0.name==cookie.name},"Resetting the guest must not erase owner's legacy cookies")
+        XCTAssertEqual(defaults.data(forKey:"browser_saved_tabs_list"),try JSONEncoder().encode([tab]),"Guest reset must not clear owner's legacy settings")
         await withCheckedContinuation{(c:CheckedContinuation<Void,Never>)in ownerStore.delete(cookie){c.resume()}}
         XCTAssertFalse(cookies.contains{$0.name==cookie.name},"An owned legacy cookie store must not be reused by a guest")
     }
