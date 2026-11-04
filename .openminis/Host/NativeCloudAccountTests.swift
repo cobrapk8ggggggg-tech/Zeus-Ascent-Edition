@@ -8,6 +8,27 @@ import XCTest
         addTeardownBlock { try? FileManager.default.removeItem(at: root) }
         return root
     }
+    func testFreshGuestNeedsNoAccountAndPersistsWithoutClaimingDevice()throws{
+        let root=try temporary(),defaults=try XCTUnwrap(UserDefaults(suiteName:UUID().uuidString))
+        let owner=CloudLocalOwner(root:root),previous=NativeLocalExecutionBoundary.shared.isAllowed
+        defer{NativeLocalExecutionBoundary.shared.setAllowed(previous)}
+        let guest=CloudAccount(owner:owner,defaults:defaults);guest.enterGuest()
+        XCTAssertEqual(guest.phase,.guest);XCTAssertNil(guest.identity);XCTAssertNil(try owner.read())
+        XCTAssertTrue(guest.allowsGuestLocalExecution)
+        let reopened=CloudAccount(owner:owner,defaults:defaults);reopened.start()
+        XCTAssertEqual(reopened.phase,.guest);XCTAssertTrue(reopened.allowsGuestLocalExecution)
+    }
+    func testGuestCannotOpenOwnedAgentOrAuthorizeCloudRequests()async throws{
+        let root=try temporary(),owner=CloudLocalOwner(root:root),id=UUID()
+        try owner.claim(id)
+        let previous=NativeLocalExecutionBoundary.shared.isAllowed
+        defer{NativeLocalExecutionBoundary.shared.setAllowed(previous)}
+        let guest=CloudAccount(owner:owner,defaults:try XCTUnwrap(UserDefaults(suiteName:UUID().uuidString)))
+        guest.enterGuest();XCTAssertTrue(guest.guestIsolated);XCTAssertFalse(guest.allowsGuestLocalExecution)
+        XCTAssertFalse(NativeLocalExecutionBoundary.shared.isAllowed);XCTAssertEqual(try owner.read(),id)
+        do{_ = try await guest.authorization(for:id);XCTFail("Guest must not authorize owner's data")}catch{}
+        XCTAssertFalse(CloudGuestStorage.root.path.hasPrefix(BrowserDisk.applicationRoot.path+"/"))
+    }
     func testCloudIsDefaultForFreshAndOldUncommittedPreference() {
         let owner = UUID()
         XCTAssertTrue(CloudExecutionPreference.resolved(owner: owner, secure: nil, disk: nil))

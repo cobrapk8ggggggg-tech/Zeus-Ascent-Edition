@@ -76,3 +76,19 @@ test('changing lettering settings preserves the source revision and image identi
  await new Promise(r=>setTimeout(r,0));s.bridge.resume('second','session');await new Promise(r=>setTimeout(r,0));const fresh=s.bridge.scan(false).items[0];assert.equal(fresh.id,c.id);assert.equal(fresh.revision,c.revision);assert.equal(fresh.source,c.source);
  }finally{s.close()}
 });
+
+test('whole Asura chapter is discovered without scrolling and cover is excluded',()=>{
+ const s=setup('<img src="/cover.webp">'+Array.from({length:27},(_,i)=>`<img data-page-index="${i}" src="/chapter/${i}.webp">`).join(''));
+ try{[...s.w.document.images].forEach((el,i)=>{el.getBoundingClientRect=()=>({left:0,top:i*16000,right:800,bottom:i*16000+16000,width:800,height:16000})});
+ const all=s.bridge.scan(true).items;assert.equal(all.length,27);assert.ok(all.at(-1).source.endsWith('/26.webp'));assert.ok(!all.some(v=>v.source.endsWith('cover.webp')));
+ assert.equal(s.bridge.scan(false).items.length,1);
+ }finally{s.close()}
+});
+test('far reader lazy images wake without scrolling, in bounded batches',()=>{
+ const s=setup('<div id="readerarea">'+Array.from({length:12},(_,i)=>`<img data-pending="yes" data-src="/chapter/${i}.webp" src="/spinner.gif">`).join('')+'</div><aside><img src="/recommend.webp"></aside>');
+ try{[...s.w.document.images].forEach((el,i)=>{el.getBoundingClientRect=()=>({left:0,top:40000+i*2000,right:800,bottom:40001+i*2000,width:800,height:1})});
+ assert.equal(s.bridge.scan(true).items.length,12);assert.equal([...s.w.document.images].filter(el=>el.src.includes('/chapter/')).length,4);
+ for(const el of [...s.w.document.images].slice(0,4))el.dataset.pending='no';s.bridge.scan(true);
+ assert.equal([...s.w.document.images].filter(el=>el.src.includes('/chapter/')).length,8);
+ }finally{s.close()}
+});

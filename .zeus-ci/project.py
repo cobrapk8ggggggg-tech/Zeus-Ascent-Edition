@@ -45,7 +45,7 @@ spec = {
             }},
         },
         'ZEUSNextTests': {
-            'type': 'bundle.unit-test', 'platform': 'iOS', 'sources': ['ZEUSNextTests', '.openminis/Host/NativeComicTranslationTests.swift'],
+            'type': 'bundle.unit-test', 'platform': 'iOS', 'sources': ['ZEUSNextTests', '.openminis/Host/NativeComicTranslationTests.swift', '.openminis/Host/NativeCloudAccountTests.swift'],
             'dependencies': [{'target': 'ZEUSNext'}],
             'settings': {'base': {'GENERATE_INFOPLIST_FILE': 'YES', 'PRODUCT_BUNDLE_IDENTIFIER': 'tools.zeus.tests', 'TEST_HOST': '$(BUILT_PRODUCTS_DIR)/ZEUSNext.app/ZEUSNext', 'BUNDLE_LOADER': '$(TEST_HOST)'}},
         },

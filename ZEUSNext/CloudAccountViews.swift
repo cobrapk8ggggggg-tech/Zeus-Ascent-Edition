@@ -19,7 +19,10 @@ struct CloudAccountGate<Content: View>: View {
         .onOpenURL { url in Task { await account.handle(url) } }
     }
     @ViewBuilder private var gated: some View {
-        if account.phase == .ready && !account.passwordRecovery { content().id(account.identity?.id) }
+        if account.phase == .guest{
+            if account.guestIsolated{IsolatedGuestBrowser()}
+            else{content().id("unclaimed-local-guest")}
+        }else if account.phase == .ready && !account.passwordRecovery { content().id(account.identity?.id) }
         else { CloudWelcomeView(account: account) }
     }
 }
@@ -56,6 +59,13 @@ private struct CloudWelcomeView: View {
                             .multilineTextAlignment(.center)
                         VStack(spacing: 24) {
                             form
+                            if !account.passwordRecovery{
+                                Button("المتابعة كضيف دون حساب"){account.enterGuest()}
+                                    .font(.system(size:18,weight:.semibold)).disabled(account.busy)
+                                    .accessibilityIdentifier("continueAsGuest")
+                                Text("تُحفظ بيانات الضيف على هذا الجهاز. تسجيل الدخول اختياري للمزامنة.")
+                                    .font(.footnote).foregroundStyle(.white.opacity(0.65)).multilineTextAlignment(.center)
+                            }
                             if let issue = account.issue, account.phase != .blocked {
                                 Label(issue, systemImage: "exclamationmark.circle")
                                     .font(.footnote).foregroundStyle(.white.opacity(0.9)).textSelection(.enabled)
@@ -288,7 +298,7 @@ struct CloudPreparedBrowser<Content: View>: View {
     let content: () -> Content
     var body: some View {
         Group {
-            if sync.prepared { content() }
+            if CloudAccount.shared.phase == .guest || sync.prepared { content() }
             else {
                 VStack(spacing: 20) {
                     if switching { ProgressView(transitionProgress) }
@@ -324,6 +334,13 @@ struct CloudAccountSettingsView: View {
     init(model: BrowserModel) { self.model = model; self.sync = model.cloudSync }
     var body: some View {
         Form {
+            if account.phase == .guest{
+                Section("وضع الضيف"){
+                    Text("بياناتك محلية على هذا الجهاز. يمكنك تسجيل الدخول لتفعيل مزامنة الحساب.")
+                    Button("تسجيل الدخول أو إنشاء حساب"){model.persist();account.leaveGuest()}
+                        .accessibilityIdentifier("guestSignIn")
+                }
+            }else{
             Section("حساب ZEUS") {
                 LabeledContent("البريد", value: account.identity?.email ?? "غير مسجل")
                 Text("الحساب يملك بروفايلاتك الدائمة والوكيل المشترك بينها. كلمة مرور البروفايل المحلية مستقلة عن كلمة مرور حساب ZEUS.").font(.footnote)
@@ -359,9 +376,36 @@ struct CloudAccountSettingsView: View {
                 if let issue = account.issue { Text(issue).foregroundStyle(.orange) }
                 if let notice = account.notice { Text(notice).foregroundStyle(.secondary) }
             }
-        }.navigationTitle("الحساب والمزامنة").task { await nativeBackup.refreshUsage() }
+            }
+        }.navigationTitle("الحساب والمزامنة").task { if account.phase == .ready{await nativeBackup.refreshUsage()} }
             .confirmationDialog("تسجيل الخروج؟", isPresented: $signOutPrompt) {
                 Button("تسجيل الخروج", role: .destructive) { Task { await account.signOut() } }
             } message: { Text(sync.pending ? "توجد تغييرات لم تحفظ سحابيًا بعد. ستبقى محليًا في هذا التثبيت." : "تبقى نسخ الحساب محفوظة في السحابة.") }
+    }
+}
+
+// The root is outside the owner's browser/backup directory. Profile UUIDs give
+// guest cookies, provider secrets, downloads and translation caches their own scope.
+enum CloudGuestStorage{
+    static var root:URL{FileManager.default.urls(for:.applicationSupportDirectory,in:.userDomainMask)[0].appendingPathComponent("ZEUSLocalGuest",isDirectory:true)}
+}
+@MainActor private final class IsolatedGuestHolder:ObservableObject{
+    let model=BrowserModel(profiles:ProfileStore(root:CloudGuestStorage.root,downloadsRoot:CloudGuestStorage.root.appendingPathComponent("Downloads")),useBackgroundDownloads:false)
+}
+private struct IsolatedGuestBrowser:View{
+    @StateObject private var holder=IsolatedGuestHolder()
+    var body:some View{
+        #if ZEUS_NATIVE_HOST
+        BrowserRoot(model:holder.model,nativeAssistant:{_,presentation in
+            AnyView(VStack(spacing:20){
+                Text("مساعد الحساب محفوظ").font(.title2)
+                Text("سجّل الدخول لفتح محادثات وملفات مساعدك. تصفح الضيف وترجمة الصور متاحان في مساحة منفصلة.").multilineTextAlignment(.center)
+                Button("تسجيل الدخول"){holder.model.persist();CloudAccount.shared.leaveGuest()}
+                Button("إغلاق",action:presentation.close)
+            }.padding(30))
+        }).environment(\.nativeAgentPreferences,nil).environment(\.layoutDirection,.rightToLeft)
+        #else
+        BrowserRoot(model:holder.model).environment(\.layoutDirection,.rightToLeft)
+        #endif
     }
 }

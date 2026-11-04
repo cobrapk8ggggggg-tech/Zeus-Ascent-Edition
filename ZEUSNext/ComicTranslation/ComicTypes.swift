@@ -173,7 +173,7 @@ enum ComicIdentity {
         hash(segments.map{$0.id+"\0"+$0.text}.joined(separator:"\n"))
     }
     static func settings(_ preferences: ComicPreferences, translation: TranslationPreferences, provider: AIProviderConfiguration?) -> String {
-        hash("comic-v30|fallback:\(preferences.allowOnlineFallback ?? false)|\(preferences.mode.rawValue)|\(preferences.source)|\(translation.target)|" + TranslationMemory.namespace(page: "comic://content", preferences: translation, provider: provider))
+        hash("comic-v31|fallback:\(preferences.allowOnlineFallback ?? false)|\(preferences.mode.rawValue)|\(preferences.source)|\(translation.target)|" + TranslationMemory.namespace(page: "comic://content", preferences: translation, provider: provider))
     }
 }
 enum ComicGeometry {
@@ -192,7 +192,7 @@ enum ComicGeometry {
         guard candidate.height>0,viewport>0 else{return []}
         func bounds(_ r:ComicRegion)->(Double,Double){let scale=candidate.h/Double(candidate.height);return(candidate.y+Double(r.y+r.coreTop)*scale,candidate.y+Double(r.y+r.coreBottom)*scale)}
         func distance(_ r:ComicRegion)->Double{let (top,bottom)=bounds(r);return max(0,top-scroll-viewport,scroll-bottom)}
-        return regions.filter{r in let(top,bottom)=bounds(r);return bottom>=scroll-(readAhead ? viewport:0)&&top<=scroll+viewport*(readAhead ? 8:1)}.sorted{distance($0)<distance($1)}
+        return regions.filter{r in let(top,bottom)=bounds(r);return readAhead || (bottom>=scroll && top<=scroll+viewport)}.sorted{let a=distance($0),b=distance($1);return a == b ? $0.y<$1.y:a<b}
     }
     static func estimateAngle(_ lines:[ComicLine])->Double{
         // Baseline orientation comes from the OCR quadrilateral. The drift of

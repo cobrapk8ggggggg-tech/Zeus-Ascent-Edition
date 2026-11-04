@@ -148,7 +148,31 @@ actor ComicOCR {
         let scores=[("arabic",s.filter{(0x0600...0x06FF).contains($0.value)||(0xFE70...0xFEFF).contains($0.value)}.count),("korean",s.filter{(0xAC00...0xD7AF).contains($0.value)}.count),("han",s.filter{(0x3040...0x30FF).contains($0.value)||(0x4E00...0x9FFF).contains($0.value)}.count),("cyrillic",s.filter{(0x0400...0x052F).contains($0.value)}.count),("latin",s.filter{$0.value<=0x024F}.count)]
         return scores.max(by:{$0.1<$1.1}).flatMap{$0.1>=2 ? $0.0:nil} ?? "other"
     }
+    // ML Kit/Vision internally shrink very tall webtoon strips. Read bounded
+    // overlapping tiles at their real resolution so small captions survive.
     private func fast(_ image:CGImage,source:String)async throws->[ComicLine]{
+        var lines:[ComicLine]=[]
+        for area in Self.tiles(width:image.width,height:image.height){
+            try Task.checkCancellation()
+            guard let cut=image.cropping(to:area)else{continue}
+            var local=try await fastNative(cut,source:source)
+            // Fast mode remains entirely local and never needs restoration models.
+            if local.isEmpty{local=try Self.vision(cut,languages:[source],accurate:true)}
+            let translated=local.map{line -> ComicLine in
+                var value=line;value.rect=value.rect.offsetBy(dx:area.minX,dy:area.minY)
+                value.words=value.words?.map{ComicWord(text:$0.text,rect:$0.rect.offsetBy(dx:area.minX,dy:area.minY))};return value
+            }
+            lines=Self.merge(lines,accurate:translated)
+        }
+        return lines
+    }
+    static func tiles(width:Int,height:Int)->[CGRect]{
+        let size=1536,overlap=128
+        return stride(from:0,to:height,by:size-overlap).filter{$0==0 || $0+overlap<height}.flatMap{y in
+            stride(from:0,to:width,by:size-overlap).filter{$0==0 || $0+overlap<width}.map{x in CGRect(x:x,y:y,width:min(size,width-x),height:min(size,height-y))}
+        }
+    }
+    private func fastNative(_ image:CGImage,source:String)async throws->[ComicLine]{
         #if canImport(MLKitTextRecognition)
         let recognizer: TextRecognizer
         let script=source.hasPrefix("ko") ? "ko":source.hasPrefix("ja") ? "ja":source.hasPrefix("zh") ? "zh":"latin"
@@ -175,7 +199,7 @@ actor ComicOCR {
         let request=VNRecognizeTextRequest();request.automaticallyDetectsLanguage=automatic;request.recognitionLevel=accurate ? .accurate:.fast;let aliases=["ko":"ko-KR","ja":"ja-JP","zh":"zh-Hans","en":"en-US","ar":"ar-SA"]
         let supported=try request.supportedRecognitionLanguages()
         let requested=languages.map{aliases[$0] ?? $0}.filter{supported.contains($0)}
-        request.recognitionLanguages=requested.isEmpty ? ["en-US"]:requested;request.usesLanguageCorrection=false
+        request.recognitionLanguages=requested.isEmpty ? ["en-US"]:requested;request.usesLanguageCorrection=false;request.minimumTextHeight=0.003
         try VNImageRequestHandler(cgImage:image,options:[:]).perform([request])
         return (request.results ?? []).compactMap{r in
             guard let value=r.topCandidates(1).first else{return nil}

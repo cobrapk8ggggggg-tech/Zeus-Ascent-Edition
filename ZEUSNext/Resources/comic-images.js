@@ -55,19 +55,38 @@
   }
   function fingerprint(el) { try { const c=document.createElement('canvas');c.width=c.height=16;c.getContext('2d').drawImage(el,0,0,16,16);return Array.from(c.getContext('2d').getImageData(0,0,16,16).data).join(','); }catch{return '';} }
   function shortSource(source,id,revision){if(!source.startsWith('data:')||source.length<=512)return source;let hash=2166136261;for(const start of [0,Math.max(0,(source.length>>1)-128),Math.max(0,source.length-256)])for(let i=start;i<Math.min(source.length,start+256);i++){hash^=source.charCodeAt(i);hash=Math.imul(hash,16777619);}return 'data:#'+source.length+'.'+(hash>>>0).toString(36);}
+  // Only a coherent reader is prepared in full: never sweep covers, navigation,
+  // recommendations or every image on an ordinary web page.
+  function chapterImages() {
+    const indexed=[...document.querySelectorAll('img[data-page-index]')];
+    if(indexed.length>=2)return new Set(indexed);
+    const roots=[...document.querySelectorAll('#readerarea,.reading-content,.chapter-content,.reader-content,[data-reader]')];
+    for(const root of roots){const images=[...root.querySelectorAll('img')];if(images.length>=2)return new Set(images);}
+    const groups=new Map();
+    for(const el of document.images){
+      const b=el.getBoundingClientRect();
+      if(b.width<200||b.height<b.width*.8||el.closest('nav,header,footer,aside'))continue;
+      const parent=el.closest('picture')?.parentElement||el.parentElement;
+      if(!parent)continue;const group=groups.get(parent)||[];group.push(el);groups.set(parent,group);
+    }
+    const best=[...groups.values()].filter(v=>v.length>=3).sort((a,b)=>b.length-a.length)[0];
+    return new Set(best||[]);
+  }
   function scan(wake=true) {
-    const items=[], viewport=visualViewport?.height||innerHeight;
+    const items=[], viewport=visualViewport?.height||innerHeight,chapter=wake ? chapterImages():new Set();
     let woken=0;
     for(const el of document.images) {
-      const r=record(el,'image'), box=el.getBoundingClientRect();
-      if(box.width<64||box.height<1||box.bottom< -viewport||box.top>viewport*9)continue;
+      const r=record(el,'image'), box=el.getBoundingClientRect(),member=chapter.has(el);
+      if(box.width<64||(!member&&box.height<1)||(!member&&(box.bottom< -viewport||box.top>viewport*9)))continue;
+      if(wake&&chapter.size&&!member)continue;
       if(/^(광고|廣告|广告|ad|ads|advert|advertisement|sponsored)$/i.test((el.alt||'').trim()))continue;
       let desired=''; for(const key of lazyAttributes){const value=el.getAttribute(key);if(value&&/^https?:/i.test(absolute(value))){desired=absolute(value);break;}}
       const source=sourceOf(r);
       const waiting=(!el.complete||!el.naturalWidth||!!desired&&desired!==source&&!r.original);
-      if(wake&&waiting&&box.top<viewport*8&&woken<4){if(el.loading==='lazy')el.loading='eager';if(desired&&r.woken!==desired){el.src=desired;r.woken=desired;}woken++;}
+      if(wake&&waiting&&(member||box.top<viewport*8)&&woken<4){if(el.loading==='lazy')el.loading='eager';if(desired&&r.woken!==desired){el.src=desired;r.woken=desired;}woken++;}
       items.push({id:r.id,source:shortSource(sourceOf(r),r.id,r.revision),kind:r.kind,width:r.original?.width||el.naturalWidth||0,height:r.original?.height||el.naturalHeight||0,x:box.left+scrollX,y:box.top+scrollY,w:box.width,h:box.height,pending:waiting,revision:String(r.revision),referrerPolicy:policyOf(r)});
     }
+    observer.takeRecords(); // Our lazy-source writes are not a new page revision.
     for(const el of document.querySelectorAll('canvas,[style*="background-image"]')) {
       if(el.tagName==='IMG')continue; // Partial image overlays already have an image record.
       const kind=el.tagName==='CANVAS'?'canvas':'background',r=record(el,kind),box=el.getBoundingClientRect();

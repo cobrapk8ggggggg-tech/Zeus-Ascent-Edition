@@ -752,13 +752,27 @@ import UIKit
     func testEndToEndImagesDoNotTranslateDOMAndFontChangesReuseOCRAndProvider()async throws { try await runImagePipeline(crossOrigin:false) }
     func testCrossOriginNoReferrerImagesTranslateThroughNativeFetch()async throws { try await runImagePipeline(crossOrigin:true) }
     func testCompletedImagesCannotStarveOtherVisiblePanels()async throws { try await runImagePipeline(crossOrigin:false,panelCount:6) }
-    private func runImagePipeline(crossOrigin:Bool,panelCount:Int=1)async throws{
+    func testWholeChapterTranslatesWithoutScrolling()async throws{try await runImagePipeline(crossOrigin:false,panelCount:20,wholeChapter:true)}
+    func testReadAheadIncludesEveryRegionOfATallChapterImage(){
+        let c=ComicCandidate(id:"chapter",source:"https://cdn.example/2.webp",kind:"image",width:800,height:16000,x:0,y:20000,w:800,h:16000,pending:false,revision:"0")
+        let all=ComicGeometry.regions(width:800,height:16000)
+        XCTAssertEqual(Set(ComicGeometry.prioritized(all,candidate:c,scroll:0,viewport:800,readAhead:true).map(\.y)),Set(all.map(\.y)))
+        XCTAssertTrue(ComicGeometry.prioritized(all,candidate:c,scroll:0,viewport:800,readAhead:false).isEmpty)
+    }
+    func testTallOCRTilesPreserveNativeResolutionAndOverlap(){
+        let tiles=ComicOCR.tiles(width:800,height:4296)
+        XCTAssertEqual(tiles.count,3);XCTAssertEqual(tiles.first?.minY,0);XCTAssertEqual(tiles.last?.maxY,4296)
+        XCTAssertTrue(tiles.allSatisfy{$0.width==800 && $0.height<=1536})
+        for pair in zip(tiles,tiles.dropFirst()){XCTAssertGreaterThanOrEqual(pair.0.maxY-pair.1.minY,128)}
+    }
+    private func runImagePipeline(crossOrigin:Bool,panelCount:Int=1,wholeChapter:Bool=false)async throws{
         let root=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let model=BrowserModel(profiles:ProfileStore(root:root,downloadsRoot:root.appendingPathComponent("Downloads")),useBackgroundDownloads:false)
         model.data.settings.shieldsEnabled=false
         var provider=AIProviderConfiguration();provider.baseURL="http://127.0.0.1:8765/v1";provider.model="comic-"+UUID().uuidString;model.data.settings.aiProviders=[provider]
         var preferences=ComicPreferences();preferences.source="en";preferences.showUntranslated=true
-        if panelCount>1{preferences.readAhead=false}
+        if panelCount>1{preferences.readAhead=wholeChapter}
+        if wholeChapter{preferences.mode = .fastest;preferences.restorationEnabled=false}
         var translation=TranslationPreferences();translation.engine = .ai;translation.providerID=provider.id;preferences.translation=translation;model.data.settings.comicTranslation=preferences
         let tab=try XCTUnwrap(model.current);tab.url="http://127.0.0.1:8765/comic-end-to-end"
         let prepared=await model.prepare(tab),view=try XCTUnwrap(prepared),session=try XCTUnwrap(tab.comicTranslation)
@@ -775,8 +789,8 @@ import UIKit
         // exactly as in the reported reader's promotional overlay. Finishing
         // the first four must make room for the remaining visible images.
         let images=(0..<panelCount).map{index in
-            let style=panelCount>1 ? "position:absolute;width:240px;height:90px;left:0;top:\(60+index*12)px":"width:100%;height:auto"
-            return "<img referrerpolicy='no-referrer' style='\(style)' src='\(sourceURL)'>"
+            let style=wholeChapter ? "display:block;width:640px;height:240px;margin-bottom:1500px":panelCount>1 ? "position:absolute;width:240px;height:90px;left:0;top:\(60+index*12)px":"width:100%;height:auto"
+            return "<img data-page-index='\(index)' referrerpolicy='no-referrer' style='\(style)' src='\(sourceURL)'>"
         }.joined()
         view.loadHTMLString("<html><body><p id='text'>Original page text stays unchanged.</p>\(images)</body></html>",baseURL:URL(string:tab.url))
         var deadline=Date().addingTimeInterval(20)
@@ -785,9 +799,10 @@ import UIKit
             let tainted=try await view.evaluateJavaScript("(()=>{try{const c=document.createElement('canvas');c.width=640;c.height=240;c.getContext('2d').drawImage(document.images[0],0,0);c.toDataURL();return false}catch(e){return e.name==='SecurityError'}})()")as? Bool
             XCTAssertEqual(tainted,true,"Fixture must exercise native fallback after canvas is tainted")
         }
-        session.start();deadline=Date().addingTimeInterval(35)
+        session.start();deadline=Date().addingTimeInterval(wholeChapter ? 90:35)
         while Date()<deadline && (session.running||session.completed<panelCount) && session.error==nil{try await Task.sleep(for:.milliseconds(100))}
         XCTAssertNil(session.error);XCTAssertEqual(session.completed,panelCount)
+        if wholeChapter{let scroll=try await view.evaluateJavaScript("scrollY")as? Int;XCTAssertEqual(scroll,0,"Preparing the chapter must not move the reader")}
         let paintedCount=try await view.evaluateJavaScript("[...document.images].filter(i=>i.src.startsWith('blob:')).length")as? Int
         XCTAssertEqual(paintedCount,panelCount,"Completed DOM images must not consume the next work budget")
         let unchanged=try await view.evaluateJavaScript("document.querySelector('#text').textContent")as? String
@@ -797,13 +812,14 @@ import UIKit
         let endpoint=URL(string:"http://127.0.0.1:8765/translation-requests?model="+provider.model)!
         let (firstData,_)=try await URLSession.shared.data(from:endpoint)
         let before=try XCTUnwrap(JSONSerialization.jsonObject(with:firstData)as? [[String]])
-        XCTAssertFalse(before.isEmpty);let ocrBefore=session.ocrRuns,completeBefore=session.completed
+        XCTAssertFalse(before.isEmpty);let ocrBefore=session.ocrRuns,completeBefore=session.completed,detectedBefore=session.detectedTexts
         preferences.fontScale=0.65;preferences.textColor="163B72";model.data.settings.comicTranslation=preferences
         session.pause();session.start();deadline=Date().addingTimeInterval(25)
         while Date()<deadline && session.running && session.error==nil{try await Task.sleep(for:.milliseconds(100))}
         XCTAssertNil(session.error)
         XCTAssertEqual(session.completed,completeBefore,"Changing lettering must not count the same source as another image")
         XCTAssertEqual(session.ocrRuns,ocrBefore,"Changing lettering must reuse the original OCR result")
+        XCTAssertEqual(session.detectedTexts,detectedBefore,"Settings variants must not double-count source bubbles")
         let (secondData,_)=try await URLSession.shared.data(from:endpoint),after=try XCTUnwrap(JSONSerialization.jsonObject(with:secondData)as? [[String]])
         XCTAssertEqual(before.count,after.count,"Changing lettering must not spend another translation request")
         if let snapshot=try? await view.takeSnapshot(configuration:nil){let attachment=XCTAttachment(image:snapshot);attachment.name="Image-only end-to-end - Arabic custom color";attachment.lifetime = .keepAlways;add(attachment)}

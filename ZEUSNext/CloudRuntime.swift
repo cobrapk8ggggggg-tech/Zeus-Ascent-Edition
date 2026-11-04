@@ -131,6 +131,9 @@ actor CloudCheckpointGate {
             NativeLocalExecutionBoundary.shared.setAllowed(false); return true
         }
         #endif
+        if CloudAccount.shared.phase == .guest{
+            NativeLocalExecutionBoundary.shared.setAllowed(CloudAccount.shared.allowsGuestLocalExecution);return false
+        }
         guard let id = CloudAccount.shared.identity?.id, CloudAccount.shared.phase == .ready else {
             #if DEBUG
             if CommandLine.arguments.contains("--zeus-native-fixture"), !CommandLine.arguments.contains(where: { $0.hasPrefix("--zeus-cloud-") }) {
@@ -144,14 +147,30 @@ actor CloudCheckpointGate {
         NativeLocalExecutionBoundary.shared.setAllowed(!enabled)
         return enabled
     }
-    public static func setEnabled(_ value: Bool) async throws {
+    // A local choice must work even when the execution service is unreachable.
+    // Keep archive writes blocked until cloud-only files have been reconciled.
+    private static var hydrationKey:String? { ownerID.map{"cloudSync.pendingLocalRestore."+$0} }
+    public static var localRestorePending:Bool { hydrationKey.map{UserDefaults.standard.bool(forKey:$0)} ?? false }
+    public static func markLocalRestorePending(_ value:Bool){if let key=hydrationKey{UserDefaults.standard.set(value,forKey:key)}}
+    static func persistExecutionChoice(_ value:Bool)throws{
         guard let id = CloudAccount.shared.identity?.id, CloudAccount.shared.phase == .ready else { throw CloudAccountError.wrongOwner }
-        // Persist the user's selection before any network request. A suspended
-        // transfer must never turn cloud execution back into local execution.
         let preference = Preference(owner: id, enabled: value, choiceVersion: 2, pendingCommit: true)
         try CloudSessionStorage().store(key: "zeus-execution:" + id.uuidString, value: JSONEncoder().encode(preference))
         try? BrowserDisk.write(preference, to: preferencesURL)
         NativeLocalExecutionBoundary.shared.setAllowed(!value)
+    }
+    public static func selectLocalExecution()throws{
+        try dataDelegate?.validateLocalExecutionIdle()
+        // Write the protective marker first; interruption can only defer backup.
+        markLocalRestorePending(true)
+        try persistExecutionChoice(false)
+    }
+    public static func setEnabled(_ value: Bool) async throws {
+        try persistExecutionChoice(value)
+        try await commitExecutionChoice(value)
+    }
+    static func commitExecutionChoice(_ value:Bool)async throws{
+        guard usesCloud == value else{return}
         try await prepareBrowserBackup?()
         await CloudCheckpointGate.shared.enter()
         do {
@@ -334,7 +353,7 @@ public struct NativeCloudExecutionSettings: View {
         Form {
             Section("مكان تشغيل الوكيل") {
                 Picker("التشغيل", selection: $enabled) { Text("محلي على الجهاز").tag(false); Text("سحابي").tag(true) }
-                    .pickerStyle(.segmented).disabled(busy).accessibilityIdentifier("cloudExecutionTarget")
+                    .pickerStyle(.segmented).disabled(busy || CloudAccount.shared.phase == .guest).accessibilityIdentifier("cloudExecutionTarget")
                 Text(enabled ? "الوكيل والطرفية والمهام تعمل على الخادم. المتصفح وأدوات الجهاز متاحة عندما يكون جهازك حاضرًا فقط." : "يعمل الوكيل بأدواته وبيئة iSH المحلية الحالية.").font(.footnote)
             }
             Section("النقل والمساحة") {
@@ -345,6 +364,27 @@ public struct NativeCloudExecutionSettings: View {
                 else if !progress.isEmpty { Text(progress) }
                 if let issue { Text(issue).foregroundStyle(.orange).textSelection(.enabled) }
                 Text("اختيار السحابي لا ينقل ملفات الجهاز. المحادثات الجديدة تُحفظ في الحساب وتستخدم Linux السحابي مباشرة. نقل المشاريع المحلية إجراء مستقل تختاره أدناه.").font(.footnote)
+            }
+            if !enabled && NativeCloudAccountAPI.localRestorePending{
+                Section("ملفات السحابة"){
+                    Text("التشغيل المحلي متاح الآن. ملفات السحابة محفوظة، وحفظ نسخة الوكيل معلّق حتى استعادتها لتجنّب استبدالها بملفات ناقصة.").font(.footnote)
+                    Button("استعادة ملفات السحابة إلى الجهاز"){
+                        Task{
+                            busy=true;issue=nil;defer{busy=false}
+                            do{
+                                guard let delegate=NativeCloudAccountAPI.dataDelegate else{throw CloudAccountError.invalidResponse}
+                                try await delegate.prepareLocalExecution{progress=$0}
+                                try await delegate.validateExecutionTransition()
+                                try await delegate.finishExecutionTransition(enabled:false)
+                                NativeCloudAccountAPI.markLocalRestorePending(false)
+                                progress="اكتملت استعادة ملفات السحابة."
+                            }catch{
+                                try? await NativeCloudAccountAPI.dataDelegate?.finishExecutionTransition(enabled:nil)
+                                issue=error.localizedDescription
+                            }
+                        }
+                    }.disabled(busy)
+                }
             }
             Section("المشاريع المحلية السابقة") {
                 Text("الملفات المحلية تبقى على جهازك. استخدم النقل فقط إذا أردت متابعة مشروع محلي موجود على الخادم؛ مهارات التطبيق الجاهزة لا تُرفع.").font(.footnote)
@@ -388,9 +428,13 @@ public struct NativeCloudExecutionSettings: View {
                     throw CloudAccountError.incomplete("الخادم غير جاهز للتنفيذ بعد؛ بقي الوضع المحلي كما هو.")
                 }
                 try await delegate.prepareCloudExecution { progress = $0 }
-            } else { try await delegate.prepareLocalExecution { progress = $0 } }
+            } else {
+                try NativeCloudAccountAPI.selectLocalExecution()
+                progress="فُعّل المحلي. يمكنك استعادة ملفات السحابة لاحقًا عند عودة الخادم."
+                Task{try? await NativeCloudAccountAPI.commitExecutionChoice(false)}
+                return
+            }
             try await delegate.validateExecutionTransition()
-            if !value { try await NativeCloudAccountAPI.setEnabled(false) }
             try await delegate.finishExecutionTransition(enabled: value)
             progress = value ? "فُعّل التشغيل السحابي بعد التحقق من النقل." : "فُعّل التشغيل المحلي. النسخة السحابية محفوظة."
         } catch {

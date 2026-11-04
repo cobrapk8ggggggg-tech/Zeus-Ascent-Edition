@@ -86,7 +86,7 @@ struct ComicSettingsSheet: View {
             Toggle("ترجمة الصور تلقائيًا",isOn:binding(\.automatic))
             Text("الوضع المتوازن موصى به. اختر دقيقًا للنصوص الصغيرة أو المزخرفة.").font(.caption).foregroundStyle(.secondary)
             Toggle("عرض الأصل أثناء التجهيز",isOn:binding(\.showUntranslated))
-            Toggle("تجهيز الصور التالية أثناء القراءة",isOn:binding(\.readAhead))
+            Toggle("تجهيز الفصل كاملًا مسبقًا",isOn:binding(\.readAhead))
             Toggle("ترميم الخلفيات المعقدة",isOn:Binding(get:{prefs.restorationEnabled ?? true},set:{var p=prefs;p.restorationEnabled=$0;save(p)}))
             Text("يعالج النص فوق الرسم على الجهاز عند توفر الذاكرة. ينزّل نموذجَي الترميم عند أول حاجة إليهما (نحو 303 م.ب). يمكنك إيقافه للاكتفاء بالتنظيف الخفيف.").font(.caption).foregroundStyle(.secondary)
         }

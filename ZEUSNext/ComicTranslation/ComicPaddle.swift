@@ -43,6 +43,25 @@ actor ComicPaddle {
             dictionary=try Self.dictionary(String(contentsOf:file,encoding:.utf8));dictionaries=[name:dictionary]
         }
         let maxPixels:Double=ProcessInfo.processInfo.physicalMemory<5*1024*1024*1024 ? 700_000:2_000_000
+        // In careful mode use native-resolution tiles directly. The previous
+        // reduced global pass plus two reduced halves repeated work and still
+        // lost small/outlined captions on 16,000px chapter images.
+        if careful && Double(image.width*image.height)>maxPixels{
+            let tileWidth=min(image.width,1024),tileHeight=max(256,min(1536,Int(maxPixels)/tileWidth))
+            var result:[ComicLine]=[]
+            for y in stride(from:0,to:image.height,by:max(128,tileHeight-96)){
+                for x in stride(from:0,to:image.width,by:max(128,tileWidth-96)){
+                    try Task.checkCancellation()
+                    let area=CGRect(x:x,y:y,width:min(tileWidth,image.width-x),height:min(tileHeight,image.height-y))
+                    guard let cut=image.cropping(to:area)else{continue}
+                    let local=try await read(cut,source:source,careful:false).map{line -> ComicLine in
+                        var v=line;v.rect=v.rect.offsetBy(dx:area.minX,dy:area.minY);v.words=v.words?.map{ComicWord(text:$0.text,rect:$0.rect.offsetBy(dx:area.minX,dy:area.minY))};return v
+                    }
+                    result=ComicOCR.merge(result,accurate:local)
+                }
+            }
+            return result
+        }
         let factor=min(1,sqrt(maxPixels/Double(image.width*image.height)),4000/Double(max(image.width,image.height)))
         let width=max(32,Int((Double(image.width)*factor/32).rounded())*32),height=max(32,Int((Double(image.height)*factor/32).rounded())*32)
         let (probabilities,shape)=try infer(image,width:width,height:height,detector:true,session:detector)
@@ -62,17 +81,6 @@ actor ComicPaddle {
             let result=Self.ctc(logits,steps:s[1],classes:s[2],dictionary:dictionary)
             let text=name=="arabic" ? ComicBidi.logicalFromVisual(result.0):result.0
             if result.1>=0.65 && text.contains(where:{$0.isLetter || $0.isNumber}){lines.append(ComicLine(text:text,confidence:result.1,rect:rect,glyphHeight:Double(min(rect.height,rect.width))*0.72,words:Self.words(logits,steps:s[1],classes:s[2],dictionary:dictionary,rect:rect,arabic:name=="arabic")))}
-        }
-        // Careful mode re-detects at native-sized overlapping crops, retaining lines
-        // missed by a reduced global pass. The scheduler bounds image dimensions.
-        if careful && factor<0.75 {
-            let step=max(128,image.height/2)
-            for y in stride(from:0,to:image.height,by:step){
-                let rect=CGRect(x:0,y:max(0,y-64),width:image.width,height:min(image.height-max(0,y-64),step+128))
-                guard let part=image.cropping(to:rect)else{continue}
-                let additional=try await read(part,source:source,careful:false)
-                for var line in additional{line.rect.origin.y+=rect.minY;line.words=line.words?.map{ComicWord(text:$0.text,rect:$0.rect.offsetBy(dx:0,dy:rect.minY))};if !lines.contains(where:{$0.rect.intersection(line.rect).width>min($0.rect.width,line.rect.width)*0.6 && abs($0.rect.midY-line.rect.midY)<min($0.rect.height,line.rect.height)*0.6}){lines.append(line)}}
-            }
         }
         return lines
     }
