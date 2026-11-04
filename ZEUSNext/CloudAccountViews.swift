@@ -387,10 +387,10 @@ struct CloudAccountSettingsView: View {
 // The root is outside the owner's browser/backup directory. Profile UUIDs give
 // guest cookies, provider secrets, downloads and translation caches their own scope.
 enum CloudGuestStorage{
-    static var root:URL{FileManager.default.urls(for:.applicationSupportDirectory,in:.userDomainMask)[0].appendingPathComponent("ZEUSLocalGuest",isDirectory:true)}
+    static var root:URL{FileManager.default.urls(for:.applicationSupportDirectory,in:.userDomainMask)[0].appendingPathComponent("ZEUSLocalGuest/v1",isDirectory:true)}
 }
 @MainActor private final class IsolatedGuestHolder:ObservableObject{
-    let model=BrowserModel(profiles:ProfileStore(root:CloudGuestStorage.root,downloadsRoot:CloudGuestStorage.root.appendingPathComponent("Downloads")),useBackgroundDownloads:false)
+    let model=BrowserModel(profiles:ProfileStore(root:CloudGuestStorage.root,downloadsRoot:CloudGuestStorage.root.appendingPathComponent("Downloads"),allowLegacyImport:false),useBackgroundDownloads:false)
 }
 private struct IsolatedGuestBrowser:View{
     @StateObject private var holder=IsolatedGuestHolder()

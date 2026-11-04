@@ -182,7 +182,7 @@ enum BrowserDisk {
     private var pendingStoreRemovals: Set<UUID> = []
     private struct Index: Codable { var profiles: [BrowserProfile]; var activeID: UUID }
 
-    init(root: URL = BrowserDisk.applicationRoot, downloadsRoot: URL = BrowserDisk.downloadsRoot) {
+    init(root: URL = BrowserDisk.applicationRoot, downloadsRoot: URL = BrowserDisk.downloadsRoot, allowLegacyImport:Bool = true) {
         self.root = root; self.downloadsRoot = downloadsRoot
         loadedExistingIndex = FileManager.default.fileExists(atPath: root.appendingPathComponent("profiles.json").path)
         pendingStoreRemovals = Set(BrowserDisk.read([UUID].self, from: root.appendingPathComponent("removed-web-stores.json")) ?? [])
@@ -197,10 +197,10 @@ enum BrowserDisk {
         } else {
             var initial = BrowserProfile(name: "الرئيسي")
             initial.account = AccountOptions(role: .administrator)
-            initial.legacyWebsiteStore = UserDefaults.standard.data(forKey: "browser_saved_tabs_list") != nil || UserDefaults.standard.data(forKey: "saved_websites") != nil
+            initial.legacyWebsiteStore = allowLegacyImport && (UserDefaults.standard.data(forKey: "browser_saved_tabs_list") != nil || UserDefaults.standard.data(forKey: "saved_websites") != nil)
             profiles = [initial]; activeID = initial.id
             persistIndex()
-            migrateLegacy(into: initial)
+            if allowLegacyImport{migrateLegacy(into: initial)}
         }
         ensureSpecialAccounts()
         for profile in profiles where profile.isPrivate { AISecretVault.removeAll(profile: profile.id); try? FileManager.default.removeItem(at: folder(for: profile)) }

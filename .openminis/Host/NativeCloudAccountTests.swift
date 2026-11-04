@@ -1,4 +1,5 @@
 import XCTest
+import WebKit
 #if canImport(ZEUSBrowser)
 @testable import ZEUSBrowser
 #else
@@ -32,6 +33,21 @@ import XCTest
         XCTAssertFalse(NativeLocalExecutionBoundary.shared.isAllowed);XCTAssertEqual(try owner.read(),id)
         do{_ = try await guest.authorization(for:id);XCTFail("Guest must not authorize owner's data")}catch{}
         XCTAssertFalse(CloudGuestStorage.root.path.hasPrefix(BrowserDisk.applicationRoot.path+"/"))
+    }
+    func testIsolatedGuestDoesNotImportLegacyOwnerTabsOrCookies()async throws{
+        let defaults=UserDefaults.standard,legacy=defaults.data(forKey:"browser_saved_tabs_list")
+        defer{if let legacy{defaults.set(legacy,forKey:"browser_saved_tabs_list")}else{defaults.removeObject(forKey:"browser_saved_tabs_list")}}
+        var tab=SavedTab();tab.url="https://owner-private.example/";tab.title="Owner's legacy tab"
+        defaults.set(try JSONEncoder().encode([tab]),forKey:"browser_saved_tabs_list")
+        let root=try temporary(),guest=ProfileStore(root:root,downloadsRoot:root.appendingPathComponent("Downloads"),allowLegacyImport:false)
+        XCTAssertEqual(guest.active.legacyWebsiteStore,false)
+        XCTAssertFalse(guest.load(guest.active).tabs.contains{$0.url==tab.url})
+        let cookie=try XCTUnwrap(HTTPCookie(properties:[.domain:"guest-isolation.example",.path:"/",.name:UUID().uuidString,.value:"owner-test-only"]))
+        let ownerStore=WKWebsiteDataStore.default().httpCookieStore
+        await withCheckedContinuation{(c:CheckedContinuation<Void,Never>)in ownerStore.setCookie(cookie){c.resume()}}
+        let cookies=await withCheckedContinuation{c in guest.websiteDataStore(for:guest.active).httpCookieStore.getAllCookies{c.resume(returning:$0)}}
+        await withCheckedContinuation{(c:CheckedContinuation<Void,Never>)in ownerStore.delete(cookie){c.resume()}}
+        XCTAssertFalse(cookies.contains{$0.name==cookie.name},"An owned legacy cookie store must not be reused by a guest")
     }
     func testCloudIsDefaultForFreshAndOldUncommittedPreference() {
         let owner = UUID()
