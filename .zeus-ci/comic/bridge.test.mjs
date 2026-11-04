@@ -100,3 +100,11 @@ test('chapter load events advance lazy fetches while native processing is busy',
  assert.equal([...s.w.document.images].filter(i=>i.src.includes('/story/')).length,8);
  }finally{s.close()}
 });
+test('preparing a later strip never blurs the chapter text already painted',async()=>{
+ const s=setup();try{fakeDecoder(s);const c=s.bridge.scan(false).items[0],g=s.bridge.start();
+ s.bridge.hold(c.id,c.revision);assert.ok(s.w.document.images[0].style.filter.includes('blur'));
+ assert.equal(await s.bridge.apply(c.id,c.revision,'YQ==',{x:0,y:0,width:200,height:200},'ar',g),true);
+ assert.equal(s.w.document.images[0].style.filter,'');
+ s.bridge.hold(c.id,c.revision);assert.equal(s.w.document.images[0].style.filter,'');
+ }finally{s.close()}
+});

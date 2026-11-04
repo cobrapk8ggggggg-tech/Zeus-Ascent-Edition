@@ -139,7 +139,7 @@
     if(r.kind==='canvas'){const c=document.createElement('canvas');c.width=el.width;c.height=el.height;c.getContext('2d').drawImage(el,0,0);r.original.canvas=c;}
     return r;
   }
-  function hold(id,revision) {const r=live(id,revision);if(!r.held){r.held=css(r.el,'filter');r.el.style.setProperty('filter','blur(18px) saturate(.7)','important');}r.holdUntil=Date.now()+180000;observer.takeRecords();}
+  function hold(id,revision) {const r=live(id,revision);if(r.renderMark)return;if(!r.held){r.held=css(r.el,'filter');r.el.style.setProperty('filter','blur(18px) saturate(.7)','important');}r.holdUntil=Date.now()+180000;observer.takeRecords();}
   async function apply(id,revision,data,region,mark,expectedGeneration) {
     if(expectedGeneration!==generation||showingOriginal)return false;
     const r=live(id,revision),beforeSource=sourceOf(r),image=new Image(),bytes=typeof data==='string'?Uint8Array.from(atob(data),v=>v.charCodeAt(0)):data;
