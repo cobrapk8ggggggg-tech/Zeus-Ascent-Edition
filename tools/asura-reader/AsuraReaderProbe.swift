@@ -37,10 +37,10 @@ import WebKit
         var deadline=Date().addingTimeInterval(30)
         while Date()<deadline{if (try? await view.evaluateJavaScript("document.images.length"))as? Int==27{break};try await Task.sleep(for:.milliseconds(200))}
         var audits:[[String:Any]]=[]
-        session.onRegionAudit={reading,translations,reasons in
+        session.onRegionAudit={reading,translations,reasons,notice in
             guard let data=try? JSONEncoder().encode(reading),let geometry=try? JSONSerialization.jsonObject(with:data),
                   let texts=try? JSONEncoder().encode(translations),let translated=try? JSONSerialization.jsonObject(with:texts)else{return}
-            audits.append(["reading":geometry,"translations":translated,"unresolved_reasons":reasons])
+            audits.append(["reading":geometry,"translations":translated,"unresolved_reasons":reasons,"restoration_notice":notice ?? ""])
         }
         let began=Date();session.start();deadline=began.addingTimeInterval(1600);var idle:Date?,firstPaint:Double?
         while Date()<deadline{
@@ -54,7 +54,8 @@ import WebKit
         XCTAssertEqual(rows.count,27);XCTAssertFalse(session.running,"Whole chapter exceeded the bounded test deadline")
         XCTAssertGreaterThan(session.detectedTexts,100,"The queue must discover dialogue far beyond the initial viewport")
         XCTAssertTrue(rows.contains{$0["index"]as? String=="25" && $0["painted"]as? Bool==true},"The last story image must be processed without a scroll")
-        let report:[String:Any]=["source":"Asura chapter 2, 27 SHA-pinned originals","mode":"fastest, restoration on, Google Arabic","scroll":scroll ?? -1,"seconds":Date().timeIntervalSince(began),"first_paint_seconds":firstPaint.map{$0 as Any} ?? NSNull(),"detected":session.detectedTexts,"ready":session.translatedTexts,"regions":session.completed,"ocr_runs":session.ocrRuns,"phase_seconds":session.phaseSeconds,"region_audits":audits,"phase":session.phase.rawValue,"notice":session.contextNotice ?? "","error":session.error ?? "","images":rows]
+        let restorationLoads=await ComicRestoration.shared.sessionLoads
+        let report:[String:Any]=["source":"Asura chapter 2, 27 SHA-pinned originals","mode":"fastest, restoration on, Google Arabic","scroll":scroll ?? -1,"seconds":Date().timeIntervalSince(began),"first_paint_seconds":firstPaint.map{$0 as Any} ?? NSNull(),"detected":session.detectedTexts,"ready":session.translatedTexts,"regions":session.completed,"ocr_runs":session.ocrRuns,"restoration_session_loads":restorationLoads,"phase_seconds":session.phaseSeconds,"region_audits":audits,"phase":session.phase.rawValue,"notice":session.contextNotice ?? "","error":session.error ?? "","images":rows]
         let attachment=XCTAttachment(data:try JSONSerialization.data(withJSONObject:report,options:[.prettyPrinted,.sortedKeys]),uniformTypeIdentifier:"public.json");attachment.name="Asura entire chapter without scrolling measured results";attachment.lifetime = .keepAlways;add(attachment)
         for index in [1,2,3,5,9,17,25]{
             // Export the actual applied PNG patches, not a URL or early preview.

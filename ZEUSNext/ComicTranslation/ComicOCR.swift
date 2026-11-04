@@ -160,12 +160,32 @@ actor ComicOCR {
         }
     }
     static func scriptProbe(_ image:CGImage,region:CGRect?)async throws->(String,[ComicLine]){
-        var samples=try vision(image,languages:["ar-SA","ko-KR","ja-JP","zh-Hans","ru-RU","en-US"],accurate:true,automatic:true)
+        // This pass selects a script; actual reading still uses native-resolution
+        // tiles. Two full-size multilingual passes on every webtoon strip were
+        // substantially more expensive than the provider translation itself.
+        let scale=min(1,2048/Double(max(image.width,image.height)))
+        var probe=image
+        if scale<1,let context=ComicPixels.context(width:max(1,Int(Double(image.width)*scale)),height:max(1,Int(Double(image.height)*scale))){
+            context.interpolationQuality = .high
+            context.draw(image,in:CGRect(x:0,y:0,width:context.width,height:context.height))
+            probe=context.makeImage() ?? image
+        }
+        func originalCoordinates(_ input:[ComicLine])->[ComicLine]{
+            let sx=CGFloat(image.width)/CGFloat(probe.width),sy=CGFloat(image.height)/CGFloat(probe.height)
+            let transform=CGAffineTransform(scaleX:sx,y:sy)
+            return input.map{line in
+                var value=line;value.rect=line.rect.applying(transform)
+                value.words=line.words?.map{ComicWord(text:$0.text,rect:$0.rect.applying(transform))}
+                value.angle=atan2(sin(line.angle)*Double(sy),cos(line.angle)*Double(sx))
+                return value
+            }
+        }
+        var samples=originalCoordinates(try vision(probe,languages:["ar-SA","ko-KR","ja-JP","zh-Hans","ru-RU","en-US"],accurate:true,automatic:true))
         // Vision's automatic language choice can select English for a mixed
         // panel and omit its Arabic line. An explicit supported Arabic pass
         // supplies only Arabic-script candidates; it cannot replace Latin text.
         if try VNRecognizeTextRequest().supportedRecognitionLanguages().contains("ar-SA"){
-            let arabic=try vision(image,languages:["ar-SA"],accurate:true).filter{lineScript($0.text)=="arabic" && $0.confidence>=0.3}
+            let arabic=originalCoordinates(try vision(probe,languages:["ar-SA"],accurate:true)).filter{lineScript($0.text)=="arabic" && $0.confidence>=0.3}
             for line in arabic{
                 if let index=samples.firstIndex(where:{$0.rect.intersection(line.rect).area/min(max(1,$0.rect.area),max(1,line.rect.area))>0.6 && lineScript($0.text)=="arabic"}){
                     if line.confidence>=samples[index].confidence{samples[index]=line}

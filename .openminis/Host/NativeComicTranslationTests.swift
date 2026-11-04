@@ -814,6 +814,18 @@ import UIKit
         XCTAssertEqual(Set(ComicGeometry.prioritized(all,candidate:c,scroll:0,viewport:800,readAhead:true).map(\.y)),Set(all.map(\.y)))
         XCTAssertTrue(ComicGeometry.prioritized(all,candidate:c,scroll:0,viewport:800,readAhead:false).isEmpty)
     }
+    func testTallLanguageProbeRetainsOriginalCoordinatesAndMixedArabic()async throws{
+        let image=renderer(CGSize(width:800,height:4096)).image{context in
+            UIColor.white.setFill();context.fill(CGRect(x:0,y:0,width:800,height:4096))
+            ("THIS IS AN ENGLISH PARAGRAPH" as NSString).draw(at:CGPoint(x:40,y:600),withAttributes:[.font:UIFont.systemFont(ofSize:38),.foregroundColor:UIColor.black])
+            ("مرحبا بكم في هذا العالم" as NSString).draw(at:CGPoint(x:150,y:3500),withAttributes:[.font:UIFont.systemFont(ofSize:38),.foregroundColor:UIColor.black])
+        }.cgImage!
+        let result=try await ComicOCR.scriptProbe(image,region:CGRect(x:0,y:3300,width:800,height:600))
+        XCTAssertEqual(result.0,"ar","The region vote must use original image coordinates after a bounded script probe")
+        XCTAssertTrue(result.1.contains{$0.rect.minY>3400 && $0.text.unicodeScalars.contains{(0x0600...0x06FF).contains($0.value)}},"Mixed Arabic must survive the preliminary language pass")
+        XCTAssertTrue(result.1.contains{$0.rect.minY>500 && $0.rect.minY<800 && $0.text.contains("ENGLISH")})
+        XCTAssertTrue(result.1.flatMap{$0.words ?? []}.allSatisfy{$0.rect.maxY<=4096 && $0.rect.maxX<=800})
+    }
     func testTallOCRTilesPreserveNativeResolutionAndOverlap(){
         let tiles=ComicOCR.tiles(width:800,height:4296)
         XCTAssertEqual(tiles.count,3);XCTAssertEqual(tiles.first?.minY,0);XCTAssertEqual(tiles.last?.maxY,4296)

@@ -26,7 +26,7 @@ import CoreGraphics
     private(set) var ocrRuns=0
     private(set) var phaseSeconds:[String:Double]=[:]
     // Optional test observer; no image, text or translation telemetry is stored by the app.
-    var onRegionAudit:((ComicReading,[TranslationSegment],[String:String])->Void)?
+    var onRegionAudit:((ComicReading,[TranslationSegment],[String:String],String?)->Void)?
     @Published var phase: ComicSessionPhase = .idle
     var stage: String { phase.title }
     @Published var showingOriginal = false
@@ -241,7 +241,7 @@ import CoreGraphics
                     // A cover's Latin title must not choose the script for the
                     // following Japanese/Arabic page. Hints belong to one image.
                     let languageHintKey=document+"|"+candidate.id+"|"+candidate.revision
-                    let readingKey=imageHash+"|ocr-v24|\(prefs.source)|\(prefs.mode.rawValue)|vote:\(region.coreTop+offset):\(region.coreBottom-region.coreTop)"
+                    let readingKey=imageHash+"|ocr-v25|\(prefs.source)|\(prefs.mode.rawValue)|vote:\(region.coreTop+offset):\(region.coreBottom-region.coreTop)"
                     measure(.recognizing);phase = .recognizing
                     let reading:ComicReading
                     if let saved=readings[readingKey]{reading=saved}
@@ -321,7 +321,7 @@ import CoreGraphics
                         // Only this core is applied. Recognition context is retained above/below.
                         let rect=CGRect(x:0,y:region.coreTop+offset,width:region.width,height:region.coreBottom-region.coreTop)
                         guard let crop=drawing.image.cropping(to:rect)else{throw ComicFailure.message("تعذّر قص منطقة الرسم.")};return (try ComicPixels.png(crop),drawing.unresolved,drawing.reasons)}.value
-                        onRegionAudit?(ComicReading(lines:reading.lines,speeches:core,language:reading.language,runtime:reading.runtime),translated,result.2)
+                        onRegionAudit?(ComicReading(lines:reading.lines,speeches:core,language:reading.language,runtime:reading.runtime),translated,result.2,restored.notice)
                         rendered=result.0
                         countTexts(countKey,detected:counted.count,translated:counted.filter{source in translated.contains{$0.id==source.id} && !result.1.contains(source.id)}.count)
                         if !result.1.isEmpty{renderingPartial=true;sweepFailure=true;contextNotice="احتُفظ ببعض النصوص الأصلية لعدم اكتمال تنظيفها أو ملاءمة خطها."}
