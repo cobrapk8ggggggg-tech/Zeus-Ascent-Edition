@@ -555,6 +555,21 @@ import ZeusComicRuntime
         var prefs=ComicPreferences();let original=prefs.renderIdentity;prefs.bypassQualityChecks=true
         XCTAssertNotEqual(original,prefs.renderIdentity,"Strict and unchecked output must never share cached images")
     }
+    func testSelectiveRestorationDeletionPreservesOtherModelsAndAllDeletionRemovesFiles()async throws{
+        let root=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer{try? FileManager.default.removeItem(at:root)}
+        try FileManager.default.createDirectory(at:root.appendingPathComponent("Fonts"),withIntermediateDirectories:true)
+        for name in ["ctd.onnx","lama.onnx","latin.onnx","translation.gguf","Fonts/custom.ttf"]{
+            try Data("fixture".utf8).write(to:root.appendingPathComponent(name))
+        }
+        let store=ComicModelStore(directory:root)
+        try await store.removeRestoration()
+        XCTAssertFalse(FileManager.default.fileExists(atPath:root.appendingPathComponent("ctd.onnx").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath:root.appendingPathComponent("lama.onnx").path))
+        for name in ["latin.onnx","translation.gguf","Fonts/custom.ttf"]{XCTAssertTrue(FileManager.default.fileExists(atPath:root.appendingPathComponent(name).path),name)}
+        try await store.removeAll()
+        XCTAssertFalse(FileManager.default.fileExists(atPath:root.path),"Deletion must remove the on-disk directory, not only update a counter")
+    }
     func testImageTranslationButtonsUseAvailableSystemSymbols(){
         XCTAssertNotNil(UIImage(systemName:BrowserAction.translateImages.symbol))
         XCTAssertNotNil(UIImage(systemName:SettingsCategory.imageTranslation.symbol))

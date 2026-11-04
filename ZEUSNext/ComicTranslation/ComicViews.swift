@@ -183,7 +183,7 @@ struct ComicSettingsSheet: View {
                 Toggle("تشغيل نماذج الترميم سحابيًا",isOn:Binding(get:{prefs.useCloudRestoration ?? false},set:{var p=prefs;p.useCloudRestoration=$0;save(p)}))
                 if prefs.useCloudRestoration ?? false {
                     TextField("عنوان خادم الترميم HTTPS",text:Binding(get:{prefs.cloudRestorationURL ?? ""},set:{var p=prefs;p.cloudRestorationURL=$0;save(p)})).textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.URL)
-                    Text("يرسل بيانات النموذج مضغوطة دون فقد إلى الخادم الذي تحدده، مع توثيق حسابك. تُستخدم النماذج نفسها والأقنعة والرسم نفسها، دون تنزيل نماذج الترميم على الجهاز. يلزم خادم مجهز وحساب مسجّل؛ لا يُفعّل قبل تحديد الخادم.").font(.footnote).foregroundStyle(.secondary)
+                    Text("يرسل قصّات النص إلى خادمك لمعالجتها دون حفظ الصور عليه. يحتاج اتصالًا بالشبكة وتسجيل الدخول. يستخدم نماذج الترميم نفسها دون تنزيلها على الجهاز.").font(.footnote).foregroundStyle(.secondary)
                 }
             }
             Section("حزم قراءة الصور") {

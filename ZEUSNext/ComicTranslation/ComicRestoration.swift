@@ -14,6 +14,12 @@ actor ComicRestoration {
     private(set) var sessionLoads=0
     private(set) var modelLoads:[String:Int]=[:]
     private var deferredForMemory=false
+    private var deferredForCloud=false
+    private func markCloudRetry(_ error:Error){
+        guard cloudEndpoint != nil else{return}
+        if let http=error as? NativeCloudHTTPError{deferredForCloud = deferredForCloud || http.statusCode==429 || http.statusCode>=500}
+        else if (error as NSError).domain==NSURLErrorDomain{deferredForCloud=true}
+    }
     private var busy=false
     private var waiting:[UUID:CheckedContinuation<Void,Error>]=[:]
     private var cloudEndpoint:URL?
@@ -174,12 +180,12 @@ actor ComicRestoration {
                     for c in 0..<4{result[destination+c]=restored[source+c]}
                 }}
                 ids.insert(job.id)
-            }catch is CancellationError{throw CancellationError()}catch{/* Keep the original for this crop and continue with the remaining dialogues. */}
+            }catch is CancellationError{throw CancellationError()}catch{markCloudRetry(error) /* Keep the original for this crop and continue. */}
         }
         return ids
     }
     func restore(_ image: CGImage, speeches: [ComicSpeech], requiredHeadroom:UInt64=1_200_000_000, cloud:URL?=nil, onPreparing: (@Sendable (Bool) async -> Void)? = nil) async throws -> Result {
-        try await acquire();defer{release()};try Task.checkCancellation();minimumHeadroom=requiredHeadroom;deferredForMemory=false;cloudEndpoint=cloud
+        try await acquire();defer{release()};try Task.checkCancellation();minimumHeadroom=requiredHeadroom;deferredForMemory=false;deferredForCloud=false;cloudEndpoint=cloud
         defer{cloudEndpoint=nil}
         guard let original = ComicPixels.rgba(image, width: image.width, height: image.height) else { throw ComicFailure.message("تعذّر تجهيز ترميم الخلفية.") }
         let candidates = speeches.filter { !ComicPixels.canClean(original, width: image.width, height: image.height, speech: $0) }
@@ -212,7 +218,7 @@ actor ComicRestoration {
             local.lines = speech.lines.map { line in var line=line;line.rect=line.rect.offsetBy(dx:-bounds.minX,dy:-bounds.minY);line.words=line.words?.map{ComicWord(text:$0.text,rect:$0.rect.offsetBy(dx:-bounds.minX,dy:-bounds.minY))};return line }
             let neural:[UInt8]
             do{neural=try await hints(pixels,width:crop.width,height:crop.height)}
-            catch is CancellationError{throw CancellationError()}catch{continue}
+            catch is CancellationError{throw CancellationError()}catch{markCloudRetry(error);continue}
             try Task.checkCancellation()
             guard ComicPixels.ownsText(pixels,width:crop.width,height:crop.height,speech:local,evidence:neural)else{continue}
             var mask = [UInt8](repeating:0,count:crop.width*crop.height)
@@ -270,6 +276,6 @@ actor ComicRestoration {
             jobs.append(MaskedCrop(id:speech.id,pixels:pixels,mask:mask,bounds:bounds,width:crop.width,height:crop.height,boxes:local.lines.map(\.rect),protected:protected,retryMargin:max(8,min(18,Int(ceil(glyph*0.4))))));pendingPixels+=crop.width*crop.height
         }
         if !jobs.isEmpty{ids.formUnion(try await paint(jobs,into:&result,imageWidth:image.width))}
-        return Result(image: try ComicPixels.fromRGBA(result,width:image.width,height:image.height), restored:ids, notice:deferredForMemory ? "لم تتوفر ذاكرة كافية لإكمال ترميم بعض الخلفيات؛ ستُعاد المحاولة.":ids.count<candidates.count ? "احتُفظ ببعض النصوص الأصلية لتعذّر ترميمها كاملًا.":nil,retryable:deferredForMemory)
+        return Result(image: try ComicPixels.fromRGBA(result,width:image.width,height:image.height), restored:ids, notice:deferredForCloud ? "تعذّر الاتصال بخادم ترميم الصور؛ ستُعاد المحاولة تلقائيًا.":deferredForMemory ? "لم تتوفر ذاكرة كافية لإكمال ترميم بعض الخلفيات؛ ستُعاد المحاولة.":ids.count<candidates.count ? "احتُفظ ببعض النصوص الأصلية لتعذّر ترميمها كاملًا.":nil,retryable:deferredForMemory || deferredForCloud)
     }
 }

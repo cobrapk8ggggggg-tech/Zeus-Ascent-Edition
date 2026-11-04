@@ -60,6 +60,9 @@ class Runner:
             if self.name!=name:
                 self.current=None;self.name=None
                 options=ort.SessionOptions();options.intra_op_num_threads=2;options.graph_optimization_level=ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+                # Both graphs use the same operators and weights. Avoid keeping
+                # large CPU arenas between the detector and inpainting graph.
+                options.enable_cpu_mem_arena=False
                 self.current=ort.InferenceSession(str(self.root/name),options,providers=['CPUExecutionProvider']);self.name=name
             names=self.current.get_outputs();output=names[1].name if name=='ctd.onnx'else names[0].name
             source=self.current.get_inputs()[0].name

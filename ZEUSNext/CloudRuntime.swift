@@ -116,6 +116,7 @@ actor CloudCheckpointGate {
     public static let runtimeURL = URL(string: "https://zeus-cloud-production.up.railway.app")!
     public static weak var dataDelegate: NativeCloudDataDelegate?
     public static var sharedFilesView: (() -> AnyView)?
+    public static var storageManagementView: (() -> AnyView)?
     public static var browserFilesDidChange: (() -> Void)?
     public static var prepareBrowserBackup: (() async throws -> Void)?
     public static var isMigrating = false

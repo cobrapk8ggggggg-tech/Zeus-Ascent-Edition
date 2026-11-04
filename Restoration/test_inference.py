@@ -21,7 +21,7 @@ class TensorTransportTests(unittest.TestCase):
     def test_actual_models_match_direct_ort(self):
         import os
         if 'ZEUS_TEST_MODELS'not in os.environ:self.skipTest('Actual pinned models not configured')
-        catalog=json.loads(Path('ZEUSNext/Resources/comic-models.json').read_text())
+        catalog=json.loads(Path(os.environ.get('ZEUS_COMIC_CATALOG','ZEUSNext/Resources/comic-models.json')).read_text())
         runner=Runner(os.environ['ZEUS_TEST_MODELS'],catalog);runner.prepare()
         rng=np.random.default_rng(17)
         for name,edge in [('ctd.onnx',1024),('lama.onnx',512)]:

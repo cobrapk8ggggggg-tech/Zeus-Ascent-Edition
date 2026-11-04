@@ -215,7 +215,12 @@ struct StorageSettingsPage: View {
                 NavigationLink("المواقع — حذف بيانات موقع أو نوع محدد") { WebsiteStoragePage(context: context) }.accessibilityIdentifier("websiteStorageButton")
                 ForEach(StoredItemCategory.allCases) { category in NavigationLink(category.title) { StoredProfileItemsPage(context: context, category: category) } }
                 NavigationLink("الترجمات المحفوظة") { TranslationStoragePage(context: context) }
-                NavigationLink("محادثات الوكيل ومرفقاتها") { AgentStoragePage(context: context) }
+                if context.isActive,context.model.profile.isAdmin,context.model.profiles.root.standardizedFileURL==BrowserDisk.applicationRoot.standardizedFileURL,let storage=NativeCloudAccountAPI.storageManagementView {
+                    NavigationLink("إدارة كل ملفات التطبيق والمساعد") { storage() }
+                    Text("تعرض أيضًا بيئة المساعد والسجلات والملفات المؤقتة وبقية ملفات الجهاز. حذف المحادثات إجراء مستقل قد يُزامن مع حسابك؛ لمسح المساحة المحلية فقط اختر الكاش أو الملفات المحلية.").font(.footnote)
+                } else {
+                    NavigationLink("محادثات الوكيل ومرفقاتها") { AgentStoragePage(context: context) }
+                }
             }
             ThemedSection("البيانات") { LabeledContent("ملفات الحساب", value: byteText(bytes)); LabeledContent("مواقع خزّنت بيانات", value: "\(sites)"); LabeledContent("المساحة المتاحة بالجهاز", value: byteText(freeBytes)); Button("مسح الملفات المؤقتة") { action = "cache" }.accessibilityIdentifier("clearCacheButton"); Button("مسح الكوكيز وبيانات المواقع") { action = "web" }; Button("مسح سجل التصفح") { action = "history" }; Button("مسح سجل البحث") { action = "search" }; Button("حذف التنزيلات") { action = "downloads" } }
             ThemedSection("مساحة التطبيق الفعلية") {

@@ -4,6 +4,8 @@ import CryptoKit
 struct ComicModelArtifact: Codable { var name: String; var bytes: Int64; var url: String; var sha256: String }
 actor ComicModelStore {
     static let shared = ComicModelStore()
+    private let directory:URL
+    init(directory:URL=ComicModelStore.root){self.directory=directory}
     struct Catalog: Decodable { var version: Int; var models: [ComicModelArtifact] }
     static let root: URL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("ZEUSComicModels")
     static let catalog: [ComicModelArtifact] = {
@@ -14,14 +16,14 @@ actor ComicModelStore {
     private var verified: [String:Date] = [:]
     func file(_ name: String, download: Bool) async throws -> URL {
         guard let artifact=Self.catalog.first(where:{$0.name==name}) else{throw ComicFailure.message("ملف نموذج OCR غير معروف: \(name)")}
-        let destination=Self.root.appendingPathComponent(name)
+        let destination=directory.appendingPathComponent(name)
         if try validLocal(artifact) {return destination}
         guard download else{throw ComicFailure.message("نزّل حزمة OCR للغة المصدر من إعدادات ترجمة الصور أولًا.")}
         if let task=loading[name]{return try await task.value}
         let ticket=generation
         let task=Task<URL,Error>{
-            try FileManager.default.createDirectory(at:Self.root,withIntermediateDirectories:true)
-            var directory=Self.root;var values=URLResourceValues();values.isExcludedFromBackup=true;try directory.setResourceValues(values)
+            try FileManager.default.createDirectory(at:directory,withIntermediateDirectories:true)
+            var modelDirectory=directory;var values=URLResourceValues();values.isExcludedFromBackup=true;try modelDirectory.setResourceValues(values)
             let delegate=ComicModelDownloadLimit(limit:artifact.bytes)
             let session=URLSession(configuration:.ephemeral,delegate:delegate,delegateQueue:nil);defer{session.invalidateAndCancel()}
             let (temporary,response)=try await session.download(from:URL(string:artifact.url)!)
@@ -29,7 +31,7 @@ actor ComicModelStore {
             guard (response as? HTTPURLResponse)?.statusCode==200,try Self.valid(temporary,artifact:artifact) else{throw ComicFailure.message("فشل التحقق من حجم أو بصمة نموذج OCR؛ لم يُعتمد الملف.")}
             try Task.checkCancellation()
             guard generation==ticket else{throw CancellationError()}
-            let part=Self.root.appendingPathComponent(name+".part")
+            let part=directory.appendingPathComponent(name+".part")
             try? FileManager.default.removeItem(at:part);try FileManager.default.moveItem(at:temporary,to:part)
             try? FileManager.default.removeItem(at:destination);try FileManager.default.moveItem(at:part,to:destination)
             return destination
@@ -45,7 +47,7 @@ actor ComicModelStore {
         return hash.finalize().map{String(format:"%02x",$0)}.joined()==artifact.sha256
     }
     private func validLocal(_ artifact:ComicModelArtifact)throws->Bool {
-        let url=Self.root.appendingPathComponent(artifact.name)
+        let url=directory.appendingPathComponent(artifact.name)
         guard let values=try? url.resourceValues(forKeys:[.fileSizeKey,.contentModificationDateKey]),values.fileSize==Int(artifact.bytes),let modified=values.contentModificationDate else{return false}
         if verified[artifact.name]==modified{return true}
         guard try Self.valid(url,artifact:artifact)else{return false}
@@ -78,13 +80,13 @@ actor ComicModelStore {
     func removeRestoration()throws{
         generation=UUID();loading.values.forEach{$0.cancel()};loading.removeAll();verified.removeAll()
         for name in ["ctd.onnx","lama.onnx","ctd.onnx.part","lama.onnx.part"]{
-            let url=Self.root.appendingPathComponent(name)
+            let url=directory.appendingPathComponent(name)
             if FileManager.default.fileExists(atPath:url.path){try FileManager.default.removeItem(at:url)}
         }
     }
     func removeAll()throws{
         generation=UUID();loading.values.forEach{$0.cancel()};loading.removeAll();verified.removeAll()
-        if FileManager.default.fileExists(atPath:Self.root.path){try FileManager.default.removeItem(at:Self.root)}
+        if FileManager.default.fileExists(atPath:directory.path){try FileManager.default.removeItem(at:directory)}
     }
 }
 private final class ComicModelDownloadLimit:NSObject,URLSessionDownloadDelegate,@unchecked Sendable{
