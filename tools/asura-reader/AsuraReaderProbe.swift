@@ -50,10 +50,13 @@ import WebKit
         XCTAssertTrue(rows.contains{$0["index"]as? String=="25" && $0["painted"]as? Bool==true},"The last story image must be processed without a scroll")
         let report:[String:Any]=["source":"Asura chapter 2, 27 SHA-pinned originals","mode":"fastest, restoration on, Google Arabic","scroll":scroll ?? -1,"seconds":Date().timeIntervalSince(began),"first_paint_seconds":firstPaint.map{$0 as Any} ?? NSNull(),"detected":session.detectedTexts,"ready":session.translatedTexts,"regions":session.completed,"ocr_runs":session.ocrRuns,"phase":session.phase.rawValue,"notice":session.contextNotice ?? "","error":session.error ?? "","images":rows]
         let attachment=XCTAttachment(data:try JSONSerialization.data(withJSONObject:report,options:[.prettyPrinted,.sortedKeys]),uniformTypeIdentifier:"public.json");attachment.name="Asura entire chapter without scrolling measured results";attachment.lifetime = .keepAlways;add(attachment)
-        for index in [2,9,17,25]{
-            // Export applied source-resolution patches without moving the viewport.
-            let value=try await view.callAsyncJavaScript("const i=document.images[index];return {src:i.src,background:i.style.backgroundImage};",arguments:["index":index],in:nil,contentWorld:ComicTranslation.world)
-            let note=XCTAttachment(string:String(describing:value));note.name="Asura applied image \(index)";note.lifetime = .keepAlways;add(note)
+        for index in [1,2,9,17,25]{
+            // Export the actual applied PNG patches, not a URL or early preview.
+            let value=try await view.callAsyncJavaScript("const i=document.images[index],urls=[i.src,...[...i.style.backgroundImage.matchAll(/url\\([\"']?([^\"')]+)[\"']?\\)/g)].map(m=>m[1])].filter(u=>u.startsWith('blob:'));const out=[];for(const url of [...new Set(urls)]){const b=await(await fetch(url)).blob();if(b.type!=='image/png')continue;const bytes=new Uint8Array(await b.arrayBuffer());let raw='';for(let n=0;n<bytes.length;n+=8192)raw+=String.fromCharCode(...bytes.subarray(n,n+8192));out.push(btoa(raw));}return out;",arguments:["index":index],in:nil,contentWorld:ComicTranslation.world)
+            for (part,encoded) in ((value as? [String]) ?? []).enumerated(){
+                guard let data=Data(base64Encoded:encoded),let image=UIImage(data:data)else{XCTFail("Unreadable applied PNG");continue}
+                let attachment=XCTAttachment(image:image);attachment.name="Asura original chapter applied image \(index) part \(part)";attachment.lifetime = .keepAlways;add(attachment)
+            }
         }
     }
 }

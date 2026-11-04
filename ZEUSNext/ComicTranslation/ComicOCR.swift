@@ -167,10 +167,18 @@ actor ComicOCR {
         return lines
     }
     static func tiles(width:Int,height:Int)->[CGRect]{
+        guard width>0,height>0 else{return []}
         let size=1536,overlap=128
-        return stride(from:0,to:height,by:size-overlap).filter{$0==0 || $0+overlap<height}.flatMap{y in
-            stride(from:0,to:width,by:size-overlap).filter{$0==0 || $0+overlap<width}.map{x in CGRect(x:x,y:y,width:min(size,width-x),height:min(size,height-y))}
+        var result:[CGRect]=[],y=0
+        while y<height{
+            var x=0
+            while x<width{
+                result.append(CGRect(x:x,y:y,width:min(size,width-x),height:min(size,height-y)))
+                if x+size>=width{break};x+=size-overlap
+            }
+            if y+size>=height{break};y+=size-overlap
         }
+        return result
     }
     private func fastNative(_ image:CGImage,source:String)async throws->[ComicLine]{
         #if canImport(MLKitTextRecognition)
