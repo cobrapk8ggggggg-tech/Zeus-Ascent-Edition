@@ -84,7 +84,7 @@ struct ComicPreferences: Codable, Equatable {
     var letterCaseRaw: String?
     var letterSpacing: Double?
     var letterCase: ComicLetterCase { ComicLetterCase(rawValue: letterCaseRaw ?? "") ?? .original }
-    var renderIdentity: String { "render-v20|restoration:\(restorationEnabled ?? true)|\(fontName ?? "default")|\(fontScale)|\(textColor ?? "auto")|\(inkStyle.rawValue)|\(letterCase.rawValue)|\(letterSpacing ?? 0)" }
+    var renderIdentity: String { "render-v21|restoration:\(restorationEnabled ?? true)|\(fontName ?? "default")|\(fontScale)|\(textColor ?? "auto")|\(inkStyle.rawValue)|\(letterCase.rawValue)|\(letterSpacing ?? 0)" }
     var inkStyle: ComicInkStyle { get { ComicInkStyle(rawValue: inkStyleRaw ?? "") ?? .automatic } set { inkStyleRaw = newValue.rawValue } }
     var engine: ComicOnlineEngine = .existing
     var translation: TranslationPreferences?

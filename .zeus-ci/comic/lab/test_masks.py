@@ -42,4 +42,10 @@ class Masks(unittest.TestCase):
   image=np.full((100,240,3),180,np.uint8);output,mask=self.engine.clean(image,[[30,30,190,60]])
   self.assertTrue(np.array_equal(image,output));self.assertEqual(int(mask.sum()),0)
   self.assertFalse(self.engine.safe_to_letter(image,mask,[[30,30,190,60]]))
+
+ def test_dense_mask_does_not_accept_solid_hints_or_a_frame(self):
+  rgb=np.full((120,360,3),240,np.uint8);im=Image.fromarray(rgb);d=ImageDraw.Draw(im);font=ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',36);box=d.textbbox((40,40),'GLOWING TEXT',font=font);d.text((40,40),'GLOWING TEXT',font=font,fill='black');rgba=np.ascontiguousarray(cv2.cvtColor(np.array(im),cv2.COLOR_RGB2RGBA));mask=np.zeros(rgb.shape[:2],np.uint8);l,t,r,b=box;mask[t:b,l:r]=255
+  solid=mask.copy();frame=np.zeros_like(mask);frame[t:b,l]=255;frame[t:b,r-1]=255;frame[t,l:r]=255;frame[b-1,l:r]=255
+  for hint in [solid,frame]:self.assertFalse(self.engine.lib.neural_valid(rgba,hint,mask,360,120,*box),'A dense erase needs glyph-shaped evidence, not a rectangle or panel frame')
+
 if __name__=='__main__':unittest.main()

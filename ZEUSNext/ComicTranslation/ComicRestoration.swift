@@ -205,10 +205,32 @@ actor ComicRestoration {
                     if !rect.isNull { zeus_comic_refine_text_mask(p.baseAddress,hints.baseAddress,m.baseAddress,Int32(crop.width),Int32(crop.height),Int32(rect.minX),Int32(rect.minY),Int32(rect.maxX),Int32(rect.maxY)) }
                 }
             } } }
-            let valid=pixels.withUnsafeBufferPointer{p in neural.withUnsafeBufferPointer{h in mask.withUnsafeBufferPointer{m in
-                local.lines.allSatisfy{line in let r=line.rect.integral;return zeus_comic_neural_mask_valid(p.baseAddress,h.baseAddress,m.baseAddress,Int32(crop.width),Int32(crop.height),Int32(r.minX),Int32(r.minY),Int32(r.maxX),Int32(r.maxY)) != 0}
-            }}}
-            guard valid else{continue}
+            func validMask(_ proposed:[UInt8])->Bool{
+                pixels.withUnsafeBufferPointer{p in neural.withUnsafeBufferPointer{h in proposed.withUnsafeBufferPointer{m in
+                    local.lines.allSatisfy{line in let r=line.rect.integral;return zeus_comic_neural_mask_valid(p.baseAddress,h.baseAddress,m.baseAddress,Int32(crop.width),Int32(crop.height),Int32(r.minX),Int32(r.minY),Int32(r.maxX),Int32(r.maxY)) != 0}
+                }}}
+            }
+            if !validMask(mask),local.lines.count>1{
+                // CTD sometimes connects tightly spaced glowing rows. A per-row
+                // edge test loses complete words. Refine the owned paragraph,
+                // then restrict the result to the same row ROIs and revalidate.
+                var alternate=[UInt8](repeating:0,count:mask.count),clipped=alternate
+                let text=local.lines.reduce(CGRect.null){$0.union($1.rect)}
+                let limit=local.balloon ? (local.balloonBounds ?? local.rect):CGRect(x:1,y:1,width:crop.width-2,height:crop.height-2)
+                let pad=max(3,min(text.width,text.height)*0.18),area=text.insetBy(dx:-pad,dy:-pad).intersection(limit).integral
+                if !area.isNull{
+                    pixels.withUnsafeBufferPointer{p in neural.withUnsafeBufferPointer{h in alternate.withUnsafeMutableBufferPointer{m in
+                        zeus_comic_refine_text_mask(p.baseAddress,h.baseAddress,m.baseAddress,Int32(crop.width),Int32(crop.height),Int32(area.minX),Int32(area.minY),Int32(area.maxX),Int32(area.maxY))
+                    }}}
+                    for line in local.lines{
+                        let pad=max(3,min(line.rect.height,line.rect.width)*0.18),r=line.rect.insetBy(dx:-pad,dy:-pad).intersection(limit).integral
+                        guard !r.isNull else{continue}
+                        for y in Int(r.minY)..<Int(r.maxY){for x in Int(r.minX)..<Int(r.maxX){clipped[y*crop.width+x]=alternate[y*crop.width+x]}}
+                    }
+                    if validMask(clipped){mask=clipped}
+                }
+            }
+            guard validMask(mask) else{continue}
             try Task.checkCancellation()
             let glyphs=local.lines.map{min($0.rect.width,$0.rect.height)}.sorted(),glyph=glyphs[glyphs.count/2]
             let textBounds=local.lines.reduce(CGRect.null){$0.union($1.rect)}

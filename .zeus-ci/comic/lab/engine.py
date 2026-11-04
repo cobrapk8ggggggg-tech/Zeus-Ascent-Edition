@@ -139,6 +139,17 @@ class Engine:
         for x,y,r,b in boxes:
             pad=max(3,min(r-x,b-y)*.18);box=[max(1,int(x-pad)),max(1,int(y-pad)),min(w-1,int(r+pad)),min(h-1,int(b+pad))]
             self.lib.refine(rgba,hints,mask,w,h,*box)
+        if len(boxes)>1 and not all(self.lib.neural_valid(rgba,hints,mask,w,h,*map(int,q))for q in boxes):
+            # Adjacent glowing rows can be one connected hint component. Refine
+            # their paragraph together, then clip back to the original row ROIs.
+            union=[min(q[0]for q in boxes),min(q[1]for q in boxes),max(q[2]for q in boxes),max(q[3]for q in boxes)]
+            pad=max(3,min(union[2]-union[0],union[3]-union[1])*.18)
+            area=[max(1,int(union[0]-pad)),max(1,int(union[1]-pad)),min(w-1,int(union[2]+pad)),min(h-1,int(union[3]+pad))]
+            alternate=np.zeros_like(mask);allowed=np.zeros_like(mask);self.lib.refine(rgba,hints,alternate,w,h,*area)
+            for x,y,r,b in boxes:
+                pad=max(3,min(r-x,b-y)*.18);allowed[max(1,int(y-pad)):min(h-1,int(b+pad)),max(1,int(x-pad)):min(w-1,int(r+pad))]=255
+            alternate[allowed==0]=0
+            if all(self.lib.neural_valid(rgba,hints,alternate,w,h,*map(int,q))for q in boxes):mask=alternate
         return mask
     def hints(self,rgb):
         h,w=rgb.shape[:2];scale=min(1024/h,1024/w);cw=max(1,round(w*scale));ch=max(1,round(h*scale))

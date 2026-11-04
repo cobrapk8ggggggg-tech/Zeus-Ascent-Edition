@@ -151,6 +151,27 @@ import UIKit
         XCTAssertEqual(speeches.count,1);XCTAssertEqual(speeches.first?.lines.count,4)
         XCTAssertTrue(speeches.first?.text.contains("AFTER ALL, SHE BELONGS")==true)
     }
+    func testActualAsuraGlowingPanelCleansAllRowsWithoutTouchingItsFrame()async throws{
+        struct Line:Decodable{var text:String;var x:Double;var y:Double;var width:Double;var height:Double;var glyphHeight:Double}
+        struct Fixture:Decodable{var image:String;var lines:[Line];var translation:String}
+        let(data,_)=try await URLSession.shared.data(from:URL(string:"http://127.0.0.1:8765/comic-quality-fixtures?name=neural-asura-glow.json")!)
+        let f=try JSONDecoder().decode(Fixture.self,from:data),source=try ComicPixels.decode(XCTUnwrap(Data(base64Encoded:f.image)))
+        let lines=f.lines.map{ComicLine(text:$0.text,confidence:1,rect:CGRect(x:$0.x,y:$0.y,width:$0.width,height:$0.height),glyphHeight:$0.glyphHeight)}
+        let speech=ComicSpeech(id:"asura-glow",text:lines.map(\.text).joined(separator:" "),lines:lines,rect:lines.reduce(CGRect.null){$0.union($1.rect)},vertical:false,balloon:false)
+        let result=try await ComicRestoration.shared.restore(source,speeches:[speech],requiredHeadroom:0)
+        XCTAssertTrue(result.restored.contains(speech.id),"Glowing glyphs must not be discarded with their connected halo")
+        let before=try XCTUnwrap(ComicPixels.rgba(source,width:source.width,height:source.height)),after=try XCTUnwrap(ComicPixels.rgba(result.image,width:source.width,height:source.height))
+        let all=[UInt8](repeating:255,count:source.width*source.height)
+        XCTAssertLessThanOrEqual(ComicPixels.inkResidue(before,clean:after,mask:all,width:source.width,height:source.height,boxes:lines.map(\.rect)),0.08)
+        for y in 0..<source.height{for x in 0..<source.width where x<20 || x>=source.width-20 || y<20 || y>=source.height-20{
+            let p=(y*source.width+x)*4;XCTAssertEqual(Array(before[p..<p+4]),Array(after[p..<p+4]),"The panel frame must remain unchanged")
+        }}
+        let rendered=try ComicPixels.renderReport(result.image,speeches:[speech],translations:[TranslationSegment(id:speech.id,text:f.translation)],target:"ar",fontName:nil,fontScale:1,requireCleanSource:true,precleanedIDs:result.restored,styleSource:source)
+        XCTAssertTrue(rendered.unresolved.isEmpty)
+        for (name,image) in [("source",source),("clean",result.image),("Arabic",rendered.image)]{
+            let a=XCTAttachment(image:UIImage(cgImage:image));a.name="Asura exact glowing panel - "+name;a.lifetime = .keepAlways;add(a)
+        }
+    }
     func testMemoryDeferralIsRetryableWithoutRunningModelsOrChangingSource()async throws{
         struct Line:Decodable{var x:Double;var y:Double;var width:Double;var height:Double}
         struct Fixture:Decodable{var image:String;var lines:[Line]}

@@ -156,6 +156,30 @@ static inline void comic_refine_text_mask(const unsigned char *rgba,const unsign
         if(edge||component.size()<2||(maxx-minx>w*.8f&&maxy-miny<2))continue;
         for(int p:component)ink[p]=1;
     }
+    // Pale glowing text can be brighter than its paper while its coloured halo
+    // is darker. A single polarity threshold then joins the halo to the paper
+    // and rejects the complete word as an edge component. Retain enclosed CTD
+    // glyph components in that case; never accept an edge-connected hint/frame.
+    if(hints){
+        int supported=0,covered=0;
+        for(int y=0;y<h;y++)for(int x=0;x<w;x++)if(hints[(top+y)*width+left+x]){supported++;if(ink[y*w+x])covered++;}
+        if(supported>=4 && covered<supported*.8f){
+            std::fill(seen.begin(),seen.end(),0);
+            for(int i=0;i<w*h;i++)if(hints[(top+i/w)*width+left+i%w]&&!seen[i]){
+                std::vector<int> component(1,i);seen[i]=1;bool edge=false;int minx=i%w,maxx=minx,miny=i/w,maxy=miny;
+                for(size_t head=0;head<component.size();head++){
+                    int q=component[head],x=q%w,y=q/w;edge=edge||x==0||y==0||x==w-1||y==h-1;
+                    minx=std::min(minx,x);maxx=std::max(maxx,x);miny=std::min(miny,y);maxy=std::max(maxy,y);
+                    for(int dy=-1;dy<=1;dy++)for(int dx=-1;dx<=1;dx++)if(x+dx>=0&&x+dx<w&&y+dy>=0&&y+dy<h){
+                        int next=(y+dy)*w+x+dx;
+                        if(!seen[next]&&hints[(top+y+dy)*width+left+x+dx]){seen[next]=1;component.push_back(next);}
+                    }
+                }
+                if(edge||component.size()<2||component.size()>size_t(w*h*.9f)||(maxx-minx>w*.8f&&maxy-miny<2))continue;
+                for(int q:component)ink[q]=1;
+            }
+        }
+    }
     // Fill holes of outlined glyphs, then include antialiasing and drop shadows.
     std::vector<unsigned char> outside(w*h,0);std::vector<int> queue;
     for(int x=0;x<w;x++){queue.push_back(x);queue.push_back((h-1)*w+x);}for(int y=1;y<h-1;y++){queue.push_back(y*w);queue.push_back(y*w+w-1);}
@@ -187,7 +211,20 @@ static inline bool comic_neural_mask_valid(const unsigned char *rgba,const unsig
     if(comic_mask_coverage(rgba,mask,width,height,left,top,right,bottom,hints)<.95f)return false;
     int count=0,minx=right,maxx=left,miny=bottom,maxy=top;
     for(int y=top;y<bottom;y++)for(int x=left;x<right;x++)if(mask[y*width+x]){count++;minx=std::min(minx,x);maxx=std::max(maxx,x);miny=std::min(miny,y);maxy=std::max(maxy,y);}
-    if(count<std::max(4,w*h/50)||count>w*h*.98)return false;
+    if(count<std::max(4,w*h/50))return false;
+    if(count>w*h*.98f){
+        // Condensed letters with a broad glow can merge after mask dilation.
+        // A dense result is allowed only with independently structured CTD
+        // evidence: a solid rectangle or a detected frame still fails.
+        int supported=0,edge=0,hx0=right,hx1=left,hy0=bottom,hy1=top;
+        for(int y=top;y<bottom;y++)for(int x=left;x<right;x++)if(hints[y*width+x]){
+            supported++;edge+=x==left||x==right-1||y==top||y==bottom-1;
+            hx0=std::min(hx0,x);hx1=std::max(hx1,x);hy0=std::min(hy0,y);hy1=std::max(hy1,y);
+        }
+        if(supported<w*h*.08f||supported>w*h*.8f||edge>supported*.25f)return false;
+        float hx=float(hx1-hx0+1)/w,hy=float(hy1-hy0+1)/h;
+        if(w>=h ? (hx<.8f||hy<.55f):(hy<.8f||hx<.55f))return false;
+    }
     float sx=float(maxx-minx+1)/w,sy=float(maxy-miny+1)/h;
     return w>=h?(sx>=.8f&&sy>=.55f):(sy>=.8f&&sx>=.55f);
 }
