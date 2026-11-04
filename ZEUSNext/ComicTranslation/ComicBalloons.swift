@@ -5,15 +5,27 @@ import ZeusComicRuntime
 /// Recover closed, nearly uniform balloon interiors around recognised lines.
 /// The search is bounded; textured/open regions keep their OCR geometry.
 enum ComicBalloons {
-    static func speeches(_ lines:[ComicLine],image:CGImage,source:String)->[ComicSpeech]{
+    static func speeches(_ lines:[ComicLine],image:CGImage,source:String,reuseValidated:Bool=true,onProbe:(()->Void)?=nil)->[ComicSpeech]{
         guard let pixels=ComicPixels.rgba(image,width:image.width,height:image.height)else{return ComicGeometry.group(lines,source:source)}
         let lines=ComicGeometry.uniqueLines(lines)
         var plates:[Plate]=[]
         // Probe paragraphs as well as individual lines: a small line's search
         // window can end inside a large balloon and miss its enclosure.
-        let probes=ComicGeometry.group(lines,source:source).map(\.rect)+lines.map(\.rect)
-        for probe in probes{
-            guard let plate=closedInterior(probe,pixels:pixels,width:image.width,height:image.height,textBounds:lines.map(\.rect))else{continue}
+        let paragraphs=ComicGeometry.group(lines,source:source).map(\.rect)
+        let probes=paragraphs+lines.map(\.rect)
+        for (index,probe) in probes.enumerated(){
+            // A certified uniform region already owns its glyphs. Do not flood
+            // the same paper again for every row. Actual connected-paper pixels
+            // distinguish an inner/nested region from a filled glyph hole.
+            if reuseValidated,index>=paragraphs.count,plates.contains(where:{reusable($0,for:probe)}){continue}
+            onProbe?()
+            guard var plate=closedInterior(probe,pixels:pixels,width:image.width,height:image.height,textBounds:lines.map(\.rect))else{continue}
+            if reuseValidated,plate.uniform{
+                let contained=lines.filter{plate.rect.contains($0.rect)}
+                if !contained.isEmpty,let cleanup=flatCleanup(plate,lines:contained,lobe:plate.rect,pixels:pixels,width:image.width,height:image.height),cleanup.complete{
+                    plate.validatedLines=contained;plate.validatedCleanup=cleanup
+                }
+            }
             if let index=plates.firstIndex(where:{overlap($0.rect,plate.rect)>0.7}){
                 if plate.rect.width*plate.rect.height>plates[index].rect.width*plates[index].rect.height{plates[index]=plate}
             }else{plates.append(plate)}
@@ -37,7 +49,9 @@ enum ComicBalloons {
                 let vertical=lines.allSatisfy{$0.rect.height>$0.rect.width*1.5}
                 let ordered=ComicGeometry.orderedLines(lines,vertical:vertical)
                 let area=safeRectangle(lobe,plate:plate,lines:lines)
-                result.append(ComicSpeech(id:"",text:ordered.map(\.text).joined(separator:vertical ? "":" "),lines:ordered,rect:area.0,vertical:vertical,balloon:true,flatCleanup:flatCleanup(plate,lines:lines,lobe:lobe,pixels:pixels,width:image.width,height:image.height),angle:vertical ? nil:ComicGeometry.estimateAngle(lines),balloonBounds:lobe,letteringInsideBalloon:area.1))
+                let sameOwners=lobe==plate.rect && lines.count==plate.validatedLines.count && lines.allSatisfy{plate.validatedLines.contains($0)}
+                let cleanup=sameOwners ? plate.validatedCleanup:flatCleanup(plate,lines:lines,lobe:lobe,pixels:pixels,width:image.width,height:image.height)
+                result.append(ComicSpeech(id:"",text:ordered.map(\.text).joined(separator:vertical ? "":" "),lines:ordered,rect:area.0,vertical:vertical,balloon:true,flatCleanup:cleanup,angle:vertical ? nil:ComicGeometry.estimateAngle(lines),balloonBounds:lobe,letteringInsideBalloon:area.1))
             }
         }
         result+=ComicGeometry.group(unplated,source:source)
@@ -53,7 +67,19 @@ enum ComicBalloons {
         return (lines.reduce(CGRect.null){$0.union($1.rect)}.insetBy(dx:-3,dy:-3).intersection(lobe.insetBy(dx:2,dy:2)),false)
     }
     private static func overlap(_ a:CGRect,_ b:CGRect)->CGFloat{let intersection=a.intersection(b);guard !intersection.isNull else{return 0};return intersection.width*intersection.height/max(1,min(a.width*a.height,b.width*b.height))}
-    private struct Plate{var rect:CGRect;var mask:[UInt8];var width:Int;var height:Int;var color:[UInt8];var uniform:Bool}
+    private struct Plate{var rect:CGRect;var mask:[UInt8];var width:Int;var height:Int;var color:[UInt8];var uniform:Bool;var validatedLines:[ComicLine]=[];var validatedCleanup:ComicFlatCleanup?=nil}
+    private static func reusable(_ plate:Plate,for probe:CGRect)->Bool{
+        guard plate.validatedCleanup?.complete==true,plate.validatedCleanup?.uniform==true,
+              plate.rect.contains(probe),min(probe.width,probe.height)>=12,
+              plate.validatedLines.contains(where:{$0.rect==probe})else{return false}
+        let x=Int(plate.rect.minX)-1,y=Int(plate.rect.minY)-1
+        let r=probe.offsetBy(dx:-CGFloat(x),dy:-CGFloat(y)).integral
+        let l=max(0,Int(r.minX)),t=max(0,Int(r.minY)),right=min(plate.width,Int(r.maxX)),bottom=min(plate.height,Int(r.maxY))
+        guard right>l,bottom>t else{return false}
+        var paper=0
+        for yy in t..<bottom{for xx in l..<right{if plate.mask[yy*plate.width+xx]>0{paper+=1}}}
+        return paper*2>=(right-l)*(bottom-t)
+    }
     private static func flatCleanup(_ plate:Plate,lines:[ComicLine],lobe:CGRect,pixels:[UInt8],width:Int,height:Int)->ComicFlatCleanup?{
         let x=Int(plate.rect.minX)-1,y=Int(plate.rect.minY)-1
         let area=lobe.offsetBy(dx:-CGFloat(x),dy:-CGFloat(y)).integral

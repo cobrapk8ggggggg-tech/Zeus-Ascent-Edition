@@ -83,26 +83,69 @@ actor ComicOCR {
             }
         }
         var speeches=ComicBalloons.speeches(lines,image:image,source:detected)
-        // An enclosed glyph without an OCR owner triggers a small second read,
-        // before cleanup. It must never be erased by filling the whole bubble.
+        // Closed dialogues with missing ink need another crop. Low-confidence
+        // external lettering also needs a local Paddle read: Vision can report
+        // a brush word as ALPIGHY, and ML Kit's iOS API has no calibrated score.
+        let uncertain=fast.filter{$0.confidence<0.85}.map(\.rect)
+        func difficult(_ speech:ComicSpeech)->Bool{
+            guard !speech.balloon,ComicModelStore.recognizer(detected)=="latin" else{return false}
+            return speech.lines.contains{line in uncertain.contains{r in r.intersection(line.rect).area/min(max(1,r.area),max(1,line.rect.area))>0.6}}
+        }
+        var repairUnavailable=false
         if fastSupported{
-            let repairs=speeches.filter{$0.flatCleanup?.complete==false}.prefix(mode == .fastest ? 3:8)
-            var additional:[ComicLine]=[]
+            let repairs=speeches.filter{$0.flatCleanup?.complete==false || difficult($0)}.prefix(mode == .fastest ? 3:8)
+            var additional:[ComicLine]=[],replacements:[([ComicLine],[ComicLine])]=[]
             for speech in repairs{
                 try Task.checkCancellation()
-                let area=(speech.balloonBounds ?? speech.rect).insetBy(dx:-4,dy:-4).integral.intersection(CGRect(x:0,y:0,width:image.width,height:image.height))
+                let height=speech.lines.map{min($0.rect.width,$0.rect.height)}.sorted()
+                let margin=difficult(speech) ? max(12,min(48,height[height.count/2]*0.4)):4
+                let area=(speech.balloonBounds ?? speech.rect).insetBy(dx:-margin,dy:-margin).integral.intersection(CGRect(x:0,y:0,width:image.width,height:image.height))
                 guard area.width*area.height<=500_000,let cut=image.cropping(to:area)else{continue}
-                let local=try await self.fast(cut,source:detected)
-                for var line in local{
-                    line.rect=line.rect.offsetBy(dx:area.minX,dy:area.minY)
-                    line.words=line.words?.map{ComicWord(text:$0.text,rect:$0.rect.offsetBy(dx:area.minX,dy:area.minY))}
-                    additional.append(line)
+                func shifted(_ input:[ComicLine])->[ComicLine]{input.map{line in
+                    var value=line;value.rect=value.rect.offsetBy(dx:area.minX,dy:area.minY)
+                    value.words=value.words?.map{ComicWord(text:$0.text,rect:$0.rect.offsetBy(dx:area.minX,dy:area.minY))};return value
+                }}
+                additional+=shifted(try await self.fast(cut,source:detected))
+                if difficult(speech){
+                    do{
+                        if !(await ComicModelStore.shared.isPrepared(source:detected)){
+                            await onPreparing?(true)
+                            do{try await ComicModelStore.shared.prepare(source:detected)}catch{await onPreparing?(false);throw error}
+                            await onPreparing?(false)
+                        }
+                        let precise=shifted(try await ComicPaddle.shared.read(cut,source:detected,careful:false)).filter{line in
+                            line.confidence>=0.8 && speech.rect.contains(CGPoint(x:line.rect.midX,y:line.rect.midY))
+                        }
+                        // A confident short fragment must not replace a whole
+                        // paragraph. Every old row and most letters need owners.
+                        let covers=speech.lines.allSatisfy{old in precise.contains{fresh in fresh.rect.intersection(old.rect).area/max(1,old.rect.area)>=0.8}}
+                        let preciseText=precise.map(\.text).joined()
+                        let oldCount=speech.text.filter{$0.isLetter||$0.isNumber}.count
+                        let newCount=preciseText.filter{$0.isLetter||$0.isNumber}.count
+                        if !precise.isEmpty,covers,Double(newCount)>=Double(oldCount)*0.75{
+                            replacements.append((speech.lines,precise))
+                        }
+                        if !runtime.contains("Paddle"){runtime+=" + targeted Paddle"}
+                    }catch is CancellationError{throw CancellationError()}catch{repairUnavailable=true}
                 }
             }
-            if !additional.isEmpty{lines=Self.merge(lines,accurate:additional);speeches=ComicBalloons.speeches(lines,image:image,source:detected)}
+            if !additional.isEmpty{lines=Self.merge(lines,accurate:additional)}
+            for (old,fresh) in replacements{
+                lines.removeAll{line in old.contains{previous in line.rect.intersection(previous.rect).area/min(max(1,line.rect.area),max(1,previous.rect.area))>0.75}}
+                lines+=fresh
+            }
+            if source=="auto",!replacements.isEmpty,ComicModelStore.recognizer(detected)=="latin"{
+                let text=lines.map(\.text).joined(separator:" ")
+                if text.split(whereSeparator:{$0.isWhitespace}).count>=5{
+                    let recognizer=NLLanguageRecognizer();recognizer.processString(text)
+                    if let language=recognizer.dominantLanguage,ComicModelStore.recognizer(language.rawValue)=="latin",recognizer.languageHypotheses(withMaximum:1)[language,default:0]>=0.6{detected=language.rawValue}
+                }
+            }
+            if !additional.isEmpty || !replacements.isEmpty{speeches=ComicBalloons.speeches(lines,image:image,source:detected)}
         }
-        return ComicReading(lines:lines,speeches:speeches,language:detected,runtime:runtime)
+        return ComicReading(lines:lines,speeches:speeches,language:detected,runtime:runtime,repairUnavailable:repairUnavailable)
     }
+
     // A stronger partial word cannot replace a complete fast line. Retain the
     // union of source bounds even when the readings agree on the full span.
     static func merge(_ fast:[ComicLine],accurate:[ComicLine])->[ComicLine]{

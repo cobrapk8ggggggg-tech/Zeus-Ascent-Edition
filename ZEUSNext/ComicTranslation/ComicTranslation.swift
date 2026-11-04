@@ -24,6 +24,7 @@ import CoreGraphics
     private var textCounts:[String:(Int,Int)]=[:]
     private func countTexts(_ job:String,detected:Int,translated:Int){textCounts[job]=(detected,translated);detectedTexts=textCounts.values.reduce(0){$0+$1.0};translatedTexts=textCounts.values.reduce(0){$0+$1.1}}
     private(set) var ocrRuns=0
+    private(set) var phaseSeconds:[String:Double]=[:]
     @Published var phase: ComicSessionPhase = .idle
     var stage: String { phase.title }
     @Published var showingOriginal = false
@@ -119,7 +120,7 @@ import CoreGraphics
         if let issue=configurationIssue {error=issue;phase = .failed;return}
         schedule()
     }
-    func navigationStarted(){pause();active=false;showingOriginal=false;lastRenderTicket=nil;phase = .idle;appliedRegions.removeAll();diagnostics.removeAll();contextNotice=nil;completed=0;detectedTexts=0;translatedTexts=0;textCounts.removeAll();cleanupCheckpoints.removeAll();cleanupOrder.removeAll();ocrRuns=0;done.removeAll();failed.removeAll();frames.removeAll();documents.removeAll();languageHints.removeAll();readings.removeAll();textResults.removeAll();speechTexts.removeAll();fetched.removeAll();fetchedOrder.removeAll();error=nil}
+    func navigationStarted(){pause();active=false;showingOriginal=false;lastRenderTicket=nil;phase = .idle;appliedRegions.removeAll();diagnostics.removeAll();contextNotice=nil;completed=0;detectedTexts=0;translatedTexts=0;textCounts.removeAll();cleanupCheckpoints.removeAll();cleanupOrder.removeAll();ocrRuns=0;phaseSeconds.removeAll();done.removeAll();failed.removeAll();frames.removeAll();documents.removeAll();languageHints.removeAll();readings.removeAll();textResults.removeAll();speechTexts.removeAll();fetched.removeAll();fetchedOrder.removeAll();error=nil}
     func pause(){resumeWhenVisible=false;paused=true;phase = .paused;retries.values.forEach{$0.cancel()};retries.removeAll();let previousTicket=lastRenderTicket ?? epoch.uuidString;epoch=UUID();work?.cancel();work=nil;running=false;pending=false;Task{_ = try? await call("globalThis.zeusComic?.pause(ticket)",args:["ticket":previousTicket],frame:nil)};for frame in frames.values{Task{_ = try? await call("globalThis.zeusComic?.pause(ticket)",args:["ticket":previousTicket],frame:frame)}}}
     func suspend(){let resume = resumeWhenVisible || (active && !paused);pause();resumeWhenVisible=resume}
     func becameVisible(){if resumeWhenVisible || (!paused && (active||preferences.automatic)){resumeWhenVisible=false;start()}}
@@ -205,6 +206,12 @@ import CoreGraphics
             for region in regions{
                 let job="\(document)|\(candidate.id)|\(candidate.revision)|\(region.y)|\(mark)"
                 let countKey="\(document)|\(candidate.id)|\(candidate.revision)|\(region.y)"
+                var timedPhase:ComicSessionPhase? = .fetching,phaseBegan=Date()
+                func measure(_ next:ComicSessionPhase?){
+                    if let previous=timedPhase{phaseSeconds[previous.rawValue,default:0]+=Date().timeIntervalSince(phaseBegan)}
+                    timedPhase=next;phaseBegan=Date()
+                }
+                defer{measure(nil)}
                 do{
                     phase = .fetching
                     if !prefs.showUntranslated{_ = try await call("zeusComic.hold(id,revision)",args:["id":candidate.id,"revision":candidate.revision],frame:frame)}
@@ -232,8 +239,8 @@ import CoreGraphics
                     // A cover's Latin title must not choose the script for the
                     // following Japanese/Arabic page. Hints belong to one image.
                     let languageHintKey=document+"|"+candidate.id+"|"+candidate.revision
-                    let readingKey=imageHash+"|ocr-v23|\(prefs.source)|\(prefs.mode.rawValue)|vote:\(region.coreTop+offset):\(region.coreBottom-region.coreTop)"
-                    phase = .recognizing
+                    let readingKey=imageHash+"|ocr-v24|\(prefs.source)|\(prefs.mode.rawValue)|vote:\(region.coreTop+offset):\(region.coreBottom-region.coreTop)"
+                    measure(.recognizing);phase = .recognizing
                     let reading:ComicReading
                     if let saved=readings[readingKey]{reading=saved}
                     else if persistent,let stored=await ComicMemory.shared.data(profile:owner,layer:.reading,key:readingKey),let saved=try? JSONDecoder().decode(ComicReading.self,from:stored){reading=saved}
@@ -241,9 +248,9 @@ import CoreGraphics
                             await MainActor.run { if self?.epoch == ticket { self?.phase = preparing ? .downloading:.recognizing } }
                         })
                         try valid(ticket)
-                        if persistent{do{try await ComicMemory.shared.save(JSONEncoder().encode(reading),profile:owner,layer:.reading,key:readingKey)}catch{storageNotice="تعذّر حفظ قراءة الصورة؛ ستظل الجلسة الحالية متاحة."}}
+                        if persistent && reading.repairUnavailable != true{do{try await ComicMemory.shared.save(JSONEncoder().encode(reading),profile:owner,layer:.reading,key:readingKey)}catch{storageNotice="تعذّر حفظ قراءة الصورة؛ ستظل الجلسة الحالية متاحة."}}
                     }
-                    if readings.count>=128{readings.removeAll()};readings[readingKey]=reading
+                    if readings.count>=128{readings.removeAll()};if reading.repairUnavailable != true{readings[readingKey]=reading}
                     if reading.lines.count>=2,!reading.language.isEmpty{languageHints[languageHintKey]=reading.language}
                     try valid(ticket)
                     // A speech touching this core is rendered from its complete context,
@@ -252,7 +259,7 @@ import CoreGraphics
                     let counted=core.filter{$0.rect.midY>=CGFloat(region.coreTop+offset)&&$0.rect.midY<CGFloat(region.coreBottom+offset)}
                     countTexts(countKey,detected:counted.count,translated:min(counted.count,textCounts[countKey]?.1 ?? 0))
                     if core.isEmpty{done.insert(job);_ = try await call("zeusComic.release(id)",args:["id":candidate.id],frame:frame);continue}
-                    phase = .translating
+                    measure(.translating);phase = .translating
                     let segments=core.map{TranslationSegment(id:$0.id,text:$0.text)}
                     let translationKey=readingKey+"|\(translationMark)|"+ComicIdentity.segmentIdentity(segments)
                     let translated:[TranslationSegment]
@@ -263,10 +270,10 @@ import CoreGraphics
                         if persistent && translated.count==segments.count{do{try await ComicMemory.shared.save(JSONEncoder().encode(translated),profile:owner,layer:.translation,key:translationKey)}catch{storageNotice="تعذّر حفظ الترجمة على الجهاز."}}
                     }
                     if translated.count==segments.count{if textResults.count>=64{textResults.removeAll()};textResults[translationKey]=translated}
-                    try valid(ticket);phase = .rendering
+                    try valid(ticket);measure(.rendering);phase = .rendering
                     let renderedKey=translationKey+"|"+prefs.renderIdentity
                     let rendered:Data
-                    var renderingPartial=translated.count != segments.count
+                    var renderingPartial=translated.count != segments.count || reading.repairUnavailable == true
                     var retryPartial=renderingPartial
                     if persistent,let stored=await ComicMemory.shared.data(profile:owner,layer:.rendered,key:renderedKey){rendered=stored;countTexts(countKey,detected:counted.count,translated:counted.count)}
                     else{
@@ -296,7 +303,7 @@ import CoreGraphics
                         }
                         let restored:ComicRestoration.Result
                         if prefs.restorationEnabled ?? true{
-                            let checkpoint=cleanupCheckpoints[job]
+                            let checkpoint=reading.repairUnavailable == true ? nil:cleanupCheckpoints[job]
                             let base:CGImage
                             if let checkpoint{base=try await Task.detached{try ComicPixels.decode(checkpoint.0)}.value}else{base=image}
                             let already=checkpoint?.1 ?? []
@@ -305,7 +312,7 @@ import CoreGraphics
                             })
                             restored=ComicRestoration.Result(image:next.image,restored:already.union(next.restored),notice:next.notice,retryable:next.retryable)
                             try valid(ticket)
-                            try await saveCleanup(restored.image,ids:restored.restored,job:job)
+                            if reading.repairUnavailable != true{try await saveCleanup(restored.image,ids:restored.restored,job:job)}
                             if let notice=restored.notice{contextNotice=notice;sweepFailure=true;renderingPartial=true;retryPartial = retryPartial || restored.retryable}
                         }else{restored=ComicRestoration.Result(image:image,restored:[],notice:nil)}
                         let result=try await Task.detached{let drawing=try ComicPixels.renderReport(restored.image,speeches:core,translations:lettering,target:translation.target,fontName:prefs.fontName,fontScale:prefs.fontScale,textColor:prefs.textColor,ink:prefs.inkStyle,letterSpacing:prefs.letterSpacing ?? 0,requireCleanSource:true,precleanedIDs:restored.restored,styleSource:image)

@@ -151,6 +151,23 @@ import UIKit
         XCTAssertEqual(speeches.count,1);XCTAssertEqual(speeches.first?.lines.count,4)
         XCTAssertTrue(speeches.first?.text.contains("AFTER ALL, SHE BELONGS")==true)
     }
+    func testCertifiedPaperReuseKeepsGeometryAndSkipsRepeatedFloods()throws{
+        for nested in [false,true]{
+            let image=renderer(CGSize(width:640,height:460)).image{context in
+                UIColor.darkGray.setFill();context.fill(CGRect(x:0,y:0,width:640,height:460))
+                let bubble=UIBezierPath(roundedRect:CGRect(x:100,y:35,width:440,height:370),cornerRadius:20)
+                UIColor.white.setFill();bubble.fill();UIColor.black.setStroke();bubble.lineWidth=3;bubble.stroke()
+                if nested{let box=UIBezierPath(rect:CGRect(x:174,y:200,width:226,height:44));box.lineWidth=3;box.stroke()}
+                for index in 0..<6{("HELLO ROW \(index)" as NSString).draw(at:CGPoint(x:180,y:70+index*45),withAttributes:[.font:UIFont.systemFont(ofSize:24),.foregroundColor:UIColor.black])}
+            }.cgImage!
+            let lines=(0..<6).map{ComicLine(text:"HELLO ROW \($0)",confidence:1,rect:CGRect(x:176,y:70+$0*45,width:220,height:34))}
+            var normal=0,optimized=0
+            let reference=ComicBalloons.speeches(lines,image:image,source:"en",reuseValidated:false,onProbe:{normal+=1})
+            let actual=ComicBalloons.speeches(lines,image:image,source:"en",onProbe:{optimized+=1})
+            XCTAssertEqual(actual,reference,"Reusing a region must preserve all geometry, ownership and cleanup masks")
+            if !nested{XCTAssertFalse(actual.isEmpty);XCTAssertLessThan(optimized,normal,"A known six-row dialogue must not be flood-filled seven times")}
+        }
+    }
     func testActualAsuraGlowingPanelCleansAllRowsWithoutTouchingItsFrame()async throws{
         struct Line:Decodable{var text:String;var x:Double;var y:Double;var width:Double;var height:Double;var glyphHeight:Double}
         struct Fixture:Decodable{var image:String;var lines:[Line];var translation:String}

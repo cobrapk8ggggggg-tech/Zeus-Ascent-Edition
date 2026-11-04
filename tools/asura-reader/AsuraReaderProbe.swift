@@ -10,7 +10,7 @@ import WebKit
             let areas=file=="009.webp" ? [CGRect(x:0,y:12188,width:800,height:3812)]:[CGRect(x:0,y:0,width:800,height:3300)]
             for area in areas{
                 let image=try ComicPixels.decodeRegion(data,region:ComicRegion(y:Int(area.minY),width:Int(area.width),height:Int(area.height),coreTop:0,coreBottom:Int(area.height)),expectedHeight:file=="009.webp" ? 16000:3300)
-                let reading=try await ComicOCR.shared.read(image,source:"en",mode:.fastest)
+                let reading=try await ComicOCR.shared.read(image,source:"auto",mode:.fastest)
                 let text=reading.lines.map(\.text).joined(separator:" ").uppercased()
                 for token in expected{XCTAssertTrue(text.contains(token),"Fast local OCR missed \(token): \(text)")}
                 let attachment=XCTAttachment(data:try JSONEncoder().encode(reading),uniformTypeIdentifier:"public.json");attachment.name="Asura actual fastest geometry "+file;attachment.lifetime = .keepAlways;add(attachment)
@@ -48,9 +48,9 @@ import WebKit
         XCTAssertEqual(rows.count,27);XCTAssertFalse(session.running,"Whole chapter exceeded the bounded test deadline")
         XCTAssertGreaterThan(session.detectedTexts,100,"The queue must discover dialogue far beyond the initial viewport")
         XCTAssertTrue(rows.contains{$0["index"]as? String=="25" && $0["painted"]as? Bool==true},"The last story image must be processed without a scroll")
-        let report:[String:Any]=["source":"Asura chapter 2, 27 SHA-pinned originals","mode":"fastest, restoration on, Google Arabic","scroll":scroll ?? -1,"seconds":Date().timeIntervalSince(began),"first_paint_seconds":firstPaint.map{$0 as Any} ?? NSNull(),"detected":session.detectedTexts,"ready":session.translatedTexts,"regions":session.completed,"ocr_runs":session.ocrRuns,"phase":session.phase.rawValue,"notice":session.contextNotice ?? "","error":session.error ?? "","images":rows]
+        let report:[String:Any]=["source":"Asura chapter 2, 27 SHA-pinned originals","mode":"fastest, restoration on, Google Arabic","scroll":scroll ?? -1,"seconds":Date().timeIntervalSince(began),"first_paint_seconds":firstPaint.map{$0 as Any} ?? NSNull(),"detected":session.detectedTexts,"ready":session.translatedTexts,"regions":session.completed,"ocr_runs":session.ocrRuns,"phase_seconds":session.phaseSeconds,"phase":session.phase.rawValue,"notice":session.contextNotice ?? "","error":session.error ?? "","images":rows]
         let attachment=XCTAttachment(data:try JSONSerialization.data(withJSONObject:report,options:[.prettyPrinted,.sortedKeys]),uniformTypeIdentifier:"public.json");attachment.name="Asura entire chapter without scrolling measured results";attachment.lifetime = .keepAlways;add(attachment)
-        for index in [1,2,9,17,25]{
+        for index in [1,2,3,5,9,17,25]{
             // Export the actual applied PNG patches, not a URL or early preview.
             let value=try await view.callAsyncJavaScript("const i=document.images[index],urls=[i.src,...[...i.style.backgroundImage.matchAll(/url\\([\"']?([^\"')]+)[\"']?\\)/g)].map(m=>m[1])].filter(u=>u.startsWith('blob:'));const out=[];for(const url of [...new Set(urls)]){const b=await(await fetch(url)).blob();if(b.type!=='image/png')continue;const bytes=new Uint8Array(await b.arrayBuffer());let raw='';for(let n=0;n<bytes.length;n+=8192)raw+=String.fromCharCode(...bytes.subarray(n,n+8192));out.push(btoa(raw));}return out;",arguments:["index":index],in:nil,contentWorld:ComicTranslation.world)
             for (part,encoded) in ((value as? [String]) ?? []).enumerated(){

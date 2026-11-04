@@ -161,7 +161,7 @@ struct ComicSpeech: Codable, Equatable {
     // paper shape. A fallback bounding box is not a safe restoration mask.
     var letteringInsideBalloon: Bool? = nil
 }
-struct ComicReading: Codable { var lines: [ComicLine]; var speeches: [ComicSpeech]; var language: String; var runtime: String }
+struct ComicReading: Codable { var lines: [ComicLine]; var speeches: [ComicSpeech]; var language: String; var runtime: String; var repairUnavailable:Bool? = nil }
 struct ComicCachedResult: Codable { var version = 1; var reading: ComicReading; var translations: [TranslationSegment] }
 enum ComicFailure: LocalizedError {
     case message(String)
