@@ -15,7 +15,7 @@ import WebKit
                     let(previous,_)=try await URLSession.shared.data(from:URL(string:"http://127.0.0.1:8781/images/001.webp")!)
                     let(next,_)=try await URLSession.shared.data(from:URL(string:"http://127.0.0.1:8781/images/003.webp")!)
                     let before=try ComicPixels.decodeRegion(previous,region:ComicRegion(y:15744,width:800,height:256,coreTop:0,coreBottom:256),expectedHeight:16000)
-                    let after=try ComicPixels.decodeRegion(next,region:ComicRegion(y:0,width:800,height:256,coreTop:0,coreBottom:256),expectedHeight:11904)
+                    let after=try ComicPixels.decodeRegion(next,region:ComicRegion(y:0,width:800,height:256,coreTop:0,coreBottom:256),expectedHeight:16000)
                     let window=try ComicWindow.join(center,before:before,after:after)
                     image=window.image;owned=CGRect(x:0,y:window.offset,width:center.width,height:center.height)
                 }

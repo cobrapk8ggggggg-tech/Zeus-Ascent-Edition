@@ -130,3 +130,18 @@ extern "C" float zeus_comic_ink_residue(const unsigned char*s,const unsigned cha
 extern "C" int zeus_comic_plate_color(const unsigned char*p,int iw,int ih,const unsigned char*m,int w,int h,int x,int y,unsigned char*c){return comic_plate_color(p,iw,ih,m,w,h,x,y,c);}
 
 extern "C" int zeus_comic_lettering_box(const unsigned char*p,int w,int h,int l,int t,int r,int b,const int*boxes,int n,int*out){return comic_lettering_box(p,w,h,l,t,r,b,boxes,n,out);}
+
+#include <zlib.h>
+unsigned long zeus_comic_deflate(const unsigned char *input,unsigned long size,unsigned char *output,unsigned long capacity){
+    if(!input||!output||size>16777216)return 0;
+    uLongf count=capacity;
+    return compress2(output,&count,input,size,1)==Z_OK?count:0;
+}
+int zeus_comic_inflate(const unsigned char *input,unsigned long size,unsigned char *output,unsigned long expected){
+    if(!input||!output||size>16777216||expected>16777216)return 0;
+    z_stream stream{};stream.next_in=const_cast<Bytef*>(input);stream.avail_in=static_cast<uInt>(size);stream.next_out=output;stream.avail_out=static_cast<uInt>(expected);
+    if(inflateInit(&stream)!=Z_OK)return 0;
+    int result=inflate(&stream,Z_FINISH);
+    bool valid=result==Z_STREAM_END&&stream.total_out==expected&&stream.avail_in==0;
+    inflateEnd(&stream);return valid?1:0;
+}

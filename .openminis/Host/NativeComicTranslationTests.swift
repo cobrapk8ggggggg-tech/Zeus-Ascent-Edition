@@ -539,6 +539,28 @@ import ZeusComicRuntime
         let result=try ComicPixels.render(image,speeches:speeches,translations:[TranslationSegment(id:"0",text:"أظن ذلك."),TranslationSegment(id:"1",text:"سيكون الأمر محرجًا لو كنت فتاة.")],target:"ar",fontName:nil,fontScale:1)
         let attachment=XCTAttachment(image:UIImage(cgImage:result));attachment.name="Connected real balloons - separate Arabic paragraphs";attachment.lifetime = .keepAlways;add(attachment)
     }
+    func testUncheckedRenderingKeepsTranslationWhenCleanupGateRejects()throws{
+        let image=renderer(CGSize(width:400,height:160)).image{ctx in
+            UIColor.blue.setFill();ctx.fill(CGRect(x:0,y:0,width:400,height:160))
+            ("HELLO" as NSString).draw(at:CGPoint(x:40,y:45),withAttributes:[.font:UIFont.boldSystemFont(ofSize:40),.foregroundColor:UIColor.white])
+        }.cgImage!
+        let line=ComicLine(text:"HELLO",confidence:1,rect:CGRect(x:38,y:45,width:180,height:50))
+        let speech=ComicSpeech(id:"force",text:"HELLO",lines:[line],rect:CGRect(x:30,y:30,width:250,height:100),vertical:false,balloon:false)
+        let translated=[TranslationSegment(id:"force",text:String(repeating:"مرحبا بكم في هذا العالم ",count:30))]
+        let strict=try ComicPixels.renderReport(image,speeches:[speech],translations:translated,target:"ar",fontName:nil,fontScale:1,requireCleanSource:true,allowEmpty:true)
+        XCTAssertEqual(strict.unresolved,["force"],"The fixture must actually exercise rejection before bypass is enabled")
+        let unchecked=try ComicPixels.renderReport(image,speeches:[speech],translations:translated,target:"ar",fontName:nil,fontScale:1,requireCleanSource:false,allowEmpty:true)
+        XCTAssertTrue(unchecked.unresolved.isEmpty)
+        XCTAssertNil(ComicPreferences().bypassQualityChecks)
+        var prefs=ComicPreferences();let original=prefs.renderIdentity;prefs.bypassQualityChecks=true
+        XCTAssertNotEqual(original,prefs.renderIdentity,"Strict and unchecked output must never share cached images")
+    }
+    func testCloudTensorTransportRoundTripsWithoutLosingFloatBits()throws{
+        let values:[Float]=[0,1,-1,0.3,Float.leastNonzeroMagnitude,123.456]
+        let decoded=try ComicCloudRestoration.unpack(ComicCloudRestoration.pack(values),count:values.count)
+        XCTAssertEqual(decoded.map(\.bitPattern),values.map(\.bitPattern))
+        XCTAssertThrowsError(try ComicCloudRestoration.unpack(ComicCloudRestoration.pack(values),count:values.count+1))
+    }
     func testAutomaticInkKeepsSourceOutlineAfterRestoration()throws{
         XCTAssertEqual(ComicPreferences().inkStyle,.automatic)
         let size=CGSize(width:400,height:160),bg=UIColor(red:0.25,green:0.4,blue:0.6,alpha:1)

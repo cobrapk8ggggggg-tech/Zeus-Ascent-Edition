@@ -10,7 +10,7 @@ enum BrowserAction: String, CaseIterable, Identifiable {
     var symbol: String {
         switch self {
         case .assistant: return "sparkles"
-        case .translateImages: return "character.viewfinder"
+        case .translateImages: return "photo.badge.checkmark"
         case .translate: return "translate"
         case .saveForm: return "plus.rectangle.on.rectangle"; case .fillForm: return "square.and.pencil"
         case .bookmark: return "bookmark.badge.plus"; case .pinTab: return "pin"; case .twinHorizontal: return "rectangle.split.2x1"; case .twinVertical: return "rectangle.split.1x2"; case .savePage: return "doc"; case .printPage: return "printer"; case .darkPage: return "moon"; case .fullScreen: return "arrow.up.left.and.arrow.down.right"

@@ -154,6 +154,9 @@ import CoreGraphics
     private var configurationIssue: String? {
         guard let model else{return nil}
         let prefs=preferences,translation=prefs.resolvedTranslation(model.data.settings)
+        if prefs.useCloudRestoration ?? false{
+            guard let endpoint=URL(string:prefs.cloudRestorationURL ?? ""),endpoint.scheme=="https",endpoint.host != nil else{return "حدد عنوان HTTPS لخادم الترميم السحابي من إعدادات الصور."}
+        }
         if prefs.localModel {
             return FileManager.default.fileExists(atPath:ComicLocalTranslator.modelURL.path) ? nil:"استورد نموذج GGUF من إعدادات الصور قبل بدء الترجمة المحلية."
         }
@@ -238,7 +241,7 @@ import CoreGraphics
         let provider=model.data.settings.aiProviders?.first{$0.id==translation.providerID}
         let translationMark=ComicIdentity.settings(prefs,translation:translation,provider:provider)+"|"+prefs.engine.rawValue+"|local:\(prefs.localModel)|"+ComicLocalTranslator.modelIdentity
         let mark=translationMark+"|"+prefs.renderIdentity
-        let persistent=translation.keepsTranslations && !model.profile.isPrivate
+        let persistent=(prefs.translation?.retainTranslations ?? false) && !model.profile.isPrivate
         lastRenderTicket=ticket.uuidString
         let generation=try await call("return zeusComic.resume(mark,ticket)",args:["mark":mark,"ticket":ticket.uuidString],frame:frame)as? Int ?? 0
         let value=try await call("return zeusComic.scan(wake)",args:["wake":prefs.readAhead],frame:frame)
@@ -363,7 +366,7 @@ import CoreGraphics
                             immediateCount=ready
                             if ready>0 && ready<eligible.count{
                                 let preview=try await Task.detached{()->(Data,[String]) in
-                                    let report=try ComicPixels.renderReport(base,speeches:core,translations:lettering,target:translation.target,fontName:prefs.fontName,fontScale:prefs.fontScale,textColor:prefs.textColor,ink:prefs.inkStyle,letterSpacing:prefs.letterSpacing ?? 0,requireCleanSource:true,precleanedIDs:already,styleSource:image)
+                                    let report=try ComicPixels.renderReport(base,speeches:core,translations:lettering,target:translation.target,fontName:prefs.fontName,fontScale:prefs.fontScale,textColor:prefs.textColor,ink:prefs.inkStyle,letterSpacing:prefs.letterSpacing ?? 0,requireCleanSource:!(prefs.bypassQualityChecks ?? false),precleanedIDs:already,styleSource:image)
                                     let area=CGRect(x:0,y:region.coreTop+offset,width:region.width,height:region.coreBottom-region.coreTop)
                                     guard let crop=report.image.cropping(to:area)else{throw ComicFailure.message("تعذّر تجهيز النصوص الجاهزة.")};return(try ComicPixels.png(crop),report.unresolved)
                                 }.value
@@ -381,7 +384,7 @@ import CoreGraphics
                             let remaining=eligible.filter{!already.contains($0.id)}
                             let needsModels=remaining.count>immediateCount
                             var waitingForModels=false
-                            if needsModels{waitingForModels = !(await restorationPrepared())}
+                            if needsModels && !(prefs.useCloudRestoration ?? false){waitingForModels = !(await restorationPrepared())}
                             let deferInitial=needsModels && prefs.readAhead && !hadInitialLettering && !didDeferInitialArtwork && envelope.items.count>1
                             let deferArtwork=needsModels && prefs.readAhead && !artworkPass && !nearby.contains(region.y)
                             if waitingForModels{prepareRestoration(for:job,ticket:ticket)}
@@ -391,7 +394,7 @@ import CoreGraphics
                             if deferringRestoration{restored=ComicRestoration.Result(image:base,restored:already,notice:nil)}
                             else{
                                 if needsModels{onRestorationAttempt?(job)}
-                                let next=try await ComicRestoration.shared.restore(base,speeches:remaining,onPreparing:{ [weak self] preparing in
+                                let next=try await ComicRestoration.shared.restore(base,speeches:remaining,cloud:(prefs.useCloudRestoration ?? false) ? URL(string:prefs.cloudRestorationURL ?? ""):nil,onPreparing:{ [weak self] preparing in
                                     await MainActor.run{if self?.epoch==ticket{self?.phase=preparing ? .downloading:.rendering}}
                                 })
                                 restored=ComicRestoration.Result(image:next.image,restored:already.union(next.restored),notice:next.notice,retryable:next.retryable)
@@ -400,7 +403,7 @@ import CoreGraphics
                                 if let notice=restored.notice{contextNotice=notice;sweepFailure=true;renderingPartial=true;retryPartial = retryPartial || restored.retryable}
                             }
                         }else{restored=ComicRestoration.Result(image:image,restored:[],notice:nil)}
-                        let result=try await Task.detached{let drawing=try ComicPixels.renderReport(restored.image,speeches:core,translations:lettering,target:translation.target,fontName:prefs.fontName,fontScale:prefs.fontScale,textColor:prefs.textColor,ink:prefs.inkStyle,letterSpacing:prefs.letterSpacing ?? 0,requireCleanSource:true,precleanedIDs:restored.restored,styleSource:image,allowEmpty:true)
+                        let result=try await Task.detached{let drawing=try ComicPixels.renderReport(restored.image,speeches:core,translations:lettering,target:translation.target,fontName:prefs.fontName,fontScale:prefs.fontScale,textColor:prefs.textColor,ink:prefs.inkStyle,letterSpacing:prefs.letterSpacing ?? 0,requireCleanSource:!(prefs.bypassQualityChecks ?? false),precleanedIDs:restored.restored,styleSource:image,allowEmpty:true)
                         // Only this core is applied. Recognition context is retained above/below.
                         let rect=CGRect(x:0,y:region.coreTop+offset,width:region.width,height:region.coreBottom-region.coreTop)
                         guard let crop=drawing.image.cropping(to:rect)else{throw ComicFailure.message("تعذّر قص منطقة الرسم.")};return (try ComicPixels.png(crop),drawing.unresolved,drawing.reasons)}.value

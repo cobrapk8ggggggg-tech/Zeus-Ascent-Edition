@@ -201,6 +201,8 @@ struct StorageSettingsPage: View {
     @State private var bytes: Int64 = 0
     @State private var sites = 0
     @State private var freeBytes: Int64 = 0
+    @State private var imageCacheBytes: Int64 = 0
+    @State private var imageModelBytes: Int64 = 0
     @State private var action: String?
     @State private var busy = false
     @State private var result: String?
@@ -213,6 +215,13 @@ struct StorageSettingsPage: View {
                 NavigationLink("محادثات الوكيل ومرفقاتها") { AgentStoragePage(context: context) }
             }
             ThemedSection("البيانات") { LabeledContent("ملفات الحساب", value: byteText(bytes)); LabeledContent("مواقع خزّنت بيانات", value: "\(sites)"); LabeledContent("المساحة المتاحة بالجهاز", value: byteText(freeBytes)); Button("مسح الملفات المؤقتة") { action = "cache" }.accessibilityIdentifier("clearCacheButton"); Button("مسح الكوكيز وبيانات المواقع") { action = "web" }; Button("مسح سجل التصفح") { action = "history" }; Button("مسح سجل البحث") { action = "search" }; Button("حذف التنزيلات") { action = "downloads" } }
+            ThemedSection("ترجمة الصور — مساحة محلية مستقلة") {
+                LabeledContent("القراءات والصور المحفوظة لكل البروفايلات", value: byteText(imageCacheBytes))
+                LabeledContent("نماذج القراءة والترميم", value: byteText(imageModelBytes))
+                Text("هذه الملفات تعمل على الجهاز ولا تُحذف بمسح قاعدة بيانات المواقع. حذف النماذج يتطلب تنزيلها مجددًا عند استخدامها.").font(.footnote)
+                Button("حذف كل نتائج ترجمة الصور محليًا", role: .destructive) { action = "comic-cache" }
+                Button("حذف جميع نماذج قراءة الصور والترميم", role: .destructive) { action = "comic-models" }
+            }
             if context.isActive { ThemedSection { NavigationLink("المفضلة والسجل") { LibrarySheet(model: context.model) }; NavigationLink("السكربتات") { ScriptsSheet(model: context.model) } } }
             if context.model.profile.isAdmin { ThemedSection { Button("مسح كاش الصور من إصدار ZEUS القديم") { action = "legacy" }; Button("إعادة ضبط التطبيق وكل الحسابات") { action = "reset" } } }
             if let result { Text(result).font(.footnote) }
@@ -221,6 +230,8 @@ struct StorageSettingsPage: View {
     }
     private func refresh() async {
         let folder = context.model.profiles.folder(for: context.profile), downloads = context.model.profiles.downloads(for: context.profile)
+        imageCacheBytes = await Task.detached { BrowserDisk.size(at: ComicMemory.root) }.value
+        imageModelBytes = await Task.detached { BrowserDisk.size(at: ComicModelStore.root) }.value
         freeBytes = ((try? FileManager.default.attributesOfFileSystem(forPath: NSHomeDirectory())[.systemFreeSize]) as? NSNumber)?.int64Value ?? 0
         bytes = await Task.detached { BrowserDisk.size(at: folder) + BrowserDisk.size(at: downloads) }.value
         let records: [WKWebsiteDataRecord] = await withCheckedContinuation { c in context.model.profiles.websiteDataStore(for: context.profile).fetchDataRecords(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes()) { c.resume(returning: $0) } }; sites = records.count
@@ -234,6 +245,12 @@ struct StorageSettingsPage: View {
         case "history", "search": if context.isActive { if selected == "history" { model.data.history = [] } else { model.data.searches = [] }; model.persist() } else { var data = model.profiles.load(context.profile); if selected == "history" { data.history = [] } else { data.searches = [] }; model.profiles.save(data, for: context.profile) }
         case "downloads": model.downloads.removeAll(profileID: context.profileID)
         case "legacy": do { let removed = try await BrowserDisk.clearLegacyImageCache(); FaviconMemory.purge(); result = "مُسح كاش الصور القديم: " + byteText(removed) } catch { result = error.localizedDescription }; await refresh(); return
+        case "comic-cache", "comic-models":
+            for tab in model.tabs { tab.comicTranslation?.pause() }
+            do {
+                if selected == "comic-cache" { try await ComicMemory.shared.clearAll() }
+                else { await ComicOCR.shared.purge(); await ComicPaddle.shared.purge(); await ComicRestoration.shared.purge(); try await ComicModelStore.shared.removeAll() }
+            } catch { result = error.localizedDescription; await refresh(); return }
         case "reset": await model.resetApplication()
         default: break
         }

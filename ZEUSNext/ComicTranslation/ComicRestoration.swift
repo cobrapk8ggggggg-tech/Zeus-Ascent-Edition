@@ -16,6 +16,7 @@ actor ComicRestoration {
     private var deferredForMemory=false
     private var busy=false
     private var waiting:[UUID:CheckedContinuation<Void,Error>]=[:]
+    private var cloudEndpoint:URL?
     private var minimumHeadroom:UInt64=1_200_000_000
     private func enqueue(_ id:UUID)async throws{
         try Task.checkCancellation()
@@ -84,6 +85,14 @@ actor ComicRestoration {
     }
     private func hints(_ rgba: [UInt8], width: Int, height: Int) async throws -> [UInt8] {
         let a = input(rgba, width: width, height: height, edge: 1024, reflected: false)
+        if let endpoint=cloudEndpoint{
+            let values=try await ComicCloudRestoration.infer("ctd.onnx",inputs:["image":a.values],endpoint:endpoint)
+            var mask=[UInt8](repeating:0,count:width*height)
+            for y in 0..<height{for x in 0..<width{
+                if values[min(a.height-1,y*a.height/height)*1024+min(a.width-1,x*a.width/width)]>0.3{mask[y*width+x]=255}
+            }}
+            return mask
+        }
         let s = try await session("ctd.onnx")
         let names = try s.outputNames(), inputs = try s.inputNames()
         guard names.count == 3, let name = inputs.first else { throw ComicFailure.message("واجهة كاشف حبر النص غير صالحة.") }
@@ -103,10 +112,14 @@ actor ComicRestoration {
             let sx = min(width - 1, x * width / a.width), sy = min(height - 1, y * height / a.height)
             m[y * 512 + x] = mask[sy * width + sx] > 0 ? 1 : 0
         } }
-        let s = try await session("lama.onnx"), names = try s.outputNames()
-        guard let name = names.first else { throw ComicFailure.message("واجهة نموذج الترميم غير صالحة.") }
-        let output = try s.run(withInputs: ["image": tensor(a.values, shape: [1,3,512,512]), "mask": tensor(m, shape: [1,1,512,512])], outputNames: Set([name]), runOptions: nil)
-        let values = try floats(output[name]!, count: 512 * 512 * 3)
+        let values:[Float]
+        if let endpoint=cloudEndpoint{values=try await ComicCloudRestoration.infer("lama.onnx",inputs:["image":a.values,"mask":m],endpoint:endpoint)}
+        else{
+            let s = try await session("lama.onnx"), names = try s.outputNames()
+            guard let name = names.first else { throw ComicFailure.message("واجهة نموذج الترميم غير صالحة.") }
+            let output = try s.run(withInputs: ["image": tensor(a.values, shape: [1,3,512,512]), "mask": tensor(m, shape: [1,1,512,512])], outputNames: Set([name]), runOptions: nil)
+            values = try floats(output[name]!, count: 512 * 512 * 3)
+        }
         var result = rgba
         for y in 0..<height { for x in 0..<width where mask[y * width + x] > 0 {
             let fx = min(Double(a.width - 1), (Double(x) + 0.5) * Double(a.width) / Double(width) - 0.5)
@@ -165,18 +178,21 @@ actor ComicRestoration {
         }
         return ids
     }
-    func restore(_ image: CGImage, speeches: [ComicSpeech], requiredHeadroom:UInt64=1_200_000_000, onPreparing: (@Sendable (Bool) async -> Void)? = nil) async throws -> Result {
-        try await acquire();defer{release()};try Task.checkCancellation();minimumHeadroom=requiredHeadroom;deferredForMemory=false
+    func restore(_ image: CGImage, speeches: [ComicSpeech], requiredHeadroom:UInt64=1_200_000_000, cloud:URL?=nil, onPreparing: (@Sendable (Bool) async -> Void)? = nil) async throws -> Result {
+        try await acquire();defer{release()};try Task.checkCancellation();minimumHeadroom=requiredHeadroom;deferredForMemory=false;cloudEndpoint=cloud
+        defer{cloudEndpoint=nil}
         guard let original = ComicPixels.rgba(image, width: image.width, height: image.height) else { throw ComicFailure.message("تعذّر تجهيز ترميم الخلفية.") }
         let candidates = speeches.filter { !ComicPixels.canClean(original, width: image.width, height: image.height, speech: $0) }
         if candidates.isEmpty { return Result(image: image, restored: [], notice: nil) }
         await ComicOCR.shared.purge(); await ComicPaddle.shared.purge(); await ComicLocalTranslator.shared.unload(); current = nil;currentName=nil
-        guard zeus_comic_available_memory() >= requiredHeadroom else {
+        guard cloudEndpoint != nil || zeus_comic_available_memory() >= requiredHeadroom else {
             return Result(image: image, restored: [], notice: "لم تتوفر ذاكرة كافية لترميم بعض الخلفيات؛ احتُفظ بأصلها.", retryable:true)
         }
-        await onPreparing?(true)
-        do { try await prepare() } catch { await onPreparing?(false); throw error }
-        await onPreparing?(false)
+        if cloudEndpoint==nil{
+            await onPreparing?(true)
+            do { try await prepare() } catch { await onPreparing?(false); throw error }
+            await onPreparing?(false)
+        }
         defer { current = nil;currentName=nil }
         var result = original, ids = Set<String>(),jobs:[MaskedCrop]=[],pendingPixels=0
         for speech in candidates {

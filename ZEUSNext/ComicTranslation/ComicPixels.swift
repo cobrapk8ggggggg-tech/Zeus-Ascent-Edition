@@ -44,7 +44,7 @@ enum ComicPixels {
         for speech in speeches {
             guard let text=translated[speech.id],!text.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty else{continue}
             if !needsLettering(speech.text,text){resolved.insert(speech.id);continue}
-            guard let (area,placed)=planned(speech,text:text,width:image.width,height:image.height,target:target,fontName:fontName,fontScale:fontScale,letterSpacing:letterSpacing,requireReadable:requireCleanSource)else{reasons[speech.id]="layout";continue}
+            guard let (area,placed)=planned(speech,text:text,width:image.width,height:image.height,target:target,fontName:fontName,fontScale:fontScale,letterSpacing:letterSpacing,requireReadable:requireCleanSource) ?? (requireCleanSource ? nil:uncheckedPlacement(speech,text:text,width:image.width,height:image.height,target:target,fontName:fontName))else{reasons[speech.id]="layout";continue}
             let background=backgroundColor(original,width:image.width,height:image.height,rect:area)
             if !precleanedIDs.contains(speech.id){
                 let mask=sourceMask(original,width:image.width,height:image.height,speech:speech)
@@ -101,6 +101,24 @@ enum ComicPixels {
         guard let placed=placement else{return nil}
         if requireReadable && placed.layout.size<sourceSize*CGFloat(min(1.5,max(0.5,fontScale)))*0.55{return nil}
         return(area,placed)
+    }
+    private static func uncheckedPlacement(_ speech:ComicSpeech,text:String,width:Int,height:Int,target:String,fontName:String?)->(CGRect,Placement)?{
+        let bounds=CGRect(x:0,y:0,width:width,height:height)
+        var area=speech.rect.intersection(bounds)
+        guard !area.isNull,area.width>0,area.height>0 else{return nil}
+        area=area.insetBy(dx:-max(0,(40-area.width)/2),dy:-max(0,(24-area.height)/2)).intersection(bounds)
+        let style=NSMutableParagraphStyle();style.alignment = .center;style.baseWritingDirection=TranslationPreferences.rtl(target) ? .rightToLeft:.leftToRight;style.lineBreakMode = .byCharWrapping
+        let font=fontName ?? (target.hasPrefix("ar") ? "GeezaPro":"ArialMT")
+        var low:CGFloat=0.1,high:CGFloat=max(4,min(96,area.height)),best:TextLayout?
+        for _ in 0..<14{
+            let size=(low+high)/2
+            let value=NSAttributedString(string:text,attributes:[NSAttributedString.Key(kCTFontAttributeName as String):CTFontCreateWithName(font as CFString,size,nil),.paragraphStyle:style])
+            var fit=CFRange()
+            let measured=CTFramesetterSuggestFrameSizeWithConstraints(CTFramesetterCreateWithAttributedString(value),CFRange(),nil,CGSize(width:area.width-2,height:CGFloat.greatestFiniteMagnitude),&fit)
+            if fit.length==value.length,measured.height<=area.height-2{best=TextLayout(text:value,height:ceil(measured.height),size:size);low=size}else{high=size}
+        }
+        guard let value=best else{return nil}
+        return(area,Placement(layout:value,box:CGRect(x:-(area.width-2)/2,y:-value.height/2,width:area.width-2,height:value.height),theta:0))
     }
     struct Placement{var layout:TextLayout;var box:CGRect;var theta:CGFloat}
     // Fit the translation inside the speech area. Non-zero theta (diagonal tails,

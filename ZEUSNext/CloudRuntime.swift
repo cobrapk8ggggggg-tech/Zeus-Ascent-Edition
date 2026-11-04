@@ -308,6 +308,10 @@ actor CloudCheckpointGate {
         if components.count == 2 { url.percentEncodedQuery = String(components[1]) }
         return try await request(url.url!, method: method, body: body)
     }
+    static func comicInference(endpoint: URL, body: Data) async throws -> Data {
+        guard endpoint.scheme == "https", endpoint.user == nil, endpoint.password == nil else { throw CloudAccountError.invalidResponse }
+        return try await request(endpoint.appendingPathComponent("v1/comic/infer"), method: "POST", body: body)
+    }
     private static func request(_ url: URL, method: String, body: Data?) async throws -> Data {
         guard let id = CloudAccount.shared.identity?.id else { throw CloudAccountError.wrongOwner }
         var request = URLRequest(url: url); request.httpMethod = method; request.httpBody = body; request.timeoutInterval = 90

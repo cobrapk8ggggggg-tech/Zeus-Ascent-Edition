@@ -13,6 +13,10 @@ jobs:
   live:
     runs-on: macos-15
     timeout-minutes: 65
+    strategy:
+      fail-fast: false
+      matrix:
+        quality: [strict, unchecked]
     steps:
       - uses: actions/checkout@v4
         with: {fetch-depth: 0}
@@ -24,6 +28,13 @@ jobs:
         run: |
           mkdir -p results
           cp tools/asura-reader/AsuraReaderProbe.swift .openminis/Host/NativeComicTranslationTests.swift
+          if [ "${{ matrix.quality }}" = unchecked ]; then
+            python3 - <<'PYCODE'
+          from pathlib import Path
+          p=Path('.openminis/Host/NativeComicTranslationTests.swift')
+          p.write_text(p.read_text().replace('prefs.restorationEnabled=true;', 'prefs.restorationEnabled=true;prefs.bypassQualityChecks=true;'))
+          PYCODE
+          fi
           xcrun swiftc -frontend -parse .openminis/Host/NativeComicTranslationTests.swift
           python3 .zeus-ci/project.py
           xcodegen generate --spec zeus-project.json
@@ -65,6 +76,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: live-asura-reader-evidence
+          name: live-asura-reader-evidence-${{ matrix.quality }}
           path: results
           retention-days: 14

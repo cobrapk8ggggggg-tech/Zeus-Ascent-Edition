@@ -5,7 +5,7 @@ actor ComicMemory {
     private var deleted=Set<UUID>()
     static let root = FileManager.default.urls(for:.applicationSupportDirectory,in:.userDomainMask)[0].appendingPathComponent("ZEUSComicMemory")
     enum Layer: String { case reading, translation, rendered
-        var limit:Int { self == .rendered ? 256*1024*1024 : 32*1024*1024 }
+        var limit:Int { self == .rendered ? 16*1024*1024 : 4*1024*1024 }
     }
     private func path(profile:UUID,layer:Layer,key:String)->URL {Self.root.appendingPathComponent(profile.uuidString).appendingPathComponent(layer.rawValue).appendingPathComponent(ComicIdentity.hash(key))}
     func data(profile:UUID,layer:Layer,key:String)->Data?{

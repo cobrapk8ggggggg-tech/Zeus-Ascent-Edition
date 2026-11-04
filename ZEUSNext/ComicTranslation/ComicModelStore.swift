@@ -10,6 +10,7 @@ actor ComicModelStore {
         guard let url=Bundle.main.url(forResource:"comic-models",withExtension:"json"),let data=try? Data(contentsOf:url),let c=try? JSONDecoder().decode(Catalog.self,from:data),c.version==1 else{return []};return c.models
     }()
     private var loading: [String: Task<URL, Error>] = [:]
+    private var generation=UUID()
     private var verified: [String:Date] = [:]
     func file(_ name: String, download: Bool) async throws -> URL {
         guard let artifact=Self.catalog.first(where:{$0.name==name}) else{throw ComicFailure.message("ملف نموذج OCR غير معروف: \(name)")}
@@ -17,6 +18,7 @@ actor ComicModelStore {
         if try validLocal(artifact) {return destination}
         guard download else{throw ComicFailure.message("نزّل حزمة OCR للغة المصدر من إعدادات ترجمة الصور أولًا.")}
         if let task=loading[name]{return try await task.value}
+        let ticket=generation
         let task=Task<URL,Error>{
             try FileManager.default.createDirectory(at:Self.root,withIntermediateDirectories:true)
             var directory=Self.root;var values=URLResourceValues();values.isExcludedFromBackup=true;try directory.setResourceValues(values)
@@ -25,13 +27,15 @@ actor ComicModelStore {
             let (temporary,response)=try await session.download(from:URL(string:artifact.url)!)
             defer{try? FileManager.default.removeItem(at:temporary)}
             guard (response as? HTTPURLResponse)?.statusCode==200,try Self.valid(temporary,artifact:artifact) else{throw ComicFailure.message("فشل التحقق من حجم أو بصمة نموذج OCR؛ لم يُعتمد الملف.")}
+            try Task.checkCancellation()
+            guard generation==ticket else{throw CancellationError()}
             let part=Self.root.appendingPathComponent(name+".part")
             try? FileManager.default.removeItem(at:part);try FileManager.default.moveItem(at:temporary,to:part)
             try? FileManager.default.removeItem(at:destination);try FileManager.default.moveItem(at:part,to:destination)
             return destination
         }
         loading[name]=task
-        defer{loading[name]=nil}
+        defer{if generation==ticket{loading[name]=nil}}
         return try await withTaskCancellationHandler(operation:{try await task.value},onCancel:{task.cancel()})
     }
     static func valid(_ url:URL,artifact:ComicModelArtifact)throws->Bool{
@@ -71,7 +75,10 @@ actor ComicModelStore {
         await onProgress?(files.count,files.count)
     }
     static func recognizer(_ language:String)->String { if language.hasPrefix("ko"){return "korean"};if language.hasPrefix("ja")||language.hasPrefix("zh"){return "han"};if ["ar","fa","ur"].contains(where:language.hasPrefix){return "arabic"};if ["ru","uk","bg","sr"].contains(where:language.hasPrefix){return "cyrillic"};if language.hasPrefix("el"){return "greek"};if ["hi","mr","ne"].contains(where:language.hasPrefix){return "devanagari"};if language.hasPrefix("th"){return "thai"};if language.hasPrefix("ta"){return "tamil"};if language.hasPrefix("te"){return "telugu"};return "latin" }
-    func removeAll()throws{verified.removeAll();try? FileManager.default.removeItem(at:Self.root)}
+    func removeAll()throws{
+        generation=UUID();loading.values.forEach{$0.cancel()};loading.removeAll();verified.removeAll()
+        if FileManager.default.fileExists(atPath:Self.root.path){try FileManager.default.removeItem(at:Self.root)}
+    }
 }
 private final class ComicModelDownloadLimit:NSObject,URLSessionDownloadDelegate,@unchecked Sendable{
     let limit:Int64

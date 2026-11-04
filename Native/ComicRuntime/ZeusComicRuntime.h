@@ -17,6 +17,8 @@ int zeus_comic_plate_has_edge(const unsigned char *pixels, int image_width, int 
 void zeus_comic_grow_text_mask(unsigned char *mask, int width, int height, int left, int top, int right, int bottom, int radius);
 float zeus_comic_ink_residue(const unsigned char *source, const unsigned char *clean, const unsigned char *mask, int width, int height, int left, int top, int right, int bottom);
 unsigned long long zeus_comic_available_memory(void);
+unsigned long zeus_comic_deflate(const unsigned char *input, unsigned long size, unsigned char *output, unsigned long capacity);
+int zeus_comic_inflate(const unsigned char *input, unsigned long size, unsigned char *output, unsigned long expected);
 void zeus_comic_refine_text_mask(const unsigned char *pixels, const unsigned char *hints, unsigned char *mask, int width, int height, int left, int top, int right, int bottom);
 void zeus_comic_inpaint_mask(const unsigned char *source, unsigned char *pixels, const unsigned char *mask, int width, int height, int left, int top, int right, int bottom);
 void zeus_comic_text_mask(const unsigned char *pixels, unsigned char *mask, int width, int height, int left, int top, int right, int bottom);

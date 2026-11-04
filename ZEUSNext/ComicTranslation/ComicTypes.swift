@@ -74,6 +74,9 @@ struct ComicPreferences: Codable, Equatable {
     var automatic = false
     var showUntranslated = false
     var readAhead = true
+    var cloudRestorationURL: String?
+    var useCloudRestoration: Bool?
+    var bypassQualityChecks: Bool?
     var restorationEnabled: Bool?
     var fontName: String?
     var localModel = false
@@ -84,7 +87,7 @@ struct ComicPreferences: Codable, Equatable {
     var letterCaseRaw: String?
     var letterSpacing: Double?
     var letterCase: ComicLetterCase { ComicLetterCase(rawValue: letterCaseRaw ?? "") ?? .original }
-    var renderIdentity: String { "render-v21|restoration:\(restorationEnabled ?? true)|\(fontName ?? "default")|\(fontScale)|\(textColor ?? "auto")|\(inkStyle.rawValue)|\(letterCase.rawValue)|\(letterSpacing ?? 0)" }
+    var renderIdentity: String { "render-v23|cloud:\(useCloudRestoration ?? false):\(cloudRestorationURL ?? "")|unchecked:\(bypassQualityChecks ?? false)|restoration:\(restorationEnabled ?? true)|\(fontName ?? "default")|\(fontScale)|\(textColor ?? "auto")|\(inkStyle.rawValue)|\(letterCase.rawValue)|\(letterSpacing ?? 0)" }
     var inkStyle: ComicInkStyle { get { ComicInkStyle(rawValue: inkStyleRaw ?? "") ?? .automatic } set { inkStyleRaw = newValue.rawValue } }
     var engine: ComicOnlineEngine = .existing
     var translation: TranslationPreferences?

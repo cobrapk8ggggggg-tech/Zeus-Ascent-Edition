@@ -59,7 +59,7 @@ struct ComicSettingsSheet: View {
                 }.pickerStyle(.segmented)
             }.listRowBackground(Color.clear)
             switch selectedSection {
-            case .reading: readingSettings;engineSettings
+            case .reading: readingSettings;qualitySettings;engineSettings
             case .appearance: appearanceSettings
             case .models: storageSettings
             }
@@ -89,6 +89,12 @@ struct ComicSettingsSheet: View {
             Toggle("تجهيز الفصل كاملًا مسبقًا",isOn:binding(\.readAhead))
             Toggle("ترميم الخلفيات المعقدة",isOn:Binding(get:{prefs.restorationEnabled ?? true},set:{var p=prefs;p.restorationEnabled=$0;save(p)}))
             Text("يعالج النص فوق الرسم على الجهاز عند توفر الذاكرة. ينزّل نموذجَي الترميم عند أول حاجة إليهما (نحو 303 م.ب). يمكنك إيقافه للاكتفاء بالتنظيف الخفيف.").font(.caption).foregroundStyle(.secondary)
+        }
+    }
+    private var qualitySettings: some View {
+        Section("قبول النتائج") {
+            Toggle("تجاوز فحوص التنظيف وملاءمة النص",isOn:Binding(get:{prefs.bypassQualityChecks ?? false},set:{var p=prefs;p.bypassQualityChecks=$0;save(p)}))
+            Text("معطّل افتراضيًا. عند تفعيله تُرسم الترجمة حتى مع بقايا النص الأصلي أو ضعف الملاءمة. لا يعوّض النصوص التي لم يكتشفها OCR أو أخطاء مزوّد الترجمة.").font(.caption).foregroundStyle(.secondary)
         }
     }
     private var engineSettings: some View {
@@ -173,6 +179,13 @@ struct ComicSettingsSheet: View {
     }
     private var storageSettings: some View {
         Group {
+            Section("مكان ترميم الخلفيات") {
+                Toggle("تشغيل نماذج الترميم سحابيًا",isOn:Binding(get:{prefs.useCloudRestoration ?? false},set:{var p=prefs;p.useCloudRestoration=$0;save(p)}))
+                if prefs.useCloudRestoration ?? false {
+                    TextField("عنوان خادم الترميم HTTPS",text:Binding(get:{prefs.cloudRestorationURL ?? ""},set:{var p=prefs;p.cloudRestorationURL=$0;save(p)})).textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.URL)
+                    Text("يرسل بيانات النموذج مضغوطة دون فقد إلى الخادم الذي تحدده، مع توثيق حسابك. تُستخدم النماذج نفسها والأقنعة والرسم نفسها، دون تنزيل نماذج الترميم على الجهاز. يلزم خادم مجهز وحساب مسجّل؛ لا يُفعّل قبل تحديد الخادم.").font(.footnote).foregroundStyle(.secondary)
+                }
+            }
             Section("حزم قراءة الصور") {
                 Text(prefs.source == "auto" ? "تُكتشف لغة الصورة وتُجهّز حزمتها تلقائيًا عند القراءة. للتجهيز المسبق اختر لغة المصدر في قسم القراءة." : "اللغة المحددة: \(ComicPreferences.sourceLanguages.first(where:{$0.0==prefs.source})?.1 ?? prefs.source)")
                     .font(.callout).foregroundStyle(.secondary)
@@ -186,7 +199,7 @@ struct ComicSettingsSheet: View {
                 Text("تُفحص أحجام الملفات وبصماتها قبل اعتمادها. الملفات المكتملة تبقى متاحة دون إعادة تنزيل.").font(.footnote).foregroundStyle(.secondary)
             }
             Section("الحفظ على الجهاز") {
-                Toggle("حفظ النتائج على الجهاز",isOn:translationBinding(\.retainTranslations,default:true))
+                Toggle("حفظ النتائج على الجهاز",isOn:translationBinding(\.retainTranslations,default:false))
                 Text("تغيير المظهر يعيد استخدام القراءة والترجمة المحفوظتين. التصفح الخاص يحتفظ بالنتائج في الذاكرة فقط.").font(.footnote).foregroundStyle(.secondary)
                 Button("مسح حفظ صور هذا البروفايل",role:.destructive) {
                     let id=model.profile.id
