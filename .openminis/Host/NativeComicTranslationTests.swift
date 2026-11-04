@@ -1,6 +1,7 @@
 import XCTest
 import WebKit
 import UIKit
+import ZeusComicRuntime
 #if canImport(ZEUSBrowser)
 @testable import ZEUSBrowser
 #else
