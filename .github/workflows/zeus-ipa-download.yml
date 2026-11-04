@@ -2,7 +2,7 @@ name: ZEUS integrated IPA - build and publish (no tests)
 run-name: IPA from ${{ github.ref_name }} (${{ github.sha }})
 on:
   push:
-    branches: [fix/comic-translation-reliability,fix/image-translation-entry-20261102, fix/unsigned-ipa-20261101, main, edition/ascent-parity-20261101, feature/zeus-manhwa-translation-20261101, build/zeus-unsigned-ipa-repair-20261023, feature/zeus-project-agent-20261023, feature/zeus-direct-integrations-20261023, feature/zeus-ipad-layout-studio-20261025, feature/zeus-cloud-account-20261026, feature/zeus-android-lab-20261030]
+    branches: [fix/ipa-build-reliability-20261104, fix/comic-translation-reliability,fix/image-translation-entry-20261102, fix/unsigned-ipa-20261101, main, edition/ascent-parity-20261101, feature/zeus-manhwa-translation-20261101, build/zeus-unsigned-ipa-repair-20261023, feature/zeus-project-agent-20261023, feature/zeus-direct-integrations-20261023, feature/zeus-ipad-layout-studio-20261025, feature/zeus-cloud-account-20261026, feature/zeus-android-lab-20261030]
     paths: [.github/workflows/zeus-ipa-download.yml, .openminis/**, ZEUSNext/**, Native/ComicRuntime/**, .zeus-ci/**]
   workflow_dispatch:
     inputs:
@@ -15,7 +15,9 @@ permissions:
   contents: read
 concurrency:
   group: zeus-ipa-${{ github.ref }}
-  cancel-in-progress: true
+# Keep every requested device build alive until it completes or hits its own timeout.
+# New pushes queue behind an active IPA instead of cancelling expensive macOS work.
+  cancel-in-progress: false
 jobs:
   ipa:
     runs-on: macos-15
