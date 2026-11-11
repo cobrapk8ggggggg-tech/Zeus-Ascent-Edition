@@ -3,13 +3,31 @@ import Foundation
 /// Independent adapters. Account-specific keys are supplied by the user through
 /// Keychain. No credential extracted from Ascent is distributed with ZEUS.
 enum ComicWebEngines {
+    private static func googleRows(_ response:Any,input:[TranslationSegment])throws->(translated:[TranslationSegment],missing:[TranslationSegment]){
+        guard let rows=response as? [Any],rows.count==input.count else{throw ComicFailure.message("عدد نتائج Google لا يطابق النصوص؛ احتُفظ بالأصل.")}
+        var translated:[TranslationSegment]=[],missing:[TranslationSegment]=[]
+        for (source,row)in zip(input,rows){
+            let text=(row as? String) ?? ((row as? [Any])?.first as? String)
+            if let text,!text.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty{translated.append(TranslationSegment(id:source.id,text:text))}else{missing.append(source)}
+        }
+        return(translated,missing)
+    }
     static func translate(_ input:[TranslationSegment],source:String,target:String,engine:ComicOnlineEngine,secret:String,session:URLSession=AIHTTP.shared)async throws->[TranslationSegment]{
         if engine.needsKey && secret.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty{throw ComicFailure.message("أضف مفتاح \(engine.title) في إعدادات ترجمة الصور.")}
         let source=source.components(separatedBy:"-")[0],target=target.components(separatedBy:"-")[0]
         let output:[String]
         switch engine{
         case .google:
-            return try TextTranslationService.parseGoogleBatch(await AIHTTP.object(TextTranslationService.googleBatchRequest(input.map(\.text),target:target),session:session),originals:input)
+            var result=try googleRows(await AIHTTP.object(TextTranslationService.googleBatchRequest(input.map(\.text),target:target),session:session),input:input)
+            if !result.missing.isEmpty{
+                do{
+                    let retry=try googleRows(await AIHTTP.object(TextTranslationService.googleBatchRequest(result.missing.map(\.text),target:target),session:session),input:result.missing)
+                    result.translated+=retry.translated;result.missing=retry.missing
+                }catch is CancellationError{throw CancellationError()}catch{/* Keep successful rows; report the remaining original IDs below. */}
+            }
+            if !result.missing.isEmpty{throw ComicPartialTranslation(translated:result.translated,failedIDs:Set(result.missing.map(\.id)))}
+            let values=Dictionary(uniqueKeysWithValues:result.translated.map{($0.id,$0.text)})
+            return input.compactMap{row in values[row.id].map{TranslationSegment(id:row.id,text:$0)}}
         case .microsoft:
             var c=URLComponents(string:"https://edge.microsoft.com/translate/translatetext")!
             c.queryItems=[URLQueryItem(name:"from",value:source == "auto" ? "":source),URLQueryItem(name:"to",value:target),URLQueryItem(name:"isEnterpriseClient",value:"false")]

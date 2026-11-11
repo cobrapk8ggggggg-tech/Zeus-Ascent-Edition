@@ -5,22 +5,90 @@ import CryptoKit
 enum ComicReadingMode: String, Codable, CaseIterable { case fastest, balanced, careful
     var title: String { switch self { case .fastest: return "الأسرع"; case .balanced: return "متوازن"; case .careful: return "دقيق" } }
 }
-enum ComicInkStyle: String, Codable, CaseIterable { case plain, outline, shadow
-    var title: String { switch self { case .plain: return "عادي"; case .outline: return "محدّد (حواف بارزة)"; case .shadow: return "مظلّل" } }
+enum ComicInkStyle: String, Codable, CaseIterable { case automatic, plain, outline, shadow
+    var title: String { switch self { case .automatic: return "مطابقة ألوان وحدود الأصل"; case .plain: return "عادي"; case .outline: return "محدّد (حواف بارزة)"; case .shadow: return "مظلّل" } }
+}
+enum ComicLetterCase: String, Codable, CaseIterable {
+    case original, upper, lower, sentence
+    var title: String { switch self { case .original: return "كما في الأصل"; case .upper: return "أحرف كبيرة"; case .lower: return "أحرف صغيرة"; case .sentence: return "بداية الجملة" } }
+    func apply(_ text: String) -> String {
+        switch self {
+        case .original: return text
+        case .upper: return text.uppercased()
+        case .lower: return text.lowercased()
+        case .sentence:
+            var beginning = true
+            return text.lowercased().map { character in
+                let value = beginning ? String(character).uppercased() : String(character)
+                if character.isLetter { beginning = false }
+                if ".!?؟。".contains(character) { beginning = true }
+                return value
+            }.joined()
+        }
+    }
+}
+enum ComicSessionPhase: String {
+    case idle, waiting, fetching, recognizing, downloading, translating, rendering, displaying, paused, completed, partial, failed
+    var title: String {
+        switch self {
+        case .idle: return "ترجمة الصور"
+        case .waiting: return "بانتظار الصور"
+        case .fetching: return "جلب الصورة"
+        case .recognizing: return "قراءة الفقاعات"
+        case .downloading: return "تجهيز النماذج"
+        case .translating: return "ترجمة الحوار"
+        case .rendering: return "رسم الترجمة"
+        case .displaying: return "عرض الترجمة"
+        case .paused: return "الترجمة متوقفة"
+        case .completed: return "الصور المتاحة جاهزة"
+        case .partial: return "اكتملت بعض الصور"
+        case .failed: return "تعذّرت ترجمة الصور"
+        }
+    }
+}
+struct ComicDiagnostic: Identifiable {
+    let id = UUID()
+    let phase: ComicSessionPhase
+    let domain: String
+    let code: Int
+    let status: Int?
+    let retryable: Bool
+    var detail: String { "\(phase.title) · \(domain) \(code)" + (status.map { " · HTTP \($0)" } ?? "") }
+    static func capture(_ error: Error, phase: ComicSessionPhase) -> ComicDiagnostic {
+        if let failure = error as? ComicHTTPFailure {
+            return ComicDiagnostic(phase: phase, domain: "HTTP", code: failure.status, status: failure.status, retryable: failure.status == 429 || failure.status >= 500)
+        }
+        let value = error as NSError
+        let retryable = value.domain == NSURLErrorDomain && [NSURLErrorTimedOut, NSURLErrorNetworkConnectionLost, NSURLErrorNotConnectedToInternet, NSURLErrorCannotConnectToHost].contains(value.code)
+        return ComicDiagnostic(phase: phase, domain: value.domain, code: value.code, status: nil, retryable: retryable)
+    }
+}
+struct ComicHTTPFailure: LocalizedError {
+    let status: Int
+    var errorDescription: String? { status == 403 ? "رفض خادم الصور الطلب. يمكنك إعادة المحاولة بعد التحقق من تحميل الصورة في الصفحة." : "تعذّر جلب الصورة من الخادم (\(status))." }
 }
 struct ComicPreferences: Codable, Equatable {
     static let sourceLanguages=TranslationPreferences.languages+[("el","Ελληνικά"),("hi","हिन्दी"),("th","ไทย"),("ta","தமிழ்"),("te","తెలుగు"),("uk","Українська")]
-    var mode: ComicReadingMode = .fastest
+    var mode: ComicReadingMode = .balanced
     var source = "auto"
     var automatic = false
     var showUntranslated = false
     var readAhead = true
+    var cloudRestorationURL: String?
+    var useCloudRestoration: Bool?
+    var bypassQualityChecks: Bool?
+    var restorationEnabled: Bool?
     var fontName: String?
     var localModel = false
     var fontScale: Double = 1
     var textColor: String?
     var inkStyleRaw: String?
-    var inkStyle: ComicInkStyle { get { ComicInkStyle(rawValue: inkStyleRaw ?? "") ?? .plain } set { inkStyleRaw = newValue.rawValue } }
+    var allowOnlineFallback: Bool?
+    var letterCaseRaw: String?
+    var letterSpacing: Double?
+    var letterCase: ComicLetterCase { ComicLetterCase(rawValue: letterCaseRaw ?? "") ?? .original }
+    var renderIdentity: String { "render-v23|cloud:\(useCloudRestoration ?? false):\(cloudRestorationURL ?? "")|unchecked:\(bypassQualityChecks ?? false)|restoration:\(restorationEnabled ?? true)|\(fontName ?? "default")|\(fontScale)|\(textColor ?? "auto")|\(inkStyle.rawValue)|\(letterCase.rawValue)|\(letterSpacing ?? 0)" }
+    var inkStyle: ComicInkStyle { get { ComicInkStyle(rawValue: inkStyleRaw ?? "") ?? .automatic } set { inkStyleRaw = newValue.rawValue } }
     var engine: ComicOnlineEngine = .existing
     var translation: TranslationPreferences?
     func resolvedTranslation(_ settings:BrowserSettings)->TranslationPreferences{
@@ -41,6 +109,8 @@ struct ComicCandidate: Codable, Identifiable {
     var h: Double
     var pending: Bool
     var revision: String
+    var referrerPolicy: String?
+    var loadFailed:Bool? = nil
 }
 struct ComicEnvelope: Codable {
     var document: String
@@ -59,11 +129,25 @@ struct ComicRegion: Codable, Equatable {
     var coreBottom: Int
     var rect: CGRect { CGRect(x: x, y: y, width: width, height: height) }
 }
+struct ComicWord: Codable, Equatable {
+    var text: String
+    var rect: CGRect
+}
 struct ComicLine: Codable, Equatable {
     var text: String
     var confidence: Float
     var rect: CGRect
     var angle: Double = 0
+    var glyphHeight: Double? = nil
+    var words: [ComicWord]? = nil
+}
+struct ComicFlatCleanup: Codable, Equatable {
+    var color:[UInt8]
+    var uniform:Bool
+    // Sparse source-pixel spans: x, y, length. Only enclosed, OCR-owned glyphs.
+    var runs:[Int]
+    var complete:Bool
+    func offsetBy(dx:Int,dy:Int)->ComicFlatCleanup{var value=self;for i in stride(from:0,to:value.runs.count,by:3){value.runs[i]+=dx;value.runs[i+1]+=dy};return value}
 }
 struct ComicSpeech: Codable, Equatable {
     var id: String
@@ -72,10 +156,15 @@ struct ComicSpeech: Codable, Equatable {
     var rect: CGRect
     var vertical: Bool
     var balloon: Bool = false
+    var flatCleanup: ComicFlatCleanup? = nil
     // Optional so cached results from older revisions keep decoding.
     var angle: Double? = nil
+    var balloonBounds: CGRect? = nil
+    // True only when the whole lettering rectangle is inside the recovered
+    // paper shape. A fallback bounding box is not a safe restoration mask.
+    var letteringInsideBalloon: Bool? = nil
 }
-struct ComicReading: Codable { var lines: [ComicLine]; var speeches: [ComicSpeech]; var language: String; var runtime: String }
+struct ComicReading: Codable { var lines: [ComicLine]; var speeches: [ComicSpeech]; var language: String; var runtime: String; var repairUnavailable:Bool? = nil }
 struct ComicCachedResult: Codable { var version = 1; var reading: ComicReading; var translations: [TranslationSegment] }
 enum ComicFailure: LocalizedError {
     case message(String)
@@ -88,7 +177,7 @@ enum ComicIdentity {
         hash(segments.map{$0.id+"\0"+$0.text}.joined(separator:"\n"))
     }
     static func settings(_ preferences: ComicPreferences, translation: TranslationPreferences, provider: AIProviderConfiguration?) -> String {
-        hash("comic-v1|\(preferences.mode.rawValue)|\(preferences.source)|\(translation.target)|" + TranslationMemory.namespace(page: "comic://content", preferences: translation, provider: provider))
+        hash("comic-v31|fallback:\(preferences.allowOnlineFallback ?? false)|\(preferences.mode.rawValue)|\(preferences.source)|\(translation.target)|" + TranslationMemory.namespace(page: "comic://content", preferences: translation, provider: provider))
     }
 }
 enum ComicGeometry {
@@ -107,25 +196,46 @@ enum ComicGeometry {
         guard candidate.height>0,viewport>0 else{return []}
         func bounds(_ r:ComicRegion)->(Double,Double){let scale=candidate.h/Double(candidate.height);return(candidate.y+Double(r.y+r.coreTop)*scale,candidate.y+Double(r.y+r.coreBottom)*scale)}
         func distance(_ r:ComicRegion)->Double{let (top,bottom)=bounds(r);return max(0,top-scroll-viewport,scroll-bottom)}
-        return regions.filter{r in let(top,bottom)=bounds(r);return bottom>=scroll-(readAhead ? viewport:0)&&top<=scroll+viewport*(readAhead ? 8:1)}.sorted{distance($0)<distance($1)}
+        return regions.filter{r in let(top,bottom)=bounds(r);return readAhead || (bottom>=scroll && top<=scroll+viewport)}.sorted{let a=distance($0),b=distance($1);return a == b ? $0.y<$1.y:a<b}
     }
     static func estimateAngle(_ lines:[ComicLine])->Double{
-        // Diagonal lettering (thought tails, SFX streaks) is a real Ascent capability.
-        // Axis-aligned OCR boxes still carry the drift of the line cluster: the slope
-        // between the first and last line centres. Only confident, bounded tilt is
-        // adopted — noise must not rotate ordinary bubbles.
-        guard lines.count>=2,!lines.allSatisfy({$0.rect.height>$0.rect.width*1.5}) else{return 0}
-        let ordered=lines.sorted{$0.rect.midX<$1.rect.midX}
-        guard let first=ordered.first,let last=ordered.last else{return 0}
-        let dx=last.rect.midX-first.rect.midX,dy=last.rect.midY-first.rect.midY
-        guard abs(dx)>1 else{return 0}
-        let angle=atan2(dy,dx)
-        let spread=hypot(dx,dy),height=max(first.rect.height,last.rect.height)
-        guard spread>height*1.3,abs(angle)>=2*Double.pi/180,abs(angle)<=35*Double.pi/180 else{return 0}
-        return angle
+        // Baseline orientation comes from the OCR quadrilateral. The drift of
+        // separate line centres describes paragraph alignment, never glyph tilt.
+        let angles=lines.filter { $0.rect.width > $0.rect.height && $0.confidence >= 0.5 }.map(\.angle).sorted()
+        guard !angles.isEmpty else{return 0}
+        let median=angles[angles.count/2]
+        guard abs(median)>=2 * .pi/180,abs(median)<=35 * .pi/180,
+              angles.allSatisfy({abs($0-median)<5 * .pi/180})else{return 0}
+        return median
+    }
+    static func orderedLines(_ lines:[ComicLine],vertical:Bool)->[ComicLine]{
+        if vertical{return lines.sorted{abs($0.rect.midX-$1.rect.midX)<min($0.rect.width,$1.rect.width)*0.5 ? $0.rect.midY<$1.rect.midY:$0.rect.midX>$1.rect.midX}}
+        var rows:[[ComicLine]]=[]
+        for line in lines.sorted(by:{$0.rect.midY<$1.rect.midY}){
+            if let index=rows.firstIndex(where:{row in abs(row[0].rect.midY-line.rect.midY)<min(row[0].rect.height,line.rect.height)*0.5}){rows[index].append(line)}else{rows.append([line])}
+        }
+        return rows.flatMap{row in
+            let arabic=row.map(\.text).joined().unicodeScalars.filter{(0x0600...0x06ff).contains($0.value)}.count>1
+            return row.sorted{arabic ? $0.rect.midX>$1.rect.midX:$0.rect.minX<$1.rect.minX}
+        }
+    }
+    static func uniqueLines(_ input:[ComicLine])->[ComicLine]{
+        let candidates=input.filter{line in
+            let letters=line.text.filter{$0.isLetter || $0.isNumber}.count
+            return letters>0 && line.rect.width>2 && line.rect.height>3 && line.confidence>=0.3
+        }.sorted { $0.rect.width * $0.rect.height > $1.rect.width * $1.rect.height }
+        var result:[ComicLine]=[]
+        for line in candidates {
+            let duplicate=result.contains { other in
+                let overlap=line.rect.intersection(other.rect)
+                return !overlap.isNull && overlap.width*overlap.height/(line.rect.width*line.rect.height)>0.75
+            }
+            if !duplicate{result.append(line)}
+        }
+        return result
     }
     static func group(_ input: [ComicLine], source: String) -> [ComicSpeech] {
-        let lines = input.filter { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && $0.rect.width > 0 && $0.rect.height > 0 }
+        let lines = uniqueLines(input)
         var groups: [[ComicLine]] = []
         for line in lines.sorted(by: { $0.rect.minY < $1.rect.minY }) {
             // Select among compatible groups: a nearer adjacent balloon must not
@@ -136,21 +246,38 @@ enum ComicGeometry {
                 let overlap=min(line.rect.maxX,last.rect.maxX)-max(line.rect.minX,last.rect.minX)
                 let vertical=line.rect.height>line.rect.width*1.5 && last.rect.height>last.rect.width*1.5
                 if vertical{
-                    let columnGap=max(line.rect.minX-last.rect.maxX,last.rect.minX-line.rect.maxX)
-                    let verticalOverlap=min(line.rect.maxY,last.rect.maxY)-max(line.rect.minY,last.rect.minY)
-                    return columnGap<max(line.rect.width,last.rect.width)*1.1 && verticalOverlap>min(line.rect.height,last.rect.height)*0.6
+                    // Columns have slightly different top coordinates. The
+                    // last appended column need not be the spatial neighbour;
+                    // compare every existing column so a complete OCR paragraph
+                    // cannot lose its first/rightmost column.
+                    return groups[i].contains{column in
+                        guard column.rect.height>column.rect.width*1.5 else{return false}
+                        let columnGap=max(line.rect.minX-column.rect.maxX,column.rect.minX-line.rect.maxX)
+                        let verticalOverlap=min(line.rect.maxY,column.rect.maxY)-max(line.rect.minY,column.rect.minY)
+                        return columnGap<max(line.rect.width,column.rect.width)*1.1 && verticalOverlap>min(line.rect.height,column.rect.height)*0.6
+                    }
                 }
-                return gap >= -min(line.rect.height,last.rect.height)*0.5 && gap<max(line.rect.height,last.rect.height)*1.1 && overlap>min(line.rect.width,last.rect.width)*0.4
+                let rowOverlap=min(line.rect.maxY,last.rect.maxY)-max(line.rect.minY,last.rect.minY)
+                let horizontalGap=max(line.rect.minX-last.rect.maxX,last.rect.minX-line.rect.maxX)
+                let sameRow=rowOverlap>min(line.rect.height,last.rect.height)*0.6 && horizontalGap<max(line.rect.height,last.rect.height)*1.2
+                let nextRow=gap >= -min(line.rect.height,last.rect.height)*0.5 && gap<max(line.rect.height,last.rect.height)*1.2 && overlap>min(line.rect.width,last.rect.width)*0.3
+                return sameRow || nextRow
             }
             if let i=compatible.min(by:{abs(groups[$0].last!.rect.midY-line.rect.midY)<abs(groups[$1].last!.rect.midY-line.rect.midY)}){groups[i].append(line);continue}
             groups.append([line])
         }
         let japanese = source.hasPrefix("ja")
-        return groups.enumerated().map { index, group in
+        let dialogue=groups.filter{group in
+            guard group.count==1,let text=group.first?.text.trimmingCharacters(in:.whitespacesAndNewlines),text.count==1,let scalar=text.unicodeScalars.first else{return true}
+            // Isolated Latin labels outside a closed balloon are usually logos
+            // or diagram markers. Keep them rather than lettering over artwork.
+            return !(scalar.value<0x0250 && scalar.properties.isAlphabetic)
+        }
+        return dialogue.enumerated().map { index, group in
             let bounds = group.reduce(CGRect.null) { $0.union($1.rect) }
             let vertical = group.allSatisfy { $0.rect.height > $0.rect.width * 1.5 }
-            let ordered = group.sorted { vertical ? $0.rect.midX > $1.rect.midX : $0.rect.minY < $1.rect.minY }
-            return ComicSpeech(id: String(index), text: ordered.map(\.text).joined(separator: vertical ? "" : "\n"), lines: ordered, rect: bounds, vertical: vertical, balloon: false, angle: vertical ? nil:ComicGeometry.estimateAngle(group))
+            let ordered = orderedLines(group,vertical:vertical)
+            return ComicSpeech(id: String(index), text: ordered.map(\.text).joined(separator: vertical ? "" : " "), lines: ordered, rect: bounds, vertical: vertical, balloon: false, angle: vertical ? nil:ComicGeometry.estimateAngle(group))
         }.sorted { a,b in
             if abs(a.rect.minY-b.rect.minY) < min(a.rect.height,b.rect.height)*0.35 { return japanese ? a.rect.midX > b.rect.midX : a.rect.midX < b.rect.midX }
             return a.rect.minY < b.rect.minY

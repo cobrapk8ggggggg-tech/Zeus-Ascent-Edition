@@ -3,15 +3,15 @@ import WebKit
 import UniformTypeIdentifiers
 
 enum SettingsCategory: String, CaseIterable, Identifiable, Hashable {
-    case translation, ai, account, appearance, tabs, launch, privacy, personalData, websites, network, tools, services, other, help
+    case translation, imageTranslation, ai, account, appearance, tabs, launch, privacy, personalData, websites, network, tools, services, other, help
     var id: String { rawValue }
     var title: String {
-        switch self { case .translation: return "ترجمة الصفحات"; case .ai: return "الذكاء الاصطناعي"; case .account: return "الحساب"; case .appearance: return "واجهة المستخدم والأشرطة"; case .tabs: return "التبويبات"; case .launch: return "بدء التطبيق"; case .privacy: return "الخصوصية"; case .personalData: return "البيانات الشخصية"; case .websites: return "مواقع الويب"; case .network: return "الشبكة"; case .tools: return "الأدوات"; case .services: return "الخدمات"; case .other: return "أخرى"; case .help: return "المساعدة والخصوصية" }
+        switch self { case .translation: return "ترجمة الصفحات"; case .imageTranslation: return "ترجمة الصور والمانهوا"; case .ai: return "الذكاء الاصطناعي"; case .account: return "الحساب"; case .appearance: return "واجهة المستخدم والأشرطة"; case .tabs: return "التبويبات"; case .launch: return "بدء التطبيق"; case .privacy: return "الخصوصية"; case .personalData: return "البيانات الشخصية"; case .websites: return "مواقع الويب"; case .network: return "الشبكة"; case .tools: return "الأدوات"; case .services: return "الخدمات"; case .other: return "أخرى"; case .help: return "المساعدة والخصوصية" }
     }
     var symbol: String {
-        switch self { case .translation: return "translate"; case .ai: return "sparkles"; case .account: return "person.2"; case .appearance: return "macwindow.on.rectangle"; case .tabs: return "square.on.square"; case .launch: return "play"; case .privacy: return "hand.raised"; case .personalData: return "tray"; case .websites: return "character.book.closed"; case .network: return "antenna.radiowaves.left.and.right"; case .tools: return "wrench.and.screwdriver"; case .services: return "cloud"; case .other: return "archivebox"; case .help: return "questionmark.circle" }
+        switch self { case .translation: return "translate"; case .imageTranslation: return "photo"; case .ai: return "sparkles"; case .account: return "person.2"; case .appearance: return "macwindow.on.rectangle"; case .tabs: return "square.on.square"; case .launch: return "play"; case .privacy: return "hand.raised"; case .personalData: return "tray"; case .websites: return "character.book.closed"; case .network: return "antenna.radiowaves.left.and.right"; case .tools: return "wrench.and.screwdriver"; case .services: return "cloud"; case .other: return "archivebox"; case .help: return "questionmark.circle" }
     }
-    var group: Int { switch self { case .account: return 0; case .appearance, .tabs, .launch: return 1; case .privacy, .personalData: return 2; case .translation, .ai, .websites, .network, .tools, .services: return 3; case .other: return 4; case .help: return 5 } }
+    var group: Int { switch self { case .account: return 0; case .appearance, .tabs, .launch: return 1; case .privacy, .personalData: return 2; case .translation, .imageTranslation, .ai, .websites, .network, .tools, .services: return 3; case .other: return 4; case .help: return 5 } }
 }
 
 struct SettingsSheet: View {
@@ -78,6 +78,9 @@ struct SettingsSheet: View {
     @ViewBuilder private func detail(_ category: SettingsCategory) -> some View {
         Group { switch category {
         case .translation: TranslationSettingsPage(context: context)
+        case .imageTranslation:
+            if context.isActive { ComicSettingsSheet(model: context.model, embedded: true) }
+            else { Text("افتح هذا الحساب أولًا لتعديل إعدادات ترجمة صوره.").padding() }
         case .ai: AISettingsPage(context: context)
         case .account: AccountSettingsView(model: context.model, profile: context.profile, embedded: true)
         case .appearance: appearance
@@ -198,6 +201,11 @@ struct StorageSettingsPage: View {
     @State private var bytes: Int64 = 0
     @State private var sites = 0
     @State private var freeBytes: Int64 = 0
+    @State private var imageCacheBytes: Int64 = 0
+    @State private var imageModelBytes: Int64 = 0
+    @State private var containerBytes: Int64 = 0
+    @State private var cacheBytes: Int64 = 0
+    @State private var bundleBytes: Int64 = 0
     @State private var action: String?
     @State private var busy = false
     @State private var result: String?
@@ -207,9 +215,29 @@ struct StorageSettingsPage: View {
                 NavigationLink("المواقع — حذف بيانات موقع أو نوع محدد") { WebsiteStoragePage(context: context) }.accessibilityIdentifier("websiteStorageButton")
                 ForEach(StoredItemCategory.allCases) { category in NavigationLink(category.title) { StoredProfileItemsPage(context: context, category: category) } }
                 NavigationLink("الترجمات المحفوظة") { TranslationStoragePage(context: context) }
-                NavigationLink("محادثات الوكيل ومرفقاتها") { AgentStoragePage(context: context) }
+                if context.isActive,context.model.profile.isAdmin,context.model.profiles.root.standardizedFileURL==BrowserDisk.applicationRoot.standardizedFileURL,let storage=NativeCloudAccountAPI.storageManagementView {
+                    NavigationLink("إدارة كل ملفات التطبيق والمساعد") { storage() }
+                    Text("تعرض أيضًا بيئة المساعد والسجلات والملفات المؤقتة وبقية ملفات الجهاز. حذف المحادثات إجراء مستقل قد يُزامن مع حسابك؛ لمسح المساحة المحلية فقط اختر الكاش أو الملفات المحلية.").font(.footnote)
+                } else {
+                    NavigationLink("محادثات الوكيل ومرفقاتها") { AgentStoragePage(context: context) }
+                }
             }
             ThemedSection("البيانات") { LabeledContent("ملفات الحساب", value: byteText(bytes)); LabeledContent("مواقع خزّنت بيانات", value: "\(sites)"); LabeledContent("المساحة المتاحة بالجهاز", value: byteText(freeBytes)); Button("مسح الملفات المؤقتة") { action = "cache" }.accessibilityIdentifier("clearCacheButton"); Button("مسح الكوكيز وبيانات المواقع") { action = "web" }; Button("مسح سجل التصفح") { action = "history" }; Button("مسح سجل البحث") { action = "search" }; Button("حذف التنزيلات") { action = "downloads" } }
+            ThemedSection("مساحة التطبيق الفعلية") {
+                LabeledContent("البرنامج المثبت والموارد المضمنة", value: byteText(bundleBytes))
+                LabeledContent("ملفات التطبيق المحلية كاملة", value: byteText(containerBytes))
+                LabeledContent("مجلد الكاش العام", value: byteText(cacheBytes))
+                Text("حجم البرنامج المثبت لا يحذف بمسح البيانات. بيانات الحساب السحابية مستقلة عن نماذج الصور والكاش والتنزيلات وبيانات المواقع على الجهاز.").font(.footnote)
+                if context.model.profile.isAdmin { Button("مسح كاش الشبكة والصور المؤقتة", role: .destructive) { action = "app-cache" } }
+            }
+            ThemedSection("ترجمة الصور — مساحة محلية مستقلة") {
+                LabeledContent("القراءات والصور المحفوظة لكل البروفايلات", value: byteText(imageCacheBytes))
+                LabeledContent("نماذج القراءة والترميم", value: byteText(imageModelBytes))
+                Text("هذه الملفات تعمل على الجهاز ولا تُحذف بمسح قاعدة بيانات المواقع. حذف النماذج يتطلب تنزيلها مجددًا عند استخدامها.").font(.footnote)
+                Button("حذف نتائج ترجمة الصور محليًا", role: .destructive) { action = "comic-cache" }
+                Button("حذف نموذجَي الترميم فقط", role: .destructive) { action = "comic-restoration" }
+                Button("حذف كل نماذج الصور وGGUF والخطوط المستوردة", role: .destructive) { action = "comic-models" }
+            }
             if context.isActive { ThemedSection { NavigationLink("المفضلة والسجل") { LibrarySheet(model: context.model) }; NavigationLink("السكربتات") { ScriptsSheet(model: context.model) } } }
             if context.model.profile.isAdmin { ThemedSection { Button("مسح كاش الصور من إصدار ZEUS القديم") { action = "legacy" }; Button("إعادة ضبط التطبيق وكل الحسابات") { action = "reset" } } }
             if let result { Text(result).font(.footnote) }
@@ -218,6 +246,12 @@ struct StorageSettingsPage: View {
     }
     private func refresh() async {
         let folder = context.model.profiles.folder(for: context.profile), downloads = context.model.profiles.downloads(for: context.profile)
+        let container=URL(fileURLWithPath:NSHomeDirectory()),cache=FileManager.default.urls(for:.cachesDirectory,in:.userDomainMask)[0],bundle=Bundle.main.bundleURL
+        let totals=await Task.detached { (BrowserDisk.size(at:container),BrowserDisk.size(at:cache),BrowserDisk.size(at:bundle)) }.value
+        containerBytes=totals.0;cacheBytes=totals.1;bundleBytes=totals.2
+        let imageRoot=context.model.profile.isAdmin && context.model.profiles.root.standardizedFileURL==BrowserDisk.applicationRoot.standardizedFileURL ? ComicMemory.root:ComicMemory.root.appendingPathComponent(context.profileID.uuidString)
+        imageCacheBytes = await Task.detached { BrowserDisk.size(at:imageRoot) }.value
+        imageModelBytes = await Task.detached { BrowserDisk.size(at: ComicModelStore.root) }.value
         freeBytes = ((try? FileManager.default.attributesOfFileSystem(forPath: NSHomeDirectory())[.systemFreeSize]) as? NSNumber)?.int64Value ?? 0
         bytes = await Task.detached { BrowserDisk.size(at: folder) + BrowserDisk.size(at: downloads) }.value
         let records: [WKWebsiteDataRecord] = await withCheckedContinuation { c in context.model.profiles.websiteDataStore(for: context.profile).fetchDataRecords(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes()) { c.resume(returning: $0) } }; sites = records.count
@@ -231,6 +265,26 @@ struct StorageSettingsPage: View {
         case "history", "search": if context.isActive { if selected == "history" { model.data.history = [] } else { model.data.searches = [] }; model.persist() } else { var data = model.profiles.load(context.profile); if selected == "history" { data.history = [] } else { data.searches = [] }; model.profiles.save(data, for: context.profile) }
         case "downloads": model.downloads.removeAll(profileID: context.profileID)
         case "legacy": do { let removed = try await BrowserDisk.clearLegacyImageCache(); FaviconMemory.purge(); result = "مُسح كاش الصور القديم: " + byteText(removed) } catch { result = error.localizedDescription }; await refresh(); return
+        case "app-cache":
+            guard context.model.profile.isAdmin else{return}
+            for tab in model.tabs{tab.dispose()}
+            URLCache.shared.removeAllCachedResponses();URLCache.shared.diskCapacity=0
+            do{_ = try await BrowserDisk.clearLegacyImageCache()}catch{result=error.localizedDescription;await refresh();return}
+            let store=model.profiles.websiteDataStore(for:context.profile)
+            await store.removeData(ofTypes:[WKWebsiteDataTypeDiskCache,WKWebsiteDataTypeMemoryCache,WKWebsiteDataTypeFetchCache],modifiedSince:.distantPast)
+            if context.isActive{await model.ensureCurrentLoaded()}
+        case "comic-cache", "comic-models", "comic-restoration":
+            for tab in model.tabs { tab.comicTranslation?.pause() }
+            do {
+                if selected == "comic-cache" {
+                    if context.model.profile.isAdmin && model.profiles.root.standardizedFileURL==BrowserDisk.applicationRoot.standardizedFileURL{try await ComicMemory.shared.clearAll()}
+                    else{try await ComicMemory.shared.clear(profile:context.profileID)}
+                }
+                else {
+                    await ComicOCR.shared.purge();await ComicPaddle.shared.purge();await ComicRestoration.shared.purge();await ComicLocalTranslator.shared.unload()
+                    if selected == "comic-restoration"{try await ComicModelStore.shared.removeRestoration()}else{try await ComicModelStore.shared.removeAll()}
+                }
+            } catch { result = error.localizedDescription; await refresh(); return }
         case "reset": await model.resetApplication()
         default: break
         }

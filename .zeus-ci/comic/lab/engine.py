@@ -1,0 +1,230 @@
+"""CPU reference harness. Shared native masks; ONNX tensors match the app."""
+import ctypes, hashlib, json, pathlib, subprocess, time, os, uuid
+import cv2, numpy as np, onnxruntime as ort, yaml
+HERE=pathlib.Path(__file__).resolve().parent
+class Engine:
+    def __init__(self,models):
+        self.models=pathlib.Path(models);self.sessions={};self.dictionaries={}
+        header=HERE.parents[2]/'Native/ComicRuntime/ComicInpaint.h'
+        self.native_sha=hashlib.sha256(header.read_bytes()+(HERE/'native.cpp').read_bytes()).hexdigest()
+        library=HERE/'output'/('mask-'+self.native_sha[:16]+'.so');library.parent.mkdir(exist_ok=True)
+        if not library.exists():
+            temporary=library.with_name(library.name+'.'+uuid.uuid4().hex+'.tmp')
+            subprocess.run(['g++','-O2','-std=c++17','-shared','-fPIC',str(HERE/'native.cpp'),'-o',str(temporary)],check=True)
+            os.replace(temporary,library)
+        self.lib=ctypes.CDLL(str(library));p=np.ctypeslib.ndpointer(dtype=np.uint8,flags='C_CONTIGUOUS')
+        self.lib.clean.argtypes=[p]+[ctypes.c_int]*6;self.lib.text_mask.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.clean_source.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.coverage.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.coverage.restype=ctypes.c_float;self.lib.refine.argtypes=[p,p,p]+[ctypes.c_int]*6;self.lib.refine_ocr.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.clean_mask.argtypes=[p,p,p]+[ctypes.c_int]*6;self.lib.simple_background.argtypes=[p,p]+[ctypes.c_int]*6;self.lib.neural_valid.argtypes=[p,p,p]+[ctypes.c_int]*6;self.lib.mask_owned.argtypes=[p]+[ctypes.c_int]*6+[np.ctypeslib.ndpointer(dtype=np.int32,flags='C_CONTIGUOUS'),ctypes.c_int]
+    def lettering_box(self,paper,area,boxes):
+        u8=np.ctypeslib.ndpointer(dtype=np.uint8,flags='C_CONTIGUOUS');i32=np.ctypeslib.ndpointer(dtype=np.int32,flags='C_CONTIGUOUS');self.lib.lettering_box.argtypes=[u8]+[ctypes.c_int]*6+[i32,ctypes.c_int,i32]
+        boxes=np.ascontiguousarray(boxes,np.int32).reshape(-1,4);out=np.zeros(4,np.int32);h,w=paper.shape
+        return out.tolist()if self.lib.lettering_box(paper,w,h,*map(int,area),boxes.reshape(-1),len(boxes),out)else None
+    def plate_color(self,rgb,paper,origin):
+        u8=np.ctypeslib.ndpointer(dtype=np.uint8,flags='C_CONTIGUOUS');self.lib.plate_color.argtypes=[u8,ctypes.c_int,ctypes.c_int,u8]+[ctypes.c_int]*4+[u8]
+        rgba=np.ascontiguousarray(cv2.cvtColor(rgb,cv2.COLOR_RGB2RGBA));ih,iw=rgb.shape[:2];h,w=paper.shape;color=np.zeros(3,np.uint8)
+        uniform=bool(self.lib.plate_color(rgba,iw,ih,paper,w,h,*map(int,origin),color));return color,uniform
+    def plate_has_edge(self,rgb,paper,origin,boxes):
+        u8=np.ctypeslib.ndpointer(dtype=np.uint8,flags='C_CONTIGUOUS');i32=np.ctypeslib.ndpointer(dtype=np.int32,flags='C_CONTIGUOUS')
+        self.lib.plate_has_edge.argtypes=[u8,ctypes.c_int,ctypes.c_int,u8]+[ctypes.c_int]*4+[i32,ctypes.c_int]
+        rgba=np.ascontiguousarray(cv2.cvtColor(rgb,cv2.COLOR_RGB2RGBA));ih,iw=rgb.shape[:2];h,w=paper.shape;boxes=np.ascontiguousarray(boxes,np.int32).reshape(-1,4)
+        return bool(self.lib.plate_has_edge(rgba,iw,ih,paper,w,h,*map(int,origin),boxes.reshape(-1),len(boxes)))
+    def grow_mask(self,mask,area,radius):
+        u8=np.ctypeslib.ndpointer(dtype=np.uint8,flags='C_CONTIGUOUS');self.lib.grow_text_mask.argtypes=[u8]+[ctypes.c_int]*7
+        result=mask.copy();h,w=mask.shape;self.lib.grow_text_mask(result,w,h,*map(int,area),int(radius));return result
+    def ink_residue(self,rgb,clean,mask,boxes):
+        u8=np.ctypeslib.ndpointer(dtype=np.uint8,flags='C_CONTIGUOUS');self.lib.ink_residue.argtypes=[u8,u8,u8]+[ctypes.c_int]*6;self.lib.ink_residue.restype=ctypes.c_float
+        source=np.ascontiguousarray(cv2.cvtColor(rgb,cv2.COLOR_RGB2RGBA));output=np.ascontiguousarray(cv2.cvtColor(clean,cv2.COLOR_RGB2RGBA));h,w=mask.shape
+        return max((float(self.lib.ink_residue(source,output,mask,w,h,*map(int,box)))for box in boxes),default=1)
+    def balloon_lobes(self,interior,boxes):
+        u8=np.ctypeslib.ndpointer(dtype=np.uint8,flags='C_CONTIGUOUS');i32=np.ctypeslib.ndpointer(dtype=np.int32,flags='C_CONTIGUOUS')
+        self.lib.balloon_lobes.argtypes=[u8,ctypes.c_int,ctypes.c_int,i32,ctypes.c_int,i32,i32]
+        interior=np.ascontiguousarray(interior,np.uint8);boxes=np.ascontiguousarray(boxes,np.int32).reshape(-1,4);h,w=interior.shape
+        owners=np.zeros(len(boxes),np.int32);bounds=np.zeros(len(boxes)*4,np.int32)
+        count=self.lib.balloon_lobes(interior,w,h,boxes.reshape(-1),len(boxes),owners,bounds)
+        return owners,bounds[:count*4].reshape(-1,4)
+    def flat_balloon_mask(self,paper,boxes,area=None):
+        u8=np.ctypeslib.ndpointer(dtype=np.uint8,flags='C_CONTIGUOUS');i32=np.ctypeslib.ndpointer(dtype=np.int32,flags='C_CONTIGUOUS')
+        self.lib.flat_balloon_mask.argtypes=[u8,u8]+[ctypes.c_int]*6+[i32,ctypes.c_int]
+        paper=np.ascontiguousarray(paper,np.uint8);h,w=paper.shape;mask=np.zeros_like(paper);boxes=np.ascontiguousarray(boxes,np.int32).reshape(-1,4)
+        area=area or[1,1,w-1,h-1]
+        complete=bool(self.lib.flat_balloon_mask(paper,mask,w,h,*map(int,area),boxes.reshape(-1),len(boxes)))
+        return mask,complete
+    def apply_flat_cleanup(self,rgb,origin,flat):
+        h,w=rgb.shape[:2];mask=np.zeros((h,w),np.uint8);result=rgb.copy()
+        if not flat['complete']:return result,mask,False
+        x=flat['origin'][0]-origin[0];y=flat['origin'][1]-origin[1];mh,mw=flat['mask'].shape
+        l=max(0,x);t=max(0,y);r=min(w,x+mw);b=min(h,y+mh)
+        if r>l and b>t:mask[t:b,l:r]=flat['mask'][t-y:b-y,l-x:r-x]
+        if flat['uniform']:result[mask>0]=flat['color'];return result,mask,True
+        boxes=[[a-origin[0],c-origin[1],d-origin[0],f-origin[1]]for a,c,d,f in flat['boxes']]
+        if not self.simple_background(rgb,mask,boxes):return result,mask,False
+        source=np.ascontiguousarray(cv2.cvtColor(rgb,cv2.COLOR_RGB2RGBA));target=source.copy();merged=[]
+        for a,c,d,f in boxes:
+            pad=max(3,min(d-a,f-c)*.18);box=[max(1,int(a-pad)),max(1,int(c-pad)),min(w-1,int(np.ceil(d+pad))),min(h-1,int(np.ceil(f+pad)))]
+            while True:
+                overlaps=[q for q in merged if min(q[2],box[2])>max(q[0],box[0]) and min(q[3],box[3])>max(q[1],box[1])]
+                if not overlaps:break
+                for q in overlaps:merged.remove(q);box=[min(q[0],box[0]),min(q[1],box[1]),max(q[2],box[2]),max(q[3],box[3])]
+            merged.append(box)
+        for box in merged:self.lib.clean_mask(source,target,mask,w,h,*box)
+        return target[:,:,:3],mask,True
+    def ink_style(self,rgb,boxes):
+        u8=np.ctypeslib.ndpointer(dtype=np.uint8,flags='C_CONTIGUOUS');i32=np.ctypeslib.ndpointer(dtype=np.int32,flags='C_CONTIGUOUS');f32=np.ctypeslib.ndpointer(dtype=np.float32,flags='C_CONTIGUOUS')
+        self.lib.ink_style.argtypes=[u8,ctypes.c_int,ctypes.c_int,i32,ctypes.c_int,f32];self.lib.ink_style.restype=ctypes.c_float
+        rgba=np.ascontiguousarray(cv2.cvtColor(rgb,cv2.COLOR_RGB2RGBA));h,w=rgb.shape[:2];boxes=np.ascontiguousarray(boxes,np.int32).reshape(-1,4);output=np.zeros(7,np.float32)
+        confidence=self.lib.ink_style(rgba,w,h,boxes.reshape(-1),len(boxes),output)
+        return dict(confidence=confidence,fill=output[:3].tolist(),stroke=output[3:6].tolist()if output[6]>0 else None,stroke_percent=float(output[6]))
+    def session(self,name):
+        if name not in self.sessions:
+            # Match the app's memory discipline: only one restoration graph,
+            # or the detector plus the currently selected OCR script.
+            if name in ['ctd.onnx','lama.onnx']:self.sessions.clear()
+            else:self.sessions={k:v for k,v in self.sessions.items()if k in ['det.onnx',name]}
+            options=ort.SessionOptions();options.intra_op_num_threads=2;options.inter_op_num_threads=1;options.log_severity_level=3
+            self.sessions[name]=ort.InferenceSession(str(self.models/name),options,providers=['CPUExecutionProvider'])
+        return self.sessions[name]
+    def detect(self,rgb):
+        h,w=rgb.shape[:2];scale=min(1,(2_000_000/(w*h))**.5,4000/max(w,h));dw=max(32,round(w*scale/32)*32);dh=max(32,round(h*scale/32)*32)
+        a=cv2.resize(rgb[:,:,::-1],(dw,dh)).astype(np.float32)/255
+        a=(a-np.array([.485,.456,.406],np.float32))/np.array([.229,.224,.225],np.float32)
+        s=self.session('det.onnx');prob=s.run(None,{s.get_inputs()[0].name:a.transpose(2,0,1)[None]})[0][0,0]
+        count,labels,stats,_=cv2.connectedComponentsWithStats((prob>.3).astype(np.uint8),4)
+        lines=[]
+        for label in range(1,count):
+            x,y,bw,bh,area=map(int,stats[label]);confidence=float(prob[labels==label].mean())
+            if area<3 or confidence<=.5:continue
+            # DB emits a shrunken text kernel, not a complete glyph rectangle.
+            # Offset by area/perimeter (DB unclip), rather than 1/4 box height.
+            pad=1.5*bw*bh/(2*(bw+bh))
+            box=[max(1,int((x-pad)*w/prob.shape[1])),max(1,int((y-pad)*h/prob.shape[0])),min(w-1,int(np.ceil((x+bw+pad)*w/prob.shape[1]))),min(h-1,int(np.ceil((y+bh+pad)*h/prob.shape[0])))]
+            lines.append(dict(box=box,confidence=confidence,glyph_height=min(box[2]-box[0],box[3]-box[1])*.72))
+        return sorted(lines,key=lambda l:(l['box'][1],l['box'][0]))
+    def recognize(self,rgb,box,language):
+        return self.recognize_info(rgb,box,language)[0]
+    def recognize_info(self,rgb,box,language):
+        name={'en':'latin','ja':'han','zh':'han','ko':'korean','ar':'arabic'}[language]
+        if name not in self.dictionaries:self.dictionaries[name]=['']+yaml.safe_load((self.models/(name+'.yml')).read_text())['PostProcess']['character_dict']+[' ']
+        x,y,r,b=box;cut=rgb[y:b,x:r]
+        if cut.shape[0]>cut.shape[1]*1.5:cut=cv2.rotate(cut,cv2.ROTATE_90_COUNTERCLOCKWISE)
+        width=max(8,min(4096,int(np.ceil(cut.shape[1]*48/cut.shape[0]))))
+        tensor=cv2.resize(cut[:,:,::-1],(width,48)).astype(np.float32)/127.5-1
+        s=self.session(name+'.onnx');logits=s.run(None,{s.get_inputs()[0].name:tensor.transpose(2,0,1)[None]})[0][0]
+        indices=np.argmax(logits,axis=1);text=[];scores=[];last=0
+        for timestep,i in enumerate(indices):
+            if i and i!=last and i<len(self.dictionaries[name]):text.append(self.dictionaries[name][i]);scores.append(float(logits[timestep,i]))
+            last=i
+        return ''.join(text),float(np.mean(scores)) if scores else 0
+    def clean(self,rgb,boxes):
+        rgba=np.ascontiguousarray(cv2.cvtColor(rgb,cv2.COLOR_RGB2RGBA));mask=np.zeros(rgb.shape[:2],np.uint8);h,w=mask.shape
+        merged=[]
+        for x,y,r,b in boxes:
+            pad=max(3,min(r-x,b-y)*.18)
+            box=[max(1,int(x-pad)),max(1,int(y-pad)),min(w-1,int(np.ceil(r+pad))),min(h-1,int(np.ceil(b+pad)))]
+            while True:
+                overlaps=[q for q in merged if min(q[2],box[2])>max(q[0],box[0]) and min(q[3],box[3])>max(q[1],box[1])]
+                if not overlaps:break
+                for q in overlaps:
+                    merged.remove(q);box=[min(q[0],box[0]),min(q[1],box[1]),max(q[2],box[2]),max(q[3],box[3])]
+            merged.append(box)
+        # Masks are computed against the untouched source, then cleaned separately.
+        for box in merged:self.lib.text_mask(rgba,mask,w,h,*map(int,box))
+        if not self.safe_to_letter(rgb,mask,boxes):
+            refined=np.zeros_like(mask)
+            for box in merged:self.lib.refine_ocr(rgba,refined,w,h,*map(int,box))
+            if self.safe_to_letter(rgb,refined,boxes):mask=refined
+        out=rgba.copy()
+        for box in merged:self.lib.clean_mask(rgba,out,mask,w,h,*map(int,box))
+        return out[:,:,:3],mask
+    def refine(self,rgb,hints,boxes):
+        rgba=np.ascontiguousarray(cv2.cvtColor(rgb,cv2.COLOR_RGB2RGBA));mask=np.zeros(rgb.shape[:2],np.uint8);h,w=mask.shape
+        for x,y,r,b in boxes:
+            pad=max(3,min(r-x,b-y)*.18);box=[max(1,int(x-pad)),max(1,int(y-pad)),min(w-1,int(r+pad)),min(h-1,int(b+pad))]
+            self.lib.refine(rgba,hints,mask,w,h,*box)
+        if len(boxes)>1 and not all(self.lib.neural_valid(rgba,hints,mask,w,h,*map(int,q))for q in boxes):
+            # Adjacent glowing rows can be one connected hint component. Refine
+            # their paragraph together, then clip back to the original row ROIs.
+            union=[min(q[0]for q in boxes),min(q[1]for q in boxes),max(q[2]for q in boxes),max(q[3]for q in boxes)]
+            pad=max(3,min(union[2]-union[0],union[3]-union[1])*.18)
+            area=[max(1,int(union[0]-pad)),max(1,int(union[1]-pad)),min(w-1,int(union[2]+pad)),min(h-1,int(union[3]+pad))]
+            alternate=np.zeros_like(mask);allowed=np.zeros_like(mask);self.lib.refine(rgba,hints,alternate,w,h,*area)
+            for x,y,r,b in boxes:
+                pad=max(3,min(r-x,b-y)*.18);allowed[max(1,int(y-pad)):min(h-1,int(b+pad)),max(1,int(x-pad)):min(w-1,int(r+pad))]=255
+            alternate[allowed==0]=0
+            if all(self.lib.neural_valid(rgba,hints,alternate,w,h,*map(int,q))for q in boxes):mask=alternate
+        return mask
+    def hints(self,rgb):
+        h,w=rgb.shape[:2];scale=min(1024/h,1024/w);cw=max(1,round(w*scale));ch=max(1,round(h*scale))
+        image=cv2.copyMakeBorder(cv2.resize(rgb,(cw,ch)),0,1024-ch,0,1024-cw,cv2.BORDER_CONSTANT,value=(0,0,0))
+        session=self.session('ctd.onnx');output=session.run(['seg'],{session.get_inputs()[0].name:image.astype(np.float32).transpose(2,0,1)[None]/255})[0][0,0]
+        return ((cv2.resize(output[:ch,:cw],(w,h)))>.3).astype(np.uint8)*255
+    def reconstruct(self,rgb,mask,protected,boxes):
+        rgba=np.ascontiguousarray(cv2.cvtColor(rgb,cv2.COLOR_RGB2RGBA));h,w=mask.shape;area=[max(1,int(protected[0])),max(1,int(protected[1])),min(w-1,int(protected[2])),min(h-1,int(protected[3]))]
+        if self.lib.simple_background(rgba,mask,w,h,*area):
+            out=rgba.copy();self.lib.clean_mask(rgba,out,mask,w,h,*area);clean=out[:,:,:3]
+            if self.ink_residue(rgb,clean,mask,boxes)<=.08:return clean
+        return self.lama(rgb,mask)
+    def restore_neural(self,rgb,boxes,balloon=None,lettering_inside=None):
+        h,w=rgb.shape[:2];bounds=balloon if balloon is not None else[min(q[0]for q in boxes),min(q[1]for q in boxes),max(q[2]for q in boxes),max(q[3]for q in boxes)]
+        x=max(0,int(bounds[0])-48);y=max(0,int(bounds[1])-48);r=min(w,int(bounds[2])+48);b=min(h,int(bounds[3])+48)
+        crop=np.ascontiguousarray(rgb[y:b,x:r]);local=[[a-x,c-y,d-x,e-y]for a,c,d,e in boxes]
+        hint=self.hints(crop)
+        owned=None if balloon is None else[balloon[0]-x,balloon[1]-y,balloon[2]-x,balloon[3]-y]
+        if not self.owns_text(crop,local,owned,hint):return rgb.copy(),np.zeros((h,w),np.uint8),False
+        mask=self.refine(crop,hint,local)
+        rgba=np.ascontiguousarray(cv2.cvtColor(crop,cv2.COLOR_RGB2RGBA))
+        if not all(self.lib.neural_valid(rgba,hint,mask,crop.shape[1],crop.shape[0],*map(int,box))for box in local):return rgb.copy(),np.zeros((h,w),np.uint8),False
+        glyph=float(np.median([min(q[2]-q[0],q[3]-q[1])for q in local]));pad=max(8,min(18,glyph*.4))
+        protected=owned if owned is not None else[max(1,min(q[0]for q in local)-pad),max(1,min(q[1]for q in local)-pad),min(crop.shape[1]-1,max(q[2]for q in local)+pad),min(crop.shape[0]-1,max(q[3]for q in local)+pad)]
+        mask=self.grow_mask(mask,protected,2)
+        if lettering_inside is not None:
+            safe=[max(protected[0],lettering_inside[0]-x),max(protected[1],lettering_inside[1]-y),min(protected[2],lettering_inside[2]-x),min(protected[3],lettering_inside[3]-y)]
+            margin=max(8,min(18,int(np.ceil(glyph*.4))))
+            for a,c,d,f in local:
+                left=max(int(safe[0]),int(np.floor(a-margin)));top=max(int(safe[1]),int(np.floor(c-margin)));right=min(int(safe[2]),int(np.ceil(d+margin)));bottom=min(int(safe[3]),int(np.ceil(f+margin)))
+                if right>left and bottom>top:mask[top:bottom,left:right]=255
+        restored=self.reconstruct(crop,mask,protected,local)
+        if self.ink_residue(crop,restored,mask,local)>.08:
+            margin=max(8,min(18,int(np.ceil(glyph*.4))))
+            for a,c,d,f in local:
+                left=max(int(protected[0]),int(np.floor(a-margin)));top=max(int(protected[1]),int(np.floor(c-margin)));right=min(int(protected[2]),int(np.ceil(d+margin)));bottom=min(int(protected[3]),int(np.ceil(f+margin)))
+                mask[top:bottom,left:right]=255
+            restored=self.reconstruct(crop,mask,protected,local)
+        if self.ink_residue(crop,restored,mask,local)>.08:return rgb.copy(),np.zeros((h,w),np.uint8),False
+        result=rgb.copy();result[y:b,x:r]=restored
+        whole_mask=np.zeros((h,w),np.uint8);whole_mask[y:b,x:r]=mask
+        return result,whole_mask,True
+    def owns_text(self,rgb,boxes,balloon=None,evidence=None):
+        if balloon is None:return True
+        rgba=np.ascontiguousarray(cv2.cvtColor(rgb,cv2.COLOR_RGB2RGBA));h,w=rgb.shape[:2]
+        area=[max(1,int(balloon[0])),max(1,int(balloon[1])),min(w-1,int(balloon[2])),min(h-1,int(balloon[3]))]
+        if evidence is None:
+            evidence=np.zeros((h,w),np.uint8);self.lib.text_mask(rgba,evidence,w,h,*area)
+        owned=[]
+        for x,y,r,b in boxes:
+            pad=max(8,min(r-x,b-y)*.3);owned.append([int(np.floor(x-pad)),int(np.floor(y-pad)),int(np.ceil(r+pad)),int(np.ceil(b+pad))])
+        return bool(self.lib.mask_owned(evidence,w,h,*area,np.ascontiguousarray(owned,dtype=np.int32).reshape(-1),len(boxes)))
+    def can_letter_light(self,rgb,mask,boxes,balloon=None):
+        return self.safe_to_letter(rgb,mask,boxes) and self.simple_background(rgb,mask,boxes) and self.owns_text(rgb,boxes,balloon)
+    def safe_to_letter(self,rgb,mask,boxes):
+        rgba=np.ascontiguousarray(cv2.cvtColor(rgb,cv2.COLOR_RGB2RGBA));h,w=mask.shape
+        return all(self.lib.coverage(rgba,mask,w,h,*map(int,box))>=.95 for box in boxes)
+    def simple_background(self,rgb,mask,boxes):
+        rgba=np.ascontiguousarray(cv2.cvtColor(rgb,cv2.COLOR_RGB2RGBA));h,w=mask.shape
+        expanded=[]
+        for x,y,r,b in boxes:
+            pad=max(3,min(r-x,b-y)*.18);expanded.append([max(1,int(x-pad)),max(1,int(y-pad)),min(w-1,int(np.ceil(r+pad))),min(h-1,int(np.ceil(b+pad)))])
+        return all(self.lib.simple_background(rgba,mask,w,h,*box) for box in expanded)
+    def lama(self,rgb,mask):
+        ys,xs=np.where(mask>0)
+        if not len(xs):return rgb.copy()
+        h,w=mask.shape;pad=48;x=max(0,int(xs.min())-pad);y=max(0,int(ys.min())-pad);r=min(w,int(xs.max())+pad+1);b=min(h,int(ys.max())+pad+1)
+        crop=rgb[y:b,x:r];m=mask[y:b,x:r]
+        # Preserve aspect ratio and pad to the fixed model canvas; never stretch.
+        scale=min(512/crop.shape[0],512/crop.shape[1]);cw=max(1,round(crop.shape[1]*scale));ch=max(1,round(crop.shape[0]*scale))
+        image=cv2.copyMakeBorder(cv2.resize(crop,(cw,ch)),0,512-ch,0,512-cw,cv2.BORDER_REFLECT_101)
+        binary=np.zeros((512,512),np.float32);binary[:ch,:cw]=cv2.resize(m,(cw,ch),interpolation=cv2.INTER_NEAREST)>0
+        s=self.session('lama.onnx');out=s.run(None,{'image':image.astype(np.float32).transpose(2,0,1)[None]/255,'mask':binary[None,None]})[0]
+        if out.shape[1]==3:out=out[0].transpose(1,2,0)
+        else:out=out[0]
+        restored=cv2.resize(out[:ch,:cw].clip(0,255).astype(np.uint8),(r-x,b-y))
+        result=rgb.copy();target=result[y:b,x:r];target[m>0]=restored[m>0]
+        return result

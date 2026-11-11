@@ -1,0 +1,67 @@
+name: Live Violet reader browser verification
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/comic-translation-reliability]
+    paths: ['tools/comic-corpus/VioletBrowserProbe.swift', '.github/workflows/zeus-violet-browser.yml']
+permissions:
+  contents: read
+concurrency:
+  group: zeus-live-violet-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  live:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - name: Verify unchanged application source
+        run: git diff --exit-code 11baa9faa41133ef88c85132efb07b7afb250ed6 -- ZEUSNext Native/ComicRuntime
+      - uses: maxim-lobanov/setup-xcode@v1
+        with: {xcode-version: '26.3'}
+      - run: brew install xcodegen ninja cmake
+      - run: bash .zeus-ci/comic/build_runtime.sh iphonesimulator
+      - name: Prepare the actual browser test
+        run: |
+          mkdir -p results
+          cp tools/comic-corpus/VioletBrowserProbe.swift .openminis/Host/NativeComicTranslationTests.swift
+          xcrun swiftc -frontend -parse .openminis/Host/NativeComicTranslationTests.swift
+          python3 .zeus-ci/project.py
+          xcodegen generate --spec zeus-project.json
+      - name: Initialize the simulator catalogue
+        timeout-minutes: 4
+        run: xcrun simctl list devices available -j > results/simulators.json
+      - name: Boot an available simulator
+        timeout-minutes: 15
+        run: python3 .zeus-ci/comic/boot_simulator.py
+      - name: Run actual WebKit, automatic OCR and Google on the live chapter
+        timeout-minutes: 22
+        run: |
+          set -o pipefail
+          xcodebuild -project ZEUSNext.xcodeproj -scheme ZEUSNext -configuration Release -sdk iphonesimulator -destination "platform=iOS Simulator,id=$COMIC_SIMULATOR" -derivedDataPath "$RUNNER_TEMP/ZeusVioletLive" -resultBundlePath results/violet.xcresult -only-testing:ZEUSNextTests/NativeComicTranslationTests -parallel-testing-enabled NO -test-timeouts-enabled YES -default-test-execution-time-allowance 1000 -maximum-test-execution-time-allowance 1100 test CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- ENABLE_TESTABILITY=YES ONLY_ACTIVE_ARCH=YES ARCHS=arm64 2>&1 | tee results/live.log
+      - name: Export evidence and skip status
+        if: always()
+        run: |
+          git rev-parse HEAD > results/probe-source-commit.txt
+          echo 11baa9faa41133ef88c85132efb07b7afb250ed6 > results/app-source-commit.txt
+          if [ -f results/violet.xcresult/Info.plist ]; then
+            xcrun xcresulttool get test-results summary --path results/violet.xcresult > results/summary.json
+            xcrun xcresulttool export attachments --path results/violet.xcresult --output-path results/screenshots
+          fi
+      - name: Require an executed live reader test
+        if: always()
+        run: |
+          python3 - <<'PYCODE'
+          import json,pathlib
+          path=pathlib.Path('results/summary.json')
+          assert path.exists(), 'The live browser test did not execute'
+          summary=json.loads(path.read_text())
+          assert summary.get('passedTests')==1 and summary.get('skippedTests')==0 and summary.get('failedTests')==0, 'The live reader was not verified; inspect the evidence'
+          PYCODE
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: live-violet-reader-evidence
+          path: results
+          retention-days: 14

@@ -1,0 +1,30 @@
+# Run from the repository root. No Cloudflare paid plan is required.
+# The computer running Docker provides the compute, not the phone.
+services:
+  restoration:
+    build:
+      context: ..
+      dockerfile: Restoration/Dockerfile
+    environment:
+      ZEUS_OWNER_EMAIL: ${ZEUS_OWNER_EMAIL:?Set your Zeus account email in the environment}
+      ZEUS_COMIC_MODELS_DIR: /models
+    volumes:
+      - models:/models
+    mem_limit: 2g
+    cpus: 2
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=5)"]
+      interval: 10s
+      timeout: 6s
+      retries: 40
+      start_period: 30s
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate --url http://restoration:8080
+    depends_on:
+      restoration:
+        condition: service_healthy
+    restart: unless-stopped
+volumes:
+  models:

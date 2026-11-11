@@ -75,34 +75,51 @@ struct CloudLocalOwner {
 
 @MainActor final class CloudAccount: ObservableObject {
     static let shared = CloudAccount()
-    enum Phase: Equatable { case loading, signedOut, claim, ready, blocked }
+    enum Phase: Equatable { case loading, signedOut, claim, ready, blocked, guest }
     @Published private(set) var phase: Phase = .loading {
-        didSet { if phase != .ready { NativeLocalExecutionBoundary.shared.setAllowed(false) } }
+        didSet { if phase != .ready { NativeLocalExecutionBoundary.shared.setAllowed(phase == .guest && !guestIsolated) } }
     }
     @Published private(set) var identity: CloudIdentity?
     @Published var busy = false
     @Published var issue: String?
     @Published var notice: String?
     @Published private(set) var passwordRecovery = false
-    let auth: AuthClient
+    private let suppliedAuth: AuthClient?
+    private let defaults:UserDefaults
+    private(set) var guestIsolated=false
+    var allowsGuestLocalExecution:Bool { phase == .guest && !guestIsolated }
+    lazy var auth:AuthClient = suppliedAuth ?? AuthClient(configuration: .init(
+        url: ZeusCloudConfiguration.projectURL.appendingPathComponent("auth/v1"),
+        headers: ["apikey": ZeusCloudConfiguration.publishableKey], flowType: .pkce,
+        redirectToURL: ZeusCloudConfiguration.callback, storageKey: "zeus-auth-v1",
+        localStorage: CloudSessionStorage(), emitLocalSessionAsInitialSession: true))
     private let owner: CloudLocalOwner
     private var observation: Task<Void, Never>?
     private var epoch = UUID()
 
-    init(auth: AuthClient? = nil, owner: CloudLocalOwner = CloudLocalOwner()) {
-        self.owner = owner
-        self.auth = auth ?? AuthClient(configuration: .init(
-            url: ZeusCloudConfiguration.projectURL.appendingPathComponent("auth/v1"),
-            headers: ["apikey": ZeusCloudConfiguration.publishableKey], flowType: .pkce,
-            redirectToURL: ZeusCloudConfiguration.callback, storageKey: "zeus-auth-v1",
-            localStorage: CloudSessionStorage(), emitLocalSessionAsInitialSession: true))
+    init(auth: AuthClient? = nil, owner: CloudLocalOwner = CloudLocalOwner(), defaults:UserDefaults = .standard) {
+        self.owner=owner;self.suppliedAuth=auth;self.defaults=defaults
+    }
+    func enterGuest(){
+        let observed=observation != nil;observation?.cancel();observation=nil
+        // An owned installation uses a separate browser namespace. Its global
+        // native-agent stores cannot safely be opened by a signed-out guest.
+        do{guestIsolated=try owner.read() != nil}catch{guestIsolated=true}
+        epoch=UUID();identity=nil;passwordRecovery=false;issue=nil;notice=nil
+        defaults.set(true,forKey:"zeus.localGuest");phase = .guest
+        if observed{Task{await auth.stopAutoRefresh()}}
+    }
+    func leaveGuest(){
+        guard phase == .guest else{return}
+        defaults.set(false,forKey:"zeus.localGuest");phase = .signedOut;start()
     }
 
     func start() {
         guard observation == nil else { return }
+        if defaults.bool(forKey:"zeus.localGuest"){if phase != .guest{enterGuest()};return}
         observation = Task { [weak self, auth] in
             for await (event, session) in auth.authStateChanges {
-                guard let self else { return }
+                guard let self,!Task.isCancelled,self.phase != .guest else { return }
                 if event == .passwordRecovery { self.passwordRecovery = true }
                 self.accept(session)
             }

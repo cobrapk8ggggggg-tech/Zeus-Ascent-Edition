@@ -10,7 +10,7 @@ enum BrowserAction: String, CaseIterable, Identifiable {
     var symbol: String {
         switch self {
         case .assistant: return "sparkles"
-        case .translateImages: return "character.viewfinder"
+        case .translateImages: return "photo"
         case .translate: return "translate"
         case .saveForm: return "plus.rectangle.on.rectangle"; case .fillForm: return "square.and.pencil"
         case .bookmark: return "bookmark.badge.plus"; case .pinTab: return "pin"; case .twinHorizontal: return "rectangle.split.2x1"; case .twinVertical: return "rectangle.split.1x2"; case .savePage: return "doc"; case .printPage: return "printer"; case .darkPage: return "moon"; case .fullScreen: return "arrow.up.left.and.arrow.down.right"
@@ -98,8 +98,8 @@ struct BrowserRoot: View {
         .overlay(alignment: .top) { if model.current?.loading == true { ProgressView(value: max(0.05, model.current?.progress ?? 0)).progressViewStyle(.linear).tint(theme.accentColor).frame(height: 2).allowsHitTesting(false) } }
         .overlay(alignment: .top) { if !model.requiresUnlock, let page = model.current?.translation { TranslationCard(page: page, settings: { panel = .translation }).id(model.current?.id).animation(.spring(response: 0.45, dampingFraction: 0.82), value: page.offered) } }
         .browserTheme(theme)
-        .overlay(alignment: .bottom) { if !model.requiresUnlock, let session = model.current?.comicTranslation { ComicTranslationCard(session: session, settings: { imageTranslationSettings = true }).id(model.current?.id) } }
-        .sheet(isPresented: $imageTranslationSettings) { ComicSettingsSheet(model: model) }
+        .overlay(alignment: .bottom) { if !model.requiresUnlock, let session = model.current?.comicTranslation { ComicTranslationCard(session: session, settings: { imageTranslationSettings = true }).browserTheme(theme).padding(.bottom,barsVisible && layout != .original ? 64:20).id(model.current?.id) } }
+        .sheet(isPresented: $imageTranslationSettings) { ComicSettingsSheet(model: model).browserTheme(theme) }
         .onChange(of: model.current?.id) { _, _ in model.current?.translation?.becameVisible(); model.current?.comicTranslation?.becameVisible() }
         .fullScreenCover(item: $model.article) { ReaderSheet(model: model, article: $0).tint(theme.buttonTextColor) }
         .fullScreenCover(item: $model.gallery) { GallerySheet(model: model, gallery: $0).tint(theme.buttonTextColor) }
@@ -107,10 +107,10 @@ struct BrowserRoot: View {
         .sheet(item: $model.share) { ActivitySheet(url: $0.url) }
         .onChange(of: model.dialog?.id) { _, _ in if let dialog = model.dialog { model.dialog = nil; BrowserPresentation.present(dialog) } }
         .onChange(of: model.notice?.id) { _, _ in if let notice = model.notice { model.notice = nil; BrowserPresentation.notice(notice.text) } }
-        .onChange(of: model.requiresUnlock) { _, locked in if locked { assistantVisible = false; model.agent?.cancel(); model.agent = nil; profilePicker = false; panel = nil; model.article = nil; model.gallery = nil; model.formDraft = nil; model.share = nil; BrowserPresentation.dismissTools() } }
+        .onChange(of: model.requiresUnlock) { _, locked in if locked { imageTranslationSettings=false;assistantVisible = false; model.agent?.cancel(); model.agent = nil; profilePicker = false; panel = nil; model.article = nil; model.gallery = nil; model.formDraft = nil; model.share = nil; BrowserPresentation.dismissTools() } }
         .onChange(of: model.address) { _, value in if !addressFocused { draft = value } }
         .onChange(of: scenePhase) { _, phase in if phase == .background { model.backgrounded() }; if phase == .active { model.becameActive(); model.current?.comicTranslation?.becameVisible() } }
-        .onReceive(model.profiles.$activeID.dropFirst()) { _ in assistantVisible = false; model.agent?.cancel(); model.agent = nil; profilePicker = false; panel = nil; model.article = nil; model.gallery = nil; model.formDraft = nil; model.share = nil; BrowserPresentation.dismissTools() }
+        .onReceive(model.profiles.$activeID.dropFirst()) { _ in imageTranslationSettings=false;assistantVisible = false; model.agent?.cancel(); model.agent = nil; profilePicker = false; panel = nil; model.article = nil; model.gallery = nil; model.formDraft = nil; model.share = nil; BrowserPresentation.dismissTools() }
         .onReceive(model.profiles.objectWillChange) { model.changed() }
         .onReceive(model.downloads.objectWillChange) { model.changed() }
         .onReceive(model.downloads.$message) { if let text = $0 { model.downloads.message = nil; model.notify(text) } }
@@ -277,6 +277,11 @@ struct BrowserRoot: View {
     @ViewBuilder private func actionButton(_ action: BrowserAction) -> some View {
         if action == .tools {
             Menu {
+                Section("الترجمة") {
+                    Button(BrowserAction.translate.title, systemImage: BrowserAction.translate.symbol) { perform(.translate) }.accessibilityIdentifier("menu-translateButton")
+                    Button(BrowserAction.translateImages.title, systemImage: BrowserAction.translateImages.symbol) { perform(.translateImages) }.accessibilityIdentifier("menu-translateImagesButton")
+                    Button("إعدادات ترجمة الصور", systemImage: "slider.horizontal.3") { imageTranslationSettings = true }.accessibilityIdentifier("menu-imageTranslationSettings")
+                }
                 ForEach(BrowserActionGroup.allCases) { group in
                     Menu { ForEach(group.actions) { item in Button(item.title, systemImage: item.symbol) { perform(item) }.accessibilityIdentifier("menu-" + item.identifier) } } label: { Label(group.title, systemImage: group.symbol) }.accessibilityIdentifier("group-" + group.rawValue)
                 }

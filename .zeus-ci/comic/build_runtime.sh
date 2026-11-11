@@ -16,7 +16,7 @@ cmake -S "$src" -B "$output/cmake" -G Ninja \
   -DGGML_METAL=OFF -DGGML_OPENMP=OFF -DLLAMA_CURL=OFF -DGGML_NATIVE=OFF -DGGML_ACCELERATE=ON
 cmake --build "$output/cmake" --target llama -j 3
 if [ "$sdk" = iphonesimulator ]; then minimum=-mios-simulator-version-min=18.1; else minimum=-mios-version-min=18.1; fi
-xcrun --sdk "$sdk" clang++ -std=c++17 -arch arm64 -isysroot "$(xcrun --sdk "$sdk" --show-sdk-path)" \
+xcrun --sdk "$sdk" clang++ -std=c++17 -O3 -DNDEBUG -arch arm64 -isysroot "$(xcrun --sdk "$sdk" --show-sdk-path)" \
   "$minimum" -I"$src/include" -I"$src/ggml/include" \
   -c "$root/Native/ComicRuntime/ZeusComicRuntime.cpp" -o "$output/wrapper.o"
 common=(-G Ninja -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_SYSTEM_PROCESSOR=arm64 -DCMAKE_OSX_SYSROOT="$sdk" -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=18.1 -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF)
@@ -32,7 +32,7 @@ for spec in "jpeg https://github.com/libjpeg-turbo/libjpeg-turbo.git 3.1.0" "png
   cmake -S "$source_path" -B "$output/$name" "${common[@]}" "${flags[@]}"
   cmake --build "$output/$name" -j 3
  done
-xcrun --sdk "$sdk" clang++ -std=c++17 -arch arm64 -isysroot "$(xcrun --sdk "$sdk" --show-sdk-path)" "$minimum" \
+xcrun --sdk "$sdk" clang++ -std=c++17 -O3 -DNDEBUG -arch arm64 -isysroot "$(xcrun --sdk "$sdk" --show-sdk-path)" "$minimum" \
   -I"$root/.zeus-ci/comic/build/jpeg/src" -I"$root/.zeus-ci/comic/build/jpeg" -I"$output/jpeg" -I"$root/.zeus-ci/comic/build/png" -I"$output/png" -I"$root/.zeus-ci/comic/build/webp/src" \
   -c "$root/Native/ComicRuntime/ComicRegionDecoder.cpp" -o "$output/decoder.o"
 python3 - "$output" <<'PY'

@@ -19,26 +19,117 @@ import CoreGraphics
     @Published var running=false
     @Published var paused=false
     @Published var completed=0
+    @Published private(set) var detectedTexts=0
+    @Published private(set) var translatedTexts=0
+    private var textCounts:[String:(Int,Int)]=[:]
+    private func countTexts(_ job:String,detected:Int,translated:Int){textCounts[job]=(detected,translated);detectedTexts=textCounts.values.reduce(0){$0+$1.0};translatedTexts=textCounts.values.reduce(0){$0+$1.1}}
     private(set) var ocrRuns=0
-    @Published var stage=""
+    private(set) var phaseSeconds:[String:Double]=[:]
+    // Optional test observer; no image, text or translation telemetry is stored by the app.
+    var onRegionAudit:((ComicReading,[TranslationSegment],[String:String],String?)->Void)?
+    var onRestorationAttempt:((String)->Void)?
+    var restorationReadinessOverride:(@Sendable () async -> Bool)?
+    var restorationPreparationOverride:(@Sendable () async throws -> Void)?
+    private(set) var hasLetteredTranslation=false
+    private(set) var firstPassSeconds:Double?
+    private var startedAt:Date?
+    private var modelPreparation:Task<Void,Never>?
+    private var modelWaiters=Set<String>(),startupWaiters=Set<String>(),artworkWaiters=Set<String>()
+    private var artworkPass=false,didDeferInitialArtwork=false
+    @Published var phase: ComicSessionPhase = .idle
+    var stage: String { phase.title }
+    @Published var showingOriginal = false
+    @Published var diagnostics: [ComicDiagnostic] = []
+    @Published var contextNotice: String?
+    private var retryCounts: [String:Int] = [:]
+    private var retries: [String:Task<Void,Never>] = [:]
+    private var pendingImages = false
+    private var sawImages = false
+    private var sweepFailure = false
+    private var resumeWhenVisible = false
+    private var appliedRegions = Set<String>()
     @Published var error:String?
     @Published var storageNotice:String?
     private var work:Task<Void,Never>?
     private var epoch=UUID()
+    private var lastRenderTicket: String?
     private var frames:[String:WKFrameInfo]=[:]
     private var documents:[String:ComicEnvelope]=[:]
     private var done=Set<String>()
     private var failed=Set<String>()
     private var pending=false
     private var readings:[String:ComicReading]=[:]
+    private var languageHints:[String:String]=[:]
     private var textResults:[String:[TranslationSegment]]=[:]
     private var speechTexts:[String:String]=[:]
+    // Compressed cleanup checkpoints keep successful neural work across retries.
+    // Never retain full decoded chapter bitmaps or count a settings variant twice.
+    private var cleanupCheckpoints:[String:(Data,Set<String>)]=[:]
+    private var cleanupOrder:[String]=[]
+    private func saveCleanup(_ image:CGImage,ids:Set<String>,job:String)async throws{
+        guard !ids.isEmpty else{return}
+        let bytes=try await Task.detached{try ComicPixels.png(image)}.value
+        cleanupCheckpoints[job]=(bytes,ids);cleanupOrder.removeAll{$0==job};cleanupOrder.append(job)
+        while cleanupOrder.count>12 || cleanupCheckpoints.values.reduce(0,{$0+$1.0.count})>24_000_000{
+            let old=cleanupOrder.removeFirst();cleanupCheckpoints[old]=nil
+        }
+    }
+    private func retry(_ job:String,ticket:UUID){
+        let attempt=retryCounts[job,default:0]
+        guard attempt<2,retries[job]==nil else{return}
+        retryCounts[job]=attempt+1
+        retries[job]=Task{[weak self] in
+            do{try await Task.sleep(for:.seconds(attempt==0 ? 2:6));try Task.checkCancellation()
+                guard let self,self.epoch==ticket,self.active,!self.paused else{return}
+                self.retries[job]=nil;self.failed.remove(job);self.schedule()
+            }catch{}
+        }
+    }
+    private var blockedRestorations:Set<String>{modelWaiters.union(startupWaiters).union(artworkWaiters)}
+    private func releaseRestorations(_ jobs:Set<String>){
+        let released=jobs.subtracting(blockedRestorations)
+        if !released.isEmpty{failed.subtract(released);pending=true}
+    }
+    private func noteLettering(_ speeches:[ComicSpeech],translations:[TranslationSegment],unresolved:[String],job:String){
+        guard !hasLetteredTranslation || !startupWaiters.isEmpty else{return}
+        let omitted=Set(unresolved)
+        guard speeches.contains(where:{speech in !omitted.contains(speech.id) && translations.contains{value in value.id==speech.id && ComicPixels.needsLettering(speech.text,value.text)}})else{return}
+        hasLetteredTranslation=true
+        // A small translated credit on the first heavy panel must not release
+        // its own neural work ahead of the next ordinary story region.
+        guard !startupWaiters.contains(job) else{return}
+        let waiting=startupWaiters;startupWaiters.removeAll();releaseRestorations(waiting)
+    }
+    private func restorationPrepared()async->Bool{
+        if let readiness=restorationReadinessOverride{return await readiness()}
+        return await ComicModelStore.shared.isRestorationPrepared()
+    }
+    private func prepareRestoration(for job:String,ticket:UUID){
+        modelWaiters.insert(job)
+        guard modelPreparation==nil else{return}
+        modelPreparation=Task{[weak self]in
+            guard let self else{return}
+            for attempt in 0..<3{
+                do{
+                    if attempt>0{try await Task.sleep(for:.seconds(attempt==1 ? 2:6))}
+                    try Task.checkCancellation()
+                    if let prepare=restorationPreparationOverride{try await prepare()}else{try await ComicRestoration.shared.prepare()}
+                    guard epoch==ticket,!Task.isCancelled,active,!paused else{return}
+                    modelPreparation=nil
+                    let waiting=modelWaiters;modelWaiters.removeAll();releaseRestorations(waiting)
+                    schedule();return
+                }catch{
+                    guard epoch==ticket,!Task.isCancelled,active,!paused else{return}
+                    if attempt==2{modelPreparation=nil;sweepFailure=true;record(error,at:.downloading);return}
+                }
+            }
+        }
+    }
     private var fetched:[String:Data]=[:]
     private var fetchedOrder:[String]=[]
-    private var resolvedScripts:[String:(String,Int)]=[:]
     private var observer:NSObjectProtocol?
     var preferences:ComicPreferences{model?.data.settings.comicTranslation ?? ComicPreferences()}
-    init(model:BrowserModel,tab:BrowserTab){self.model=model;self.tab=tab;super.init();observer=NotificationCenter.default.addObserver(forName:UIApplication.didReceiveMemoryWarningNotification,object:nil,queue:.main){[weak self]_ in Task{@MainActor in self?.pause();await ComicOCR.shared.purge();await ComicPaddle.shared.purge();await ComicLocalTranslator.shared.unload()}}}
+    init(model:BrowserModel,tab:BrowserTab){self.model=model;self.tab=tab;super.init();observer=NotificationCenter.default.addObserver(forName:UIApplication.didReceiveMemoryWarningNotification,object:nil,queue:.main){[weak self]_ in Task{@MainActor in self?.pause();await ComicOCR.shared.purge();await ComicPaddle.shared.purge();await ComicRestoration.shared.purge();await ComicLocalTranslator.shared.unload()}}}
     deinit{if let observer{NotificationCenter.default.removeObserver(observer)}}
     func attach(to view:WKWebView,installScript:Bool=true){
         ComicMessageRouter.shared.pages.setObject(self,forKey:view)
@@ -60,22 +151,88 @@ import CoreGraphics
         guard let view=tab?.webView else{throw CancellationError()}
         return try await view.callAsyncJavaScript(code,arguments:args,in:frame?.isMainFrame==true ? nil:frame,contentWorld:Self.world) ?? NSNull()
     }
-    func start(){guard let model,let tab,!tab.isHome,!model.requiresUnlock,model.profile.id==tab.profileID else{return};ComicFonts.registerAll();active=true;paused=false;error=nil;failed.removeAll();schedule()}
-    func navigationStarted(){pause();active=false;completed=0;ocrRuns=0;done.removeAll();failed.removeAll();frames.removeAll();documents.removeAll();readings.removeAll();textResults.removeAll();speechTexts.removeAll();fetched.removeAll();fetchedOrder.removeAll();resolvedScripts.removeAll();error=nil}
-    func pause(){paused=true;epoch=UUID();work?.cancel();work=nil;running=false;pending=false;for frame in frames.values{Task{_ = try? await call("globalThis.zeusComic?.releaseAll?.()",frame:frame)}}}
-    func becameVisible(){if active||preferences.automatic{start()}}
-    func restore()async{pause();active=false;for frame in frames.values{_ = try? await call("globalThis.zeusComic?.restore()",frame:frame)};_ = try? await call("globalThis.zeusComic?.restore()",frame:nil);done.removeAll();failed.removeAll();completed=0;error=nil}
-    private func schedule(){if running{pending=true;return};guard active && !paused else{return};let ticket=epoch;running=true
-        work=Task{[weak self]in guard let self else{return};defer{if epoch==ticket{running=false;work=nil;if pending{pending=false;schedule()}}}
+    private var configurationIssue: String? {
+        guard let model else{return nil}
+        let prefs=preferences,translation=prefs.resolvedTranslation(model.data.settings)
+        if prefs.useCloudRestoration ?? false{
+            guard let endpoint=URL(string:prefs.cloudRestorationURL ?? ""),endpoint.scheme=="https",endpoint.host != nil else{return "حدد عنوان HTTPS لخادم الترميم السحابي من إعدادات الصور."}
+        }
+        if prefs.localModel {
+            return FileManager.default.fileExists(atPath:ComicLocalTranslator.modelURL.path) ? nil:"استورد نموذج GGUF من إعدادات الصور قبل بدء الترجمة المحلية."
+        }
+        if prefs.allowOnlineFallback == true{return nil}
+        if prefs.engine.needsKey,AISecretVault.read(profile:model.profile.id,provider:"comic-"+prefs.engine.rawValue).trimmingCharacters(in:.whitespacesAndNewlines).isEmpty {
+            return "أضف مفتاح \(prefs.engine.title) في إعدادات ترجمة الصور أو اختر محركًا دون مفتاح."
+        }
+        if translation.target=="ar",[ComicOnlineEngine.papago,.caiyun].contains(prefs.engine) {return "المحرك المختار لا يدعم العربية. اختر Google أو Microsoft أو مزودًا يدعمها."}
+        if prefs.engine == .existing,translation.engine == .ai,!(model.data.settings.aiProviders ?? []).contains(where:{$0.id==translation.providerID}) {return "اختر مزود الذكاء الاصطناعي من إعدادات ترجمة الصور أولًا."}
+        return nil
+    }
+    func start(){
+        guard !showingOriginal,let model,let tab,!tab.isHome,!model.requiresUnlock,model.profile.id==tab.profileID else{return}
+        ComicFonts.registerAll();if startedAt==nil{startedAt=Date()};active=true;paused=false;resumeWhenVisible=false;error=nil;failed.removeAll();retryCounts.removeAll()
+        if let issue=configurationIssue {error=issue;phase = .failed;return}
+        schedule()
+    }
+    func navigationStarted(){pause();hasLetteredTranslation=false;firstPassSeconds=nil;startedAt=nil;artworkPass=false;active=false;showingOriginal=false;lastRenderTicket=nil;phase = .idle;appliedRegions.removeAll();diagnostics.removeAll();contextNotice=nil;completed=0;detectedTexts=0;translatedTexts=0;textCounts.removeAll();cleanupCheckpoints.removeAll();cleanupOrder.removeAll();ocrRuns=0;phaseSeconds.removeAll();done.removeAll();failed.removeAll();frames.removeAll();documents.removeAll();languageHints.removeAll();readings.removeAll();textResults.removeAll();speechTexts.removeAll();fetched.removeAll();fetchedOrder.removeAll();error=nil}
+    func pause(){modelPreparation?.cancel();modelPreparation=nil;modelWaiters.removeAll();startupWaiters.removeAll();artworkWaiters.removeAll();didDeferInitialArtwork=hasLetteredTranslation;resumeWhenVisible=false;paused=true;phase = .paused;retries.values.forEach{$0.cancel()};retries.removeAll();let previousTicket=lastRenderTicket ?? epoch.uuidString;epoch=UUID();work?.cancel();work=nil;running=false;pending=false;Task{_ = try? await call("globalThis.zeusComic?.pause(ticket)",args:["ticket":previousTicket],frame:nil)};for frame in frames.values{Task{_ = try? await call("globalThis.zeusComic?.pause(ticket)",args:["ticket":previousTicket],frame:frame)}}}
+    func suspend(){let resume = resumeWhenVisible || (active && !paused);pause();resumeWhenVisible=resume}
+    func becameVisible(){if resumeWhenVisible || (!paused && (active||preferences.automatic)){resumeWhenVisible=false;start()}}
+    func restore()async{pause();hasLetteredTranslation=false;firstPassSeconds=nil;startedAt=nil;artworkPass=false;showingOriginal=false;active=false;phase = .idle;appliedRegions.removeAll();for frame in frames.values{_ = try? await call("globalThis.zeusComic?.restore()",frame:frame)};_ = try? await call("globalThis.zeusComic?.restore()",frame:nil);done.removeAll();failed.removeAll();completed=0;detectedTexts=0;translatedTexts=0;textCounts.removeAll();error=nil}
+    func toggleOriginal() async {
+        guard active else { return }
+        let show = !showingOriginal
+        let sourceTicket=lastRenderTicket
+        pause()
+        let ticket = epoch
+        do {
+            let arguments:[String:Any]=["show":show,"ticket":(sourceTicket.map{$0 as Any} ?? NSNull())]
+            let changed=try await call("return zeusComic.setOriginal(show,ticket)",args:arguments,frame:nil)as? Bool
+            guard changed == true else{throw CancellationError()}
+            for (document,frame) in frames where !frame.isMainFrame {
+                do { _ = try await call("return zeusComic.setOriginal(show,ticket)",args:arguments,frame:frame) }
+                catch { frames[document]=nil;contextNotice="تعذّر تبديل عرض أحد الإطارات غير المتاحة." }
+            }
+            try valid(ticket)
+            showingOriginal = show
+            if !show { start() }
+        } catch is CancellationError {} catch { record(error, at: .displaying) }
+    }
+    private func record(_ failure: Error, at phase: ComicSessionPhase) {
+        let diagnostic = ComicDiagnostic.capture(failure, phase: phase)
+        diagnostics.append(diagnostic)
+        if diagnostics.count > 8 { diagnostics.removeFirst() }
+        if failure is ComicHTTPFailure || failure is ComicFailure { error = failure.localizedDescription }
+        else if diagnostic.domain == NSURLErrorDomain {
+            error = diagnostic.code == NSURLErrorNoPermissionsToReadFile ? "تعذّرت قراءة بيانات الصورة. أعد المحاولة؛ تفاصيل المرحلة متاحة أدناه." : "تعذّر الاتصال بمصدر الصورة أو خدمة الترجمة. تحقق من الاتصال وأعد المحاولة."
+        } else { error = "تعذّرت معالجة إحدى الصور. بقي الأصل متاحًا؛ يمكنك إعادة المحاولة أو تغيير وضع القراءة." }
+    }
+    private func schedule(){guard active && !paused else{return};if let issue=configurationIssue {error=issue;phase = .failed;return};if running{pending=true;return};guard active && !paused else{return};let ticket=epoch;running=true;pendingImages=false;sawImages=false;sweepFailure=false;phase = .waiting
+        work=Task{[weak self]in guard let self else{return};defer{if epoch==ticket{running=false;work=nil
+                let terminalFailures=failed.subtracting(blockedRestorations)
+                if terminalFailures.isEmpty && !sweepFailure { error=nil }
+                phase = (!terminalFailures.isEmpty || sweepFailure) ? (completed > 0 ? .partial : .failed) : (pendingImages || !sawImages || !blockedRestorations.isEmpty ? .waiting : .completed)
+                if pending{pending=false;schedule()}}}
             do{
                 _ = try await call(Self.script,frame:nil)
                 let id=try await call("return zeusComic.documentID",frame:nil)as? String ?? ""
                 let children=frames.filter{!$0.value.isMainFrame}.map{($0.key,Optional($0.value))}
                 for (document,frame) in [(id,Optional<WKFrameInfo>.none)]+children{
                     try valid(ticket)
-                    do{try await sweep(document:document,frame:frame,ticket:ticket)}catch is CancellationError{throw CancellationError()}catch{if (error as NSError).domain==WKError.errorDomain,frame != nil{frames[document]=nil;continue};self.error=error.localizedDescription}
+                    do{try await sweep(document:document,frame:frame,ticket:ticket)}catch is CancellationError{throw CancellationError()}catch{if (error as NSError).domain==WKError.errorDomain,frame != nil{frames[document]=nil;continue};sweepFailure=true;self.record(error,at:phase)}
                 }
-            }catch is CancellationError{}catch{if epoch==ticket{self.error=error.localizedDescription}}
+                try valid(ticket)
+                if !pending{
+                    if !pendingImages,firstPassSeconds==nil,let began=startedAt{firstPassSeconds=Date().timeIntervalSince(began)}
+                    if !pendingImages{let startup=startupWaiters;startupWaiters.removeAll();releaseRestorations(startup)}
+                    if !pendingImages,!artworkPass,!artworkWaiters.isEmpty{
+                        artworkPass=true;let waiting=artworkWaiters;artworkWaiters.removeAll();releaseRestorations(waiting)
+                    }
+                    // New lazy images and viewport changes must interrupt an idle
+                    // model-download wait, so ordinary text can keep advancing.
+                    while !pending,modelPreparation != nil{phase = .downloading;try await Task.sleep(for:.milliseconds(100));try valid(ticket)}
+                }
+            }catch is CancellationError{}catch{if epoch==ticket{sweepFailure=true;self.record(error,at:phase)}}
         }
     }
     private func sweep(document:String,frame:WKFrameInfo?,ticket:UUID)async throws{
@@ -83,27 +240,48 @@ import CoreGraphics
         let owner=model.profile.id,prefs=preferences,translation=preferences.resolvedTranslation(model.data.settings)
         let provider=model.data.settings.aiProviders?.first{$0.id==translation.providerID}
         let translationMark=ComicIdentity.settings(prefs,translation:translation,provider:provider)+"|"+prefs.engine.rawValue+"|local:\(prefs.localModel)|"+ComicLocalTranslator.modelIdentity
-        let mark=translationMark+"|"+(prefs.fontName ?? "default")+"|\(prefs.fontScale)|"+(prefs.textColor ?? "auto")
-        let persistent=translation.keepsTranslations && !model.profile.isPrivate
-        let generation=try await call("return zeusComic.resume(mark)",args:["mark":mark],frame:frame)as? Int ?? 0
+        let mark=translationMark+"|"+prefs.renderIdentity
+        let persistent=(prefs.translation?.retainTranslations ?? false) && !model.profile.isPrivate
+        lastRenderTicket=ticket.uuidString
+        let generation=try await call("return zeusComic.resume(mark,ticket)",args:["mark":mark,"ticket":ticket.uuidString],frame:frame)as? Int ?? 0
         let value=try await call("return zeusComic.scan(wake)",args:["wake":prefs.readAhead],frame:frame)
         let data=try JSONSerialization.data(withJSONObject:value),envelope=try JSONDecoder().decode(ComicEnvelope.self,from:data)
-        guard envelope.document==document else{return};documents[document]=envelope
+        guard envelope.document==document else{return};documents[document]=envelope;sawImages = sawImages || !envelope.items.isEmpty;pendingImages = pendingImages || envelope.items.contains(where: {$0.pending && $0.loadFailed != true})
+        if envelope.items.contains(where:{$0.loadFailed == true}){sweepFailure=true;contextNotice="تعذّر تحميل بعض صور الفصل بعد إعادة المحاولة. يمكنك إعادة المحاولة عند تحسن الاتصال."}
         let ordered=envelope.items.filter{!$0.pending&&$0.width>0&&$0.height>0}.sorted{a,b in
             let d1=max(0,a.y-envelope.scroll-envelope.viewport,envelope.scroll-a.y-a.h),d2=max(0,b.y-envelope.scroll-envelope.viewport,envelope.scroll-b.y-b.h);return d1<d2
         }
-        // Bounded sweep; rescan geometry before the next window after a scroll.
-        for candidate in ordered.prefix(prefs.readAhead ? 16:4){
+        // Bound new work, not the DOM prefix: already-completed images (including
+        // fixed decorations) must never starve another visible chapter panel.
+        var startedImages=0
+        for candidate in ordered{
             try valid(ticket)
             let allRegions=ComicGeometry.regions(width:candidate.width,height:candidate.height,maximumPixels:7_000_000)
-            let regions=ComicGeometry.prioritized(allRegions,candidate:candidate,scroll:envelope.scroll,viewport:envelope.viewport,readAhead:prefs.readAhead)
+            let nearby=Set(ComicGeometry.prioritized(allRegions,candidate:candidate,scroll:envelope.scroll,viewport:envelope.viewport,readAhead:false).map(\.y))
+            let regions=ComicGeometry.prioritized(allRegions,candidate:candidate,scroll:envelope.scroll,viewport:envelope.viewport,readAhead:prefs.readAhead).filter{region in
+                let job="\(document)|\(candidate.id)|\(candidate.revision)|\(region.y)|\(mark)"
+                if nearby.contains(region.y),artworkWaiters.remove(job) != nil{releaseRestorations([job])}
+                return !done.contains(job) && !failed.contains(job)
+            }
             if allRegions.isEmpty{failed.insert(candidate.id);continue}
+            if regions.isEmpty{continue}
+            if try await call("return zeusComic.has(id,revision,mark)",args:["id":candidate.id,"revision":candidate.revision,"mark":mark],frame:frame)as? Bool==true{
+                for region in regions{done.insert("\(document)|\(candidate.id)|\(candidate.revision)|\(region.y)|\(mark)")}
+                continue
+            }
+            if startedImages >= (prefs.readAhead ? 16:4){pending=true;break}
+            startedImages+=1
             for region in regions{
                 let job="\(document)|\(candidate.id)|\(candidate.revision)|\(region.y)|\(mark)"
-                if done.contains(job)||failed.contains(job){continue}
-                if try await call("return zeusComic.has(id,revision,mark)",args:["id":candidate.id,"revision":candidate.revision,"mark":mark],frame:frame)as? Bool==true{done.insert(job);continue}
+                let countKey="\(document)|\(candidate.id)|\(candidate.revision)|\(region.y)"
+                var timedPhase:ComicSessionPhase? = .fetching,phaseBegan=Date()
+                func measure(_ next:ComicSessionPhase?){
+                    if let previous=timedPhase{phaseSeconds[previous.rawValue,default:0]+=Date().timeIntervalSince(phaseBegan)}
+                    timedPhase=next;phaseBegan=Date()
+                }
+                defer{measure(nil)}
                 do{
-                    stage="جلب الصورة"
+                    phase = .fetching
                     if !prefs.showUntranslated{_ = try await call("zeusComic.hold(id,revision)",args:["id":candidate.id,"revision":candidate.revision],frame:frame)}
                     let bytes=try await capture(candidate,region:region,frame:frame,ticket:ticket)
                     try valid(ticket)
@@ -113,34 +291,43 @@ import CoreGraphics
                     let contextRows=max(0,min(256,(8_000_000/center.width-center.height)/2))
                     if contextRows>0,region.y==0,let previous=neighbours.before{
                         let height=min(previous.height,max(1,contextRows*previous.width/center.width)),area=ComicRegion(y:previous.height-height,width:previous.width,height:height,coreTop:0,coreBottom:height)
-                        let context=try await capture(previous,region:area,frame:frame,ticket:ticket)
-                        before=try await Task.detached{try ComicPixels.decode(context)}.value
+                        do { let context=try await capture(previous,region:area,frame:frame,ticket:ticket)
+                            before=try await Task.detached{try ComicPixels.decode(context)}.value
+                        } catch is CancellationError { throw CancellationError() } catch { contextNotice="بعض حدود الصور تُقرأ دون سياق الجوار لتعذّر تحميله." }
                     }
                     if contextRows>0,region.y+region.height==candidate.height,let next=neighbours.after{
                         let height=min(next.height,max(1,contextRows*next.width/center.width)),area=ComicRegion(y:0,width:next.width,height:height,coreTop:0,coreBottom:height)
-                        let context=try await capture(next,region:area,frame:frame,ticket:ticket)
-                        after=try await Task.detached{try ComicPixels.decode(context)}.value
+                        do { let context=try await capture(next,region:area,frame:frame,ticket:ticket)
+                            after=try await Task.detached{try ComicPixels.decode(context)}.value
+                        } catch is CancellationError { throw CancellationError() } catch { contextNotice="بعض حدود الصور تُقرأ دون سياق الجوار لتعذّر تحميله." }
                     }
                     let window=try await Task.detached{try ComicWindow.join(center,before:before,after:after)}.value
                     let image=window.image,offset=window.offset
                     let imageHash=try await Task.detached{ComicIdentity.hash(try ComicPixels.png(image))}.value
-                    let readingKey=imageHash+"|ocr-v3|\(prefs.source)|\(prefs.mode.rawValue)"
-                    stage="قراءة الفقاعات"
+                    // A cover's Latin title must not choose the script for the
+                    // following Japanese/Arabic page. Hints belong to one image.
+                    let languageHintKey=document+"|"+candidate.id+"|"+candidate.revision
+                    let readingKey=imageHash+"|ocr-v26|\(prefs.source)|\(prefs.mode.rawValue)|vote:\(region.coreTop+offset):\(region.coreBottom-region.coreTop)"
+                    measure(.recognizing);phase = .recognizing
                     let reading:ComicReading
                     if let saved=readings[readingKey]{reading=saved}
                     else if persistent,let stored=await ComicMemory.shared.data(profile:owner,layer:.reading,key:readingKey),let saved=try? JSONDecoder().decode(ComicReading.self,from:stored){reading=saved}
-                    else{ocrRuns+=1;reading=try await ComicOCR.shared.read(image,source:prefs.source == "auto" ? (resolvedScripts[document].flatMap{$0.1%3==0 ? nil:$0.0} ?? "auto"):prefs.source,mode:prefs.mode)
+                    else{ocrRuns+=1;reading=try await ComicOCR.shared.read(image,source:prefs.source,mode:prefs.mode,languageRegion:CGRect(x:0,y:region.coreTop+offset,width:region.width,height:region.coreBottom-region.coreTop),languageHint:languageHints[languageHintKey],onPreparing: { [weak self] preparing in
+                            await MainActor.run { if self?.epoch == ticket { self?.phase = preparing ? .downloading:.recognizing } }
+                        })
                         try valid(ticket)
-                        if persistent{do{try await ComicMemory.shared.save(JSONEncoder().encode(reading),profile:owner,layer:.reading,key:readingKey)}catch{storageNotice="تعذّر حفظ قراءة الصورة؛ ستظل الجلسة الحالية متاحة."}}
+                        if persistent && reading.repairUnavailable != true{do{try await ComicMemory.shared.save(JSONEncoder().encode(reading),profile:owner,layer:.reading,key:readingKey)}catch{storageNotice="تعذّر حفظ قراءة الصورة؛ ستظل الجلسة الحالية متاحة."}}
                     }
-                    if readings.count>=128{readings.removeAll()};readings[readingKey]=reading
-                    let vote=resolvedScripts[document];resolvedScripts[document]=(reading.language,(vote?.1 ?? 0)+1)
+                    if readings.count>=128{readings.removeAll()};if reading.repairUnavailable != true{readings[readingKey]=reading}
+                    if reading.lines.count>=2,!reading.language.isEmpty{languageHints[languageHintKey]=reading.language}
                     try valid(ticket)
                     // A speech touching this core is rendered from its complete context,
                     // then clipped to this core. Its neighbour renders the other half.
                     let core=reading.speeches.filter{$0.rect.maxY>CGFloat(region.coreTop+offset)&&$0.rect.minY<CGFloat(region.coreBottom+offset)}
+                    let counted=core.filter{$0.rect.midY>=CGFloat(region.coreTop+offset)&&$0.rect.midY<CGFloat(region.coreBottom+offset)}
+                    countTexts(countKey,detected:counted.count,translated:min(counted.count,textCounts[countKey]?.1 ?? 0))
                     if core.isEmpty{done.insert(job);_ = try await call("zeusComic.release(id)",args:["id":candidate.id],frame:frame);continue}
-                    stage="ترجمة الحوار"
+                    measure(.translating);phase = .translating
                     let segments=core.map{TranslationSegment(id:$0.id,text:$0.text)}
                     let translationKey=readingKey+"|\(translationMark)|"+ComicIdentity.segmentIdentity(segments)
                     let translated:[TranslationSegment]
@@ -148,26 +335,104 @@ import CoreGraphics
                     else if persistent,let stored=await ComicMemory.shared.data(profile:owner,layer:.translation,key:translationKey),let saved=try? JSONDecoder().decode([TranslationSegment].self,from:stored){translated=saved}
                     else{translated=try await translateSpeeches(segments,reading:reading,namespace:translationMark+"|"+ComicIdentity.hash(envelope.url),profile:owner,persistent:persistent,preferences:prefs,translation:translation,provider:provider,ticket:ticket)
                         try valid(ticket)
-                        if persistent{do{try await ComicMemory.shared.save(JSONEncoder().encode(translated),profile:owner,layer:.translation,key:translationKey)}catch{storageNotice="تعذّر حفظ الترجمة على الجهاز."}}
+                        if persistent && translated.count==segments.count{do{try await ComicMemory.shared.save(JSONEncoder().encode(translated),profile:owner,layer:.translation,key:translationKey)}catch{storageNotice="تعذّر حفظ الترجمة على الجهاز."}}
                     }
-                    if textResults.count>=64{textResults.removeAll()};textResults[translationKey]=translated
-                    try valid(ticket);stage="تنظيف الفقاعات ورسم العربية"
-                    let renderedKey=translationKey+"|render-v3|\(prefs.fontName ?? "default")|\(prefs.fontScale)|\(prefs.textColor ?? "auto")|\(prefs.inkStyleRaw ?? "plain")"
+                    if translated.count==segments.count{if textResults.count>=64{textResults.removeAll()};textResults[translationKey]=translated}
+                    try valid(ticket);measure(.rendering);phase = .rendering
+                    let renderedKey=translationKey+"|"+prefs.renderIdentity
                     let rendered:Data
-                    if persistent,let stored=await ComicMemory.shared.data(profile:owner,layer:.rendered,key:renderedKey){rendered=stored}
-                    else{rendered=try await Task.detached{let drawn=try ComicPixels.render(image,speeches:core,translations:translated,target:translation.target,fontName:prefs.fontName,fontScale:prefs.fontScale,textColor:prefs.textColor,ink:prefs.inkStyle)
+                    let hadInitialLettering=hasLetteredTranslation
+                    let incompleteReading=translated.count != segments.count || reading.repairUnavailable == true
+                    var renderingPartial=incompleteReading
+                    var retryPartial=renderingPartial,deferringRestoration=false
+                    var unresolvedForPaint:[String]=[]
+                    if persistent,let stored=await ComicMemory.shared.data(profile:owner,layer:.rendered,key:renderedKey){rendered=stored;countTexts(countKey,detected:counted.count,translated:counted.count)}
+                    else{
+                        let lettering=translated.map{TranslationSegment(id:$0.id,text:prefs.letterCase.apply($0.text))}
+                        let eligible=await Task.detached{ComicPixels.restorableSpeeches(core,translations:lettering,width:image.width,height:image.height,target:translation.target,fontName:prefs.fontName,fontScale:prefs.fontScale,letterSpacing:prefs.letterSpacing ?? 0)}.value
+                        try valid(ticket)
+                        let checkpoint=(prefs.restorationEnabled ?? true) && reading.repairUnavailable != true ? cleanupCheckpoints[job]:nil
+                        let base:CGImage
+                        if let checkpoint{base=try await Task.detached{try ComicPixels.decode(checkpoint.0)}.value}else{base=image}
+                        let already=checkpoint?.1 ?? []
+                        var immediateCount=eligible.count
+                        // Paint ready flat/light dialogues before waiting for any
+                        // complex artwork. One slow SFX must not hide the page.
+                        if prefs.restorationEnabled ?? true{
+                            let ready=await Task.detached{()->Int in
+                                guard let pixels=ComicPixels.rgba(image,width:image.width,height:image.height)else{return 0}
+                                return eligible.filter{ComicPixels.canClean(pixels,width:image.width,height:image.height,speech:$0)}.count
+                            }.value
+                            immediateCount=ready
+                            if ready>0 && ready<eligible.count{
+                                let preview=try await Task.detached{()->(Data,[String]) in
+                                    let report=try ComicPixels.renderReport(base,speeches:core,translations:lettering,target:translation.target,fontName:prefs.fontName,fontScale:prefs.fontScale,textColor:prefs.textColor,ink:prefs.inkStyle,letterSpacing:prefs.letterSpacing ?? 0,requireCleanSource:!(prefs.bypassQualityChecks ?? false),precleanedIDs:already,styleSource:image)
+                                    let area=CGRect(x:0,y:region.coreTop+offset,width:region.width,height:region.coreBottom-region.coreTop)
+                                    guard let crop=report.image.cropping(to:area)else{throw ComicFailure.message("تعذّر تجهيز النصوص الجاهزة.")};return(try ComicPixels.png(crop),report.unresolved)
+                                }.value
+                                try valid(ticket)
+                                let area=["x":0,"y":region.y+region.coreTop,"width":region.width,"height":region.coreBottom-region.coreTop]
+                                if try await apply(preview.0,candidate:candidate,region:area,mark:mark,generation:generation,frame:frame,ticket:ticket){
+                                    countTexts(countKey,detected:counted.count,translated:counted.filter{source in translated.contains{$0.id==source.id} && !preview.1.contains(source.id)}.count)
+                                    noteLettering(counted,translations:translated,unresolved:preview.1,job:job)
+                                    appliedRegions.insert("\(document)|\(candidate.id)|\(candidate.revision)|\(region.y)");completed=appliedRegions.count
+                                }
+                            }
+                        }
+                        let restored:ComicRestoration.Result
+                        if prefs.restorationEnabled ?? true{
+                            let remaining=eligible.filter{!already.contains($0.id)}
+                            let needsModels=remaining.count>immediateCount
+                            var waitingForModels=false
+                            if needsModels && !(prefs.useCloudRestoration ?? false){waitingForModels = !(await restorationPrepared())}
+                            let deferInitial=needsModels && prefs.readAhead && !hadInitialLettering && !didDeferInitialArtwork && envelope.items.count>1
+                            let deferArtwork=needsModels && prefs.readAhead && !artworkPass && !nearby.contains(region.y)
+                            if waitingForModels{prepareRestoration(for:job,ticket:ticket)}
+                            if deferInitial{didDeferInitialArtwork=true;startupWaiters.insert(job)}
+                            if deferArtwork{artworkWaiters.insert(job)}
+                            deferringRestoration=waitingForModels || deferInitial || deferArtwork
+                            if deferringRestoration{restored=ComicRestoration.Result(image:base,restored:already,notice:nil)}
+                            else{
+                                if needsModels{onRestorationAttempt?(job)}
+                                let next=try await ComicRestoration.shared.restore(base,speeches:remaining,cloud:(prefs.useCloudRestoration ?? false) ? URL(string:prefs.cloudRestorationURL ?? ""):nil,onPreparing:{ [weak self] preparing in
+                                    await MainActor.run{if self?.epoch==ticket{self?.phase=preparing ? .downloading:.rendering}}
+                                })
+                                restored=ComicRestoration.Result(image:next.image,restored:already.union(next.restored),notice:next.notice,retryable:next.retryable)
+                                try valid(ticket)
+                                if reading.repairUnavailable != true{try await saveCleanup(restored.image,ids:restored.restored,job:job)}
+                                if let notice=restored.notice{contextNotice=notice;if !(prefs.bypassQualityChecks ?? false){sweepFailure=true;renderingPartial=true;retryPartial = retryPartial || restored.retryable}}
+                            }
+                        }else{restored=ComicRestoration.Result(image:image,restored:[],notice:nil)}
+                        let result=try await Task.detached{let drawing=try ComicPixels.renderReport(restored.image,speeches:core,translations:lettering,target:translation.target,fontName:prefs.fontName,fontScale:prefs.fontScale,textColor:prefs.textColor,ink:prefs.inkStyle,letterSpacing:prefs.letterSpacing ?? 0,requireCleanSource:!(prefs.bypassQualityChecks ?? false),precleanedIDs:restored.restored,styleSource:image,allowEmpty:true)
                         // Only this core is applied. Recognition context is retained above/below.
                         let rect=CGRect(x:0,y:region.coreTop+offset,width:region.width,height:region.coreBottom-region.coreTop)
-                        guard let crop=drawn.cropping(to:rect)else{throw ComicFailure.message("تعذّر قص منطقة الرسم.")};return try ComicPixels.png(crop)}.value
+                        guard let crop=drawing.image.cropping(to:rect)else{throw ComicFailure.message("تعذّر قص منطقة الرسم.")};return (try ComicPixels.png(crop),drawing.unresolved,drawing.reasons)}.value
+                        onRegionAudit?(ComicReading(lines:reading.lines,speeches:core,language:reading.language,runtime:reading.runtime),translated,result.2,restored.notice)
+                        rendered=result.0;unresolvedForPaint=result.1
+                        countTexts(countKey,detected:counted.count,translated:counted.filter{source in translated.contains{$0.id==source.id} && !result.1.contains(source.id)}.count)
+                        if !result.1.isEmpty{renderingPartial=true;if !deferringRestoration{sweepFailure=true;contextNotice="احتُفظ ببعض النصوص الأصلية لعدم اكتمال تنظيفها أو ملاءمة خطها."}}
                         try valid(ticket)
-                        if persistent{do{try await ComicMemory.shared.save(rendered,profile:owner,layer:.rendered,key:renderedKey)}catch{storageNotice="تعذّر حفظ الصورة المترجمة؛ النص المحفوظ يظل متاحًا."}}
+                        if persistent && !renderingPartial{do{try await ComicMemory.shared.save(rendered,profile:owner,layer:.rendered,key:renderedKey)}catch{storageNotice="تعذّر حفظ الصورة المترجمة؛ النص المحفوظ يظل متاحًا."}}
                     }
-                    try valid(ticket);stage="عرض الترجمة"
+                    try valid(ticket);phase = .displaying
                     let outputRegion:[String:Int]=["x":0,"y":region.y+region.coreTop,"width":region.width,"height":region.coreBottom-region.coreTop]
                     let applied=try await apply(rendered,candidate:candidate,region:outputRegion,mark:mark,generation:generation,frame:frame,ticket:ticket)
                     guard applied else{throw ComicFailure.message("لم يسمح الموقع بعرض الصورة المترجمة؛ بقي الأصل متاحًا.")}
-                    done.insert(job);completed+=1
-                }catch is CancellationError{throw CancellationError()}catch{try valid(ticket);failed.insert(job);self.error=error.localizedDescription;_ = try? await call("zeusComic.release(id)",args:["id":candidate.id],frame:frame)}
+                    noteLettering(counted,translations:translated,unresolved:unresolvedForPaint,job:job)
+                    if renderingPartial{
+                        // Model preparation can finish while the preview is being
+                        // rendered. Do not re-block a waiter after its wakeup.
+                        if deferringRestoration && !blockedRestorations.contains(job){failed.remove(job);pending=true}else{failed.insert(job)}
+                        if retryPartial && (!deferringRestoration || incompleteReading){retry(job,ticket:ticket)}
+                    }else{
+                        done.insert(job);modelWaiters.remove(job);startupWaiters.remove(job);artworkWaiters.remove(job)
+                        cleanupCheckpoints[job]=nil;cleanupOrder.removeAll{$0==job}
+                    }
+                    appliedRegions.insert("\(document)|\(candidate.id)|\(candidate.revision)|\(region.y)");completed=appliedRegions.count
+                }catch is CancellationError{throw CancellationError()}catch{try valid(ticket);failed.insert(job);self.record(error,at:phase)
+                    let diagnostic=ComicDiagnostic.capture(error,phase:phase)
+                    if diagnostic.retryable || phase == .translating{retry(job,ticket:ticket)}
+                    _ = try? await call("zeusComic.release(id)",args:["id":candidate.id],frame:frame)}
                 await Task.yield()
                 if pending{return}
             }
@@ -179,7 +444,7 @@ import CoreGraphics
     private func translateSpeeches(_ segments:[TranslationSegment],reading:ComicReading,namespace:String,profile:UUID,persistent:Bool,preferences:ComicPreferences,translation:TranslationPreferences,provider:AIProviderConfiguration?,ticket:UUID)async throws->[TranslationSegment]{
         let namespace=namespace+"|"+reading.language
         func key(_ text:String)->String{ComicIdentity.hash(namespace+"\0"+text)}
-        var values:[String:String]=[:]
+        var values:[String:String]=[:],failedTexts=Set<String>()
         for segment in segments{if let value=speechTexts[key(segment.text)]{values[segment.text]=value}}
         if persistent{let saved=await ComicMemory.shared.lookupText(segments,namespace:namespace,profile:profile);values.merge(saved){_,saved in saved}}
         try valid(ticket)
@@ -187,19 +452,44 @@ import CoreGraphics
         let missing=segments.filter{values[$0.text]==nil&&unique.insert($0.text).inserted}
         if !missing.isEmpty{
             let preceding=reading.speeches.prefix(while:{$0.id != missing.first?.id}).suffix(4).map(\.text)
-            let response=try await ComicTextTranslator.translate(missing,source:reading.language,target:translation.target,preferences:translation,provider:provider,secret:AISecretVault.read(profile:profile,provider:translation.secretKey(provider:provider)),local:preferences.localModel,engine:preferences.engine,engineSecret:AISecretVault.read(profile:profile,provider:"comic-"+preferences.engine.rawValue),context:preceding)
+            let following=reading.speeches.drop(while:{$0.id != missing.last?.id}).dropFirst().prefix(4).map(\.text)
+            let response:[TranslationSegment]
+            do {
+                response=try await ComicTextTranslator.translate(missing,source:reading.language,target:translation.target,preferences:translation,provider:provider,secret:AISecretVault.read(profile:profile,provider:translation.secretKey(provider:provider)),local:preferences.localModel,engine:preferences.engine,engineSecret:AISecretVault.read(profile:profile,provider:"comic-"+preferences.engine.rawValue),context:preceding,following:following)
+            } catch is CancellationError { throw CancellationError() }
+              catch let partial as ComicPartialTranslation {
+                response=partial.translated
+                let originals=Dictionary(uniqueKeysWithValues:missing.map{($0.id,$0.text)})
+                failedTexts.formUnion(partial.failedIDs.compactMap{originals[$0]})
+                contextNotice=partial.localizedDescription;sweepFailure=true
+              } catch {
+                try valid(ticket)
+                guard preferences.allowOnlineFallback == true,!preferences.localModel,preferences.engine != .google else{throw error}
+                contextNotice="استُخدم Google بعد تعذّر المحرك المختار، وفق إعداد الرجوع الذي فعّلته."
+                do{response=try await ComicWebEngines.translate(missing,source:reading.language,target:translation.target,engine:.google,secret:"")}
+                catch let partial as ComicPartialTranslation{
+                    response=partial.translated
+                    let originals=Dictionary(uniqueKeysWithValues:missing.map{($0.id,$0.text)})
+                    failedTexts.formUnion(partial.failedIDs.compactMap{originals[$0]})
+                    contextNotice=partial.localizedDescription;sweepFailure=true
+                }
+            }
             try valid(ticket)
             let originals=Dictionary(uniqueKeysWithValues:missing.map{($0.id,$0.text)})
             var fresh:[String:String]=[:]
             for item in response{if let original=originals[item.id]{fresh[original]=item.text}}
-            guard fresh.count==missing.count else{throw ComicFailure.message("رد الترجمة لا يطابق الفقاعات.")}
+            guard fresh.count+failedTexts.count==missing.count else{throw ComicFailure.message("رد الترجمة لا يطابق الفقاعات.")}
             values.merge(fresh){_,new in new}
             if persistent,!(await ComicMemory.shared.saveText(fresh,namespace:namespace,profile:profile)){storageNotice="تعذّر حفظ بعض النصوص؛ قد تحتاج مساحة إضافية."}
         }
         try valid(ticket)
         if speechTexts.count>=8000{speechTexts.removeAll()}
         for (text,value)in values{speechTexts[key(text)]=value}
-        return try segments.map{segment in guard let value=values[segment.text]else{throw ComicFailure.message("ترجمة ناقصة.")};return TranslationSegment(id:segment.id,text:value)}
+        return try segments.compactMap{segment -> TranslationSegment? in
+            if let value=values[segment.text]{return TranslationSegment(id:segment.id,text:value)}
+            if failedTexts.contains(segment.text){return nil}
+            throw ComicFailure.message("ترجمة ناقصة.")
+        }
     }
     private func capture(_ candidate:ComicCandidate,region:ComicRegion,frame:WKFrameInfo?,ticket:UUID)async throws->Data{
         do{
@@ -213,46 +503,87 @@ import CoreGraphics
             try valid(ticket)
             guard candidate.kind=="image",let tab,let model,let url=URL(string:candidate.source),["https","http"].contains(url.scheme),candidate.width>0,candidate.height>0 else{throw error}
             let data:Data,cacheKey=candidate.source+"|"+candidate.id+"|"+candidate.revision+"|"+(frame?.request.url?.absoluteString ?? tab.url)
-            if let cached=fetched[cacheKey]{data=cached}else{data=try await ComicImageFetch.fetch(url,view:tab.webView,store:model.profiles.websiteDataStore(for:model.profile));fetched[cacheKey]=data;fetchedOrder.removeAll{$0==cacheKey};fetchedOrder.append(cacheKey)
+            let canvasFailure=error
+            if let cached=fetched[cacheKey]{data=cached}else{do { data=try await ComicImageFetch.fetch(url,page:frame?.request.url ?? tab.webView?.url,policy:candidate.referrerPolicy ?? tab.comicDocumentPolicies[(frame?.request.url ?? tab.webView?.url)?.absoluteString ?? ""],view:tab.webView,store:model.profiles.websiteDataStore(for:model.profile))
+                } catch { diagnostics.append(ComicDiagnostic.capture(canvasFailure,phase:.fetching));if diagnostics.count>8{diagnostics.removeFirst()};throw error }
+                fetched[cacheKey]=data;fetchedOrder.removeAll{$0==cacheKey};fetchedOrder.append(cacheKey)
                 while fetchedOrder.count>4||fetched.values.reduce(0,{$0+$1.count})>33_554_432{let old=fetchedOrder.removeFirst();fetched[old]=nil}}
+            if region.height<candidate.height,try await call("return zeusComic.hasBacking(id,revision)",args:["id":candidate.id,"revision":candidate.revision],frame:frame)as? Bool != true {
+                let token=try await transfer(data,frame:frame,ticket:ticket)
+                defer{Task{_ = try? await call("zeusComic.outputDrop(token)",args:["token":token],frame:frame)}}
+                _ = try await call("zeusComic.outputOriginal(token,id,revision)",args:["token":token,"id":candidate.id,"revision":candidate.revision],frame:frame)
+            }
             return try await Task.detached{let crop=try ComicPixels.decodeRegion(data,region:region,expectedHeight:candidate.height);return try ComicPixels.png(crop)}.value
         }
     }
-    private func apply(_ data:Data,candidate:ComicCandidate,region:[String:Int],mark:String,generation:Int,frame:WKFrameInfo?,ticket:UUID)async throws->Bool{
-        guard data.count<=33_554_432 else{throw ComicFailure.message("الصورة المرسومة أكبر من حد النقل.")}
+    private func transfer(_ data:Data,frame:WKFrameInfo?,ticket:UUID)async throws->String {
         let token=UUID().uuidString
         _ = try await call("zeusComic.outputStart(token,length)",args:["token":token,"length":data.count],frame:frame)
+        do { for start in stride(from:0,to:data.count,by:49152){try valid(ticket);_ = try await call("zeusComic.outputPart(token,offset,data)",args:["token":token,"offset":start,"data":data.subdata(in:start..<min(start+49152,data.count)).base64EncodedString()],frame:frame)}
+        } catch {
+            _ = try? await call("zeusComic.outputDrop(token)",args:["token":token],frame:frame)
+            throw error
+        }
+        return token
+    }
+    private func apply(_ data:Data,candidate:ComicCandidate,region:[String:Int],mark:String,generation:Int,frame:WKFrameInfo?,ticket:UUID)async throws->Bool{
+        guard data.count<=33_554_432 else{throw ComicFailure.message("الصورة المرسومة أكبر من حد النقل.")}
+        let token=try await transfer(data,frame:frame,ticket:ticket)
         defer{Task{_ = try? await call("zeusComic.outputDrop(token)",args:["token":token],frame:frame)}}
-        for start in stride(from:0,to:data.count,by:49152){try valid(ticket);_ = try await call("zeusComic.outputPart(token,offset,data)",args:["token":token,"offset":start,"data":data.subdata(in:start..<min(start+49152,data.count)).base64EncodedString()],frame:frame)}
         try valid(ticket)
         return try await call("return await zeusComic.outputApply(token,id,revision,region,mark,generation)",args:["token":token,"id":candidate.id,"revision":candidate.revision,"region":region,"mark":mark,"generation":generation],frame:frame)as? Bool ?? false
     }
 }
 
 @MainActor enum ComicImageFetch{
-    static func fetch(_ url:URL,view:WKWebView?,store:WKWebsiteDataStore)async throws->Data{
-        guard url.user==nil,url.password==nil,let host=url.host,let page=view?.url else{throw URLError(.badURL)}
+    nonisolated static func referrer(page: URL, destination: URL, policy: String?) -> String? {
+        guard ["http","https"].contains(page.scheme),["http","https"].contains(destination.scheme),
+              var components=URLComponents(url:page,resolvingAgainstBaseURL:false) else{return nil}
+        components.user=nil;components.password=nil;components.fragment=nil
+        let full=components.url?.absoluteString
+        components.path="/";components.query=nil
+        let origin=components.url?.absoluteString
+        let same=page.scheme==destination.scheme && page.host==destination.host && (page.port ?? (page.scheme=="https" ? 443:80))==(destination.port ?? (destination.scheme=="https" ? 443:80))
+        let downgrade=page.scheme=="https" && destination.scheme=="http"
+        switch policy?.lowercased() {
+        case "no-referrer":return nil
+        case "same-origin":return same ? full:nil
+        case "origin":return origin
+        case "strict-origin":return downgrade ? nil:origin
+        case "origin-when-cross-origin":return same ? full:origin
+        case "unsafe-url":return full
+        case "no-referrer-when-downgrade":return downgrade ? nil:full
+        default:return downgrade ? nil:(same ? full:origin)
+        }
+    }
+    static func fetch(_ url:URL,page:URL?,policy:String?,view:WKWebView?,store:WKWebsiteDataStore)async throws->Data{
+        guard url.user==nil,url.password==nil,let host=url.host,let page else{throw URLError(.badURL)}
         // Do not turn page-controlled image addresses into access to local services.
         let privateHost=host=="localhost"||host=="::1"||host.hasPrefix("127.")||host.hasPrefix("10.")||host.hasPrefix("192.168.")||host.hasSuffix(".local")||host.hasPrefix("169.254.")
         guard !privateHost||page.host==host else{throw URLError(.noPermissionsToReadFile)}
         let cookies=await withCheckedContinuation{c in store.httpCookieStore.getAllCookies{c.resume(returning:$0)}}
         let configuration=URLSessionConfiguration.ephemeral;configuration.httpCookieStorage=nil;configuration.httpShouldSetCookies=false;configuration.urlCache=nil
-        let session=URLSession(configuration:configuration,delegate:ComicImageRedirects(cookies:cookies,origin:url),delegateQueue:nil);defer{session.invalidateAndCancel()}
-        var request=URLRequest(url:url);request.allHTTPHeaderFields=DownloadFiles.cookieHeaders(cookies,for:url);request.setValue(BrowserModel.origin(page).map{$0+"/"},forHTTPHeaderField:"Referer")
-        request.setValue(view?.customUserAgent,forHTTPHeaderField:"User-Agent")
+        let session=URLSession(configuration:configuration,delegate:ComicImageRedirects(cookies:cookies,origin:url,page:page,policy:policy),delegateQueue:nil);defer{session.invalidateAndCancel()}
+        var request=URLRequest(url:url);request.allHTTPHeaderFields=DownloadFiles.cookieHeaders(cookies,for:url);request.setValue(referrer(page:page,destination:url,policy:policy),forHTTPHeaderField:"Referer")
+        let agent: String?
+        if let custom=view?.customUserAgent {agent=custom}
+        else if let view {agent=(try? await view.evaluateJavaScript("navigator.userAgent")) as? String}
+        else {agent=nil}
+        request.setValue(agent,forHTTPHeaderField:"User-Agent")
         let (file,response)=try await session.download(for:request)
         defer{try? FileManager.default.removeItem(at:file)}
-        guard (response as? HTTPURLResponse)?.statusCode==200,response.mimeType?.hasPrefix("image/")==true,(try file.resourceValues(forKeys:[.fileSizeKey]).fileSize ?? Int.max)<=33_554_432 else{throw URLError(.cannotDecodeContentData)}
-        return try await Task.detached{try Data(contentsOf:file,options:.mappedIfSafe)}.value
+        if let status=(response as? HTTPURLResponse)?.statusCode,status != 200 { throw ComicHTTPFailure(status:status) }
+        guard response.mimeType?.hasPrefix("image/")==true,(try file.resourceValues(forKeys:[.fileSizeKey]).fileSize ?? Int.max)<=33_554_432 else{throw URLError(.cannotDecodeContentData)}
+        return try await Task.detached{try Data(contentsOf:file)}.value
     }
 }
 private final class ComicImageRedirects:NSObject,URLSessionDownloadDelegate,@unchecked Sendable{
     func urlSession(_ session:URLSession,downloadTask:URLSessionDownloadTask,didFinishDownloadingTo location:URL){}
     func urlSession(_ session:URLSession,downloadTask:URLSessionDownloadTask,didWriteData bytesWritten:Int64,totalBytesWritten:Int64,totalBytesExpectedToWrite:Int64){if totalBytesWritten>33_554_432||totalBytesExpectedToWrite>33_554_432{downloadTask.cancel()}}
-    let cookies:[HTTPCookie];let origin:URL
-    init(cookies:[HTTPCookie],origin:URL){self.cookies=cookies;self.origin=origin}
+    let cookies:[HTTPCookie];let origin:URL;let page:URL;let policy:String?
+    init(cookies:[HTTPCookie],origin:URL,page:URL,policy:String?){self.cookies=cookies;self.origin=origin;self.page=page;self.policy=policy}
     func urlSession(_ session:URLSession,task:URLSessionTask,willPerformHTTPRedirection response:HTTPURLResponse,newRequest request:URLRequest,completionHandler:@escaping(URLRequest?)->Void){
         guard let url=request.url,url.scheme=="https"||url.scheme==origin.scheme,url.host==origin.host else{completionHandler(nil);return}
-        var next=request;next.setValue(nil,forHTTPHeaderField:"Cookie");for(k,v)in DownloadFiles.cookieHeaders(cookies,for:url){next.setValue(v,forHTTPHeaderField:k)};completionHandler(next)
+        var next=request;next.setValue(ComicImageFetch.referrer(page:page,destination:url,policy:policy),forHTTPHeaderField:"Referer");next.setValue(nil,forHTTPHeaderField:"Cookie");for(k,v)in DownloadFiles.cookieHeaders(cookies,for:url){next.setValue(v,forHTTPHeaderField:k)};completionHandler(next)
     }
 }

@@ -24,3 +24,87 @@ test('large data URLs cross the probe as a short content identity',()=>{const s=
 test('ordinary HTTP without randomUUID can still create isolated document identity',()=>{const s=setup('<img src="/panel.png">',true);try{assert.match(s.bridge.documentID,/^[a-f0-9]{32}$/);assert.equal(s.bridge.scan(false).items.length,1);}finally{s.close()}});
 
 test('image overlays are not rediscovered as a second background candidate',()=>{const s=setup('<img src="/panel.png" style="background-image:url(/original.png)">');try{assert.equal(s.bridge.scan(false).items.length,1);}finally{s.close()}});
+
+test('image referrer policy overrides document policy and survives scanning',()=>{
+ const s=setup('<meta name="referrer" content="origin"><img referrerpolicy="no-referrer" src="https://cdn.example/panel.webp"><img src="/other.png">');
+ try{const c=s.bridge.scan(false).items;assert.equal(c[0].referrerPolicy,'no-referrer');assert.equal(c[1].referrerPolicy,'origin');}finally{s.close()}
+});
+test('native lazy load completion wakes translation without scrolling',async()=>{
+ const s=setup('<img data-pending="yes" src="/late.png">');
+ try{const notifications=[];s.w.webkit={messageHandlers:{zeusComic:{postMessage:v=>notifications.push(v.kind)}}};s.bridge.start();assert.equal(s.bridge.scan(false).items[0].pending,true);
+ s.w.document.images[0].dataset.pending='no';s.w.document.images[0].dispatchEvent(new s.w.Event('load'));await new Promise(r=>setTimeout(r,0));
+ assert.ok(notifications.includes('loaded'));assert.equal(s.bridge.scan(false).items[0].pending,false);
+ }finally{s.close()}
+});
+function fakeDecoder(s){s.w.Image=class {async decode(){}};}
+test('original toggle retains translated source and marks without reprocessing',async()=>{
+ const s=setup('<img referrerpolicy="no-referrer" src="/panel.png" style="opacity:.8">');
+ try{fakeDecoder(s);const c=s.bridge.scan(false).items[0],g=s.bridge.start();assert.equal(await s.bridge.apply(c.id,c.revision,'YQ==',{x:0,y:0,width:200,height:400},'ar',g),true);
+ s.bridge.mark(c.id,c.revision,'ar');const translated=s.w.document.images[0].src;
+ s.bridge.setOriginal(true);assert.equal(s.w.document.images[0].src,'https://reader.example/panel.png');assert.equal(s.bridge.has(c.id,c.revision,'ar'),true);
+ assert.equal(await s.bridge.apply(c.id,c.revision,'YQ==',{x:0,y:0,width:200,height:400},'ar',g),false);
+ s.bridge.setOriginal(false);assert.equal(s.w.document.images[0].src,translated);assert.equal(s.bridge.scan(false).items[0].source,c.source);
+ s.bridge.restore();assert.equal(s.w.document.images[0].src,c.source);assert.equal(s.w.document.images[0].style.opacity,'0.8');
+ }finally{s.close()}
+});
+test('partial lettering uses the fetched backing image instead of refetching its URL',async()=>{
+ const s=setup('<img referrerpolicy="no-referrer" src="https://cdn.example/panel.webp">');
+ try{fakeDecoder(s);const c=s.bridge.scan(false).items[0],g=s.bridge.start();s.bridge.outputStart('original',1);s.bridge.outputPart('original',0,'YQ==');s.bridge.outputOriginal('original',c.id,c.revision);
+ assert.equal(s.bridge.hasBacking(c.id,c.revision),true);assert.equal(await s.bridge.apply(c.id,c.revision,'YQ==',{x:0,y:0,width:200,height:200},'ar',g),true);
+ assert.ok(!s.w.document.images[0].style.backgroundImage.includes('cdn.example'));s.bridge.restore();assert.equal(s.w.document.images[0].style.backgroundImage,'');assert.equal(s.bridge.hasBacking(c.id,c.revision),false);
+ }finally{s.close()}
+});
+test('a recycled image while viewing original is never overwritten by old lettering',async()=>{
+ const s=setup();try{fakeDecoder(s);const c=s.bridge.scan(false).items[0];await s.bridge.apply(c.id,c.revision,'YQ==',{x:0,y:0,width:200,height:400},'ar',s.bridge.start());s.bridge.setOriginal(true);
+ s.w.document.images[0].src='/next.png';await new Promise(r=>setTimeout(r,0));s.bridge.setOriginal(false);assert.ok(s.w.document.images[0].src.endsWith('/next.png'));
+ }finally{s.close()}
+});
+test('a delayed pause from an old session cannot cancel a newer render',async()=>{
+ const s=setup();try{fakeDecoder(s);const c=s.bridge.scan(false).items[0];const old=s.bridge.resume('ar','old');const current=s.bridge.resume('ar','new');
+ assert.notEqual(old,current);s.bridge.pause('old');assert.equal(await s.bridge.apply(c.id,c.revision,'YQ==',{x:0,y:0,width:200,height:400},'ar',current),true);
+ s.bridge.pause('new');assert.equal(await s.bridge.apply(c.id,c.revision,'YQ==',{x:0,y:0,width:200,height:400},'ar',current),false);
+ }finally{s.close()}
+});
+test('an original toggle belonging to a previous document session is rejected',async()=>{
+ const s=setup();try{fakeDecoder(s);const c=s.bridge.scan(false).items[0];const generation=s.bridge.resume('ar','current');await s.bridge.apply(c.id,c.revision,'YQ==',{x:0,y:0,width:200,height:400},'ar',generation);const translated=s.w.document.images[0].src;
+ assert.equal(s.bridge.setOriginal(true,'old'),false);assert.equal(s.w.document.images[0].src,translated);
+ assert.equal(s.bridge.setOriginal(true,'current'),true);assert.equal(s.bridge.setOriginal(false,'current'),true);assert.equal(s.w.document.images[0].src,translated);
+ }finally{s.close()}
+});
+test('changing lettering settings preserves the source revision and image identity',async()=>{
+ const s=setup();try{fakeDecoder(s);const c=s.bridge.scan(false).items[0];const g=s.bridge.resume('first','session');await s.bridge.apply(c.id,c.revision,'YQ==',{x:0,y:0,width:200,height:400},'first',g);s.bridge.mark(c.id,c.revision,'first');
+ await new Promise(r=>setTimeout(r,0));s.bridge.resume('second','session');await new Promise(r=>setTimeout(r,0));const fresh=s.bridge.scan(false).items[0];assert.equal(fresh.id,c.id);assert.equal(fresh.revision,c.revision);assert.equal(fresh.source,c.source);
+ }finally{s.close()}
+});
+
+test('whole Asura chapter is discovered without scrolling and cover is excluded',()=>{
+ const s=setup('<img src="/cover.webp">'+Array.from({length:27},(_,i)=>`<img data-page-index="${i}" src="/chapter/${i}.webp">`).join(''));
+ try{[...s.w.document.images].forEach((el,i)=>{el.getBoundingClientRect=()=>({left:0,top:i*16000,right:800,bottom:i*16000+16000,width:800,height:16000})});
+ const all=s.bridge.scan(true).items;assert.equal(all.length,27);assert.ok(all.at(-1).source.endsWith('/26.webp'));assert.ok(!all.some(v=>v.source.endsWith('cover.webp')));
+ assert.equal(s.bridge.scan(false).items.length,1);
+ }finally{s.close()}
+});
+test('far reader lazy images wake without scrolling, in bounded batches',()=>{
+ const s=setup('<div id="readerarea">'+Array.from({length:12},(_,i)=>`<img data-pending="yes" data-src="/chapter/${i}.webp" src="/spinner.gif">`).join('')+'</div><aside><img src="/recommend.webp"></aside>');
+ try{[...s.w.document.images].forEach((el,i)=>{el.getBoundingClientRect=()=>({left:0,top:40000+i*2000,right:800,bottom:40001+i*2000,width:800,height:1})});
+ assert.equal(s.bridge.scan(true).items.length,12);assert.equal([...s.w.document.images].filter(el=>el.src.includes('/chapter/')).length,4);
+ for(const el of [...s.w.document.images].slice(0,4))el.dataset.pending='no';s.bridge.scan(true);
+ assert.equal([...s.w.document.images].filter(el=>el.src.includes('/chapter/')).length,8);
+ }finally{s.close()}
+});
+test('chapter load events advance lazy fetches while native processing is busy',async()=>{
+ const s=setup('<div id="readerarea">'+Array.from({length:12},(_,i)=>`<img data-pending="yes" data-src="/story/${i}.webp" src="/spinner.gif">`).join('')+'</div>');
+ try{s.bridge.start();s.bridge.scan(true);
+ for(const el of [...s.w.document.images].slice(0,4)){el.dataset.pending='no';el.dispatchEvent(new s.w.Event('load'));}
+ await new Promise(r=>setTimeout(r,100));
+ assert.equal([...s.w.document.images].filter(i=>i.src.includes('/story/')).length,8);
+ }finally{s.close()}
+});
+test('preparing a later strip never blurs the chapter text already painted',async()=>{
+ const s=setup();try{fakeDecoder(s);const c=s.bridge.scan(false).items[0],g=s.bridge.start();
+ s.bridge.hold(c.id,c.revision);assert.ok(s.w.document.images[0].style.filter.includes('blur'));
+ assert.equal(await s.bridge.apply(c.id,c.revision,'YQ==',{x:0,y:0,width:200,height:200},'ar',g),true);
+ assert.equal(s.w.document.images[0].style.filter,'');
+ s.bridge.hold(c.id,c.revision);assert.equal(s.w.document.images[0].style.filter,'');
+ }finally{s.close()}
+});

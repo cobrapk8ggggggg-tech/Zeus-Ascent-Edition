@@ -113,6 +113,7 @@ import ZEUSBrowser
     /// Also used for automatic account backup in local mode. Cleanup is a
     /// separate step, after the runtime has accepted the migrated workspaces.
     func backup(progress: @escaping (String) -> Void, duringTransition: Bool = false, includeLocalFiles: Bool = true) async throws -> NativeCloudArchive {
+        guard !NativeCloudAccountAPI.localRestorePending else { throw error("نسخة السحابة محفوظة. استعد ملفاتها من إعدادات التشغيل قبل حفظ نسخة الوكيل المحلي؛ المتصفح يستمر في الحفظ مستقلًا.") }
         if includeLocalFiles { try requireIdle() }
         guard !NativeCloudAccountAPI.isMigrating || duringTransition else { throw error("عملية نقل أخرى قيد التنفيذ.") }
         if !duringTransition && includeLocalFiles { NativeCloudAccountAPI.isMigrating = true }
@@ -260,6 +261,9 @@ import ZEUSBrowser
     func restoreAccountIfNeeded(progress: @escaping (String) -> Void) async throws {
         defer { scheduleBackup(); Task { await ZeusDeviceStorageBudget.prepare() } }
         guard let owner = NativeCloudAccountAPI.ownerID else { return }
+        if NativeCloudAccountAPI.localRestorePending && !NativeCloudAccountAPI.usesCloud {
+            await ZeusDefaultSkills.shared.install(forceLocal:true);return
+        }
         if (try? String(contentsOf: marker, encoding: .utf8)) == owner {
             return
         }

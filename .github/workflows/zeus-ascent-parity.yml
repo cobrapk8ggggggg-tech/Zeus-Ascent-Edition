@@ -1,8 +1,8 @@
 name: ZEUS-Ascent parity — tests, simulator and gap report
 on:
   push:
-    branches: [fix/unsigned-ipa-20261101, main, edition/ascent-parity-20261101]
-    paths: ['ZEUSNext/**', 'Native/ComicRuntime/**', '.zeus-ci/**', '.openminis/Host/NativeComicTranslationTests.swift', 'docs/comic-translation/**', '.github/workflows/zeus-ascent-parity.yml']
+    branches: [fix/comic-translation-reliability,fix/image-translation-entry-20261102, fix/unsigned-ipa-20261101, main, edition/ascent-parity-20261101]
+    paths: ['ZEUSNext/**', 'ZEUSNextUITests/**', 'Native/ComicRuntime/**', '.zeus-ci/**', '.openminis/Host/NativeComicTranslationTests.swift', 'docs/comic-translation/**', '.github/workflows/zeus-ascent-parity.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -19,6 +19,8 @@ jobs:
       - run: npm ci --prefix .zeus-ci/comic
       - run: node --test .zeus-ci/comic/bridge.test.mjs
       - run: python3 .zeus-ci/comic/compare_test.py
+      - run: python3 .zeus-ci/comic/evidence_test.py
+      - run: python3 .zeus-ci/comic/boot_simulator_test.py
       - run: python3 .zeus-ci/comic/parity_selftest.py
   decoder:
     runs-on: ubuntu-latest
@@ -29,6 +31,7 @@ jobs:
       - run: g++ -std=c++17 -shared -fPIC Native/ComicRuntime/ComicRegionDecoder.cpp -o /tmp/libcomicdecoder.so $(pkg-config --cflags --libs libjpeg libpng libwebp)
       - run: python3 .zeus-ci/comic/decoder.test.py /tmp/libcomicdecoder.so
   ios:
+    needs: [bridge, decoder]
     runs-on: macos-15
     timeout-minutes: 65
     steps:
@@ -55,23 +58,11 @@ jobs:
           assert choices
           with open(os.environ['GITHUB_ENV'],'a') as f:f.write('COMIC_SIMULATORS='+' '.join(choices[:3])+'\n')
           PY
-      - name: Boot the selected simulator with retries
-        timeout-minutes: 12
-        run: |
-          booted=""
-          for udid in $COMIC_SIMULATORS; do
-            for attempt in 1 2; do
-              xcrun simctl boot "$udid" 2>/dev/null || true
-              if xcrun simctl bootstatus "$udid" -b; then booted="$udid"; break; fi
-              echo "boot attempt $attempt failed for $udid; erasing and retrying"
-              xcrun simctl shutdown "$udid" 2>/dev/null || true
-              xcrun simctl erase "$udid" 2>/dev/null || true
-              sleep 10
-            done
-            [ -n "$booted" ] && break
-          done
-          [ -n "$booted" ] || { echo "no iOS-26 iPhone simulator could boot"; exit 1; }
-          echo "COMIC_SIMULATOR=$booted" >> "$GITHUB_ENV"
+      - name: Boot an available simulator with bounded failover
+        timeout-minutes: 15
+        run: python3 .zeus-ci/comic/boot_simulator.py $COMIC_SIMULATORS
+      - name: Download the exact Violet chapter pixels
+        run: python3 .zeus-ci/comic/prepare_violet.py
       - name: Start deterministic provider fixture
         run: |
           python3 .zeus-ci/fixture_server.py > results/fixture.log 2>&1 &
@@ -80,7 +71,7 @@ jobs:
         timeout-minutes: 25
         run: |
           set -o pipefail
-          xcodebuild -project ZEUSNext.xcodeproj -scheme ZEUSNext -sdk iphonesimulator -destination "platform=iOS Simulator,id=$COMIC_SIMULATOR" -derivedDataPath "$RUNNER_TEMP/ZeusComicSim" -resultBundlePath results/comic.xcresult -only-testing:ZEUSNextTests/NativeComicTranslationTests -parallel-testing-enabled NO -test-timeouts-enabled YES -default-test-execution-time-allowance 90 -maximum-test-execution-time-allowance 120 test CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- 2>&1 | tee results/simulator.log
+          xcodebuild -project ZEUSNext.xcodeproj -scheme ZEUSNext -sdk iphonesimulator -destination "platform=iOS Simulator,id=$COMIC_SIMULATOR" -derivedDataPath "$RUNNER_TEMP/ZeusComicSim" -resultBundlePath results/comic.xcresult -only-testing:ZEUSNextTests/NativeComicTranslationTests -only-testing:ZEUSNextUITests/ImageTranslationJourneyTests -parallel-testing-enabled NO -test-timeouts-enabled YES -default-test-execution-time-allowance 90 -maximum-test-execution-time-allowance 120 test CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- 2>&1 | tee results/simulator.log
       - name: Collect simulator diagnostics
         if: always()
         timeout-minutes: 2
@@ -94,9 +85,10 @@ jobs:
           git rev-parse HEAD > results/source-commit.txt
           if [ -f results/comic.xcresult/Info.plist ]; then
             xcrun xcresulttool get test-results summary --path results/comic.xcresult > results/summary.json
+            xcrun xcresulttool export attachments --path results/comic.xcresult --output-path results/screenshots || true
           fi
       - name: Prove the pipeline end to end inside WebKit and ONNX
-        run: python3 .zeus-ci/comic/sim_probe.py results/simulator.log results/evidence.json
+        run: python3 .zeus-ci/comic/sim_probe.py results/simulator.log results/evidence.json --bridge-passed --decoder-passed
       - name: Generate the Ascent parity report from this run's evidence
         run: |
           python3 .zeus-ci/comic/parity_report.py docs/comic-translation/ascent-parity.json results/evidence.json results/parity.json results/PARITY-CI.ar.md

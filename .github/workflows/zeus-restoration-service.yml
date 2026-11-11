@@ -1,0 +1,32 @@
+name: Lossless cloud restoration
+on:
+  push:
+    branches: [fix/comic-translation-reliability]
+    paths: ['Restoration/**', 'ZEUSNext/Resources/comic-models.json', '.github/workflows/zeus-restoration-service.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  tensors:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: pip install -r Cloud/requirements.lock numpy==2.2.6 onnxruntime==1.24.2
+      - uses: actions/cache@v4
+        with:
+          path: .zeus-ci/remote-models
+          key: comic-remote-models-${{ hashFiles('ZEUSNext/Resources/comic-models.json') }}
+      - name: Verify the real pinned restoration models
+        run: |
+          PYTHONPATH=Restoration python - <<'PYCODE'
+          import json
+          from pathlib import Path
+          from inference import Runner
+          Runner('.zeus-ci/remote-models',json.loads(Path('ZEUSNext/Resources/comic-models.json').read_text())).prepare()
+          PYCODE
+      - run: ZEUS_TEST_MODELS=.zeus-ci/remote-models PYTHONPATH=Cloud:Restoration python -m unittest -v test_api test_inference
+      - name: Validate deployable restoration image
+        run: docker build -f Restoration/Dockerfile -t zeus-restoration:test .

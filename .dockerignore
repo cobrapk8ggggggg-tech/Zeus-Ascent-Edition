@@ -21,3 +21,9 @@ AndroidLab/**/__pycache__/
 AndroidLab/**/build/
 AndroidLab/**/.gradle/
 AndroidLab/.env
+
+!Restoration/
+!Restoration/*.py
+!ZEUSNext/
+!ZEUSNext/Resources/
+!ZEUSNext/Resources/comic-models.json

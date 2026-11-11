@@ -13,18 +13,29 @@ from pathlib import Path
 
 # Core proof tests: the pipeline end to end plus Arabic lettering/contrast.
 CORE = [
+    "testMissingSourceLineIsNeverErasedOrOverpainted",
+    "testStrongerPartialOCRCannotDropTheBeginningOfACompleteLine",
+    "testUnreadableTranslationIsExcludedBeforeNeuralErasure",
+    "testPinnedNeuralRestorationRemovesLetteringOnRealArtwork",
+    "testAutomaticArabicScriptUsesTheArabicRecognizer",
+    "testAutomaticReadingRetainsMixedArabicAndEnglishLines",
+    "testVerticalJapanesePaddleReadsTopToBottom",
+    "testLanguageVoteUsesOwnedPanelInsteadOfNeighbourContext",
     "testActualWebKitSwapRestoreAndStaleResults",
     "testArabicLetteringChangesActualPixelsInsideTheBalloon",
     "testArabicCoreTextFitsAndColorIsValidated",
     "testActualLocalOCRReadsRasterText",
-    "testDiagonalTailEstimatesAngleAndRotatedLetteringStaysInsideBounds",
+    "testExplicitBaselineAngleAndRotatedLetteringStaysInsideBounds",
     "testOutlineInkAddsOppositeStrokeOverNoisyBackground",
+    "testEndToEndImagesDoNotTranslateDOMAndFontChangesReuseOCRAndProvider",
+    "testCrossOriginNoReferrerImagesTranslateThroughNativeFetch",
+    "testReferrerPoliciesAndRenderInvalidation",
 ]
 PADDLE = "testActualPinnedPaddleModelReadsRasterText"
 END_TO_END = "testEndToEndImagesDoNotTranslateDOMAndFontChangesReuseOCRAndProvider"
 
 
-def main(log_path, out_path):
+def main(log_path, out_path, bridge_passed=False, decoder_passed=False):
     text = Path(log_path).read_text(errors="replace") if Path(log_path).exists() else ""
     # Xcode 26.x: Test Case '-[ZEUSNextTests.NativeComicTranslationTests name]' passed (1.2 seconds).
     tests = re.findall(r"Test Case '-\[ZEUSNextTests\.NativeComicTranslationTests (\w+)\]' (passed|failed)", text)
@@ -39,7 +50,9 @@ def main(log_path, out_path):
     if failed:
         raise SystemExit(f"core pipeline tests failed: {sorted(failed)}")
     evidence = {
-        "passed_tests": ["bridge", "decoder", "simulator", "live"],
+        "passed_tests": ["simulator"] + (["bridge"] if bridge_passed else []) + (["decoder"] if decoder_passed else []),
+        "physical_device": False,
+        "quality_equivalence_proven": False,
         "core_passed": CORE + ([PADDLE] if PADDLE in passed else []),
         "end_to_end_webkit": END_TO_END in passed,
         "total_test_cases": len(tests),
@@ -49,4 +62,10 @@ def main(log_path, out_path):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2])
+    import argparse
+    parser=argparse.ArgumentParser()
+    parser.add_argument("log");parser.add_argument("output")
+    parser.add_argument("--bridge-passed",action="store_true")
+    parser.add_argument("--decoder-passed",action="store_true")
+    args=parser.parse_args()
+    main(args.log,args.output,args.bridge_passed,args.decoder_passed)

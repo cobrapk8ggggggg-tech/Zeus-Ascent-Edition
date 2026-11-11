@@ -1,0 +1,350 @@
+{
+  "protocol": "adaptive-v1, before preflight/font/vertical fixes",
+  "reviewer": "Codex visual inspection",
+  "regions": 57,
+  "gold": false,
+  "reviews": [
+    {
+      "id": "en-comix-14-calibration-008",
+      "source_sha256": "05bb592a85f49b3b8a114f577ccb07e55b1ae2b798d586bc8dbab035c0a8a212",
+      "note": "clean crop",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "en-0aaf8b27-calibration-017",
+      "source_sha256": "fb2d89c0a07a101bfd984e39dd5764f3e10214ad6f9cc65d3224dfe7944d948e",
+      "note": "layout failure erased source; fixed by preflight",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "en-0aaf8b27-calibration-036",
+      "source_sha256": "c43d10a75d8b0edc5e1d0b50ccb902005acb48f5fe81ec5c0d846da2de12ebea",
+      "note": "narrow multi-line grouping needs review",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "en-0aaf8b27-calibration-035",
+      "source_sha256": "adcfaa45704b15e4d4db978560541cc6b1cf72fe86d305e242e45d2b3f8cb626",
+      "note": "clean crop",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "en-0aaf8b27-calibration-022",
+      "source_sha256": "fe4d4ca1d8b26bd7b7563cf4e1bc7b650742978a63bcaf343ab076165f905164",
+      "note": "abstained: retained source",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "en-comix-14-calibration-018",
+      "source_sha256": "5fa1c0724af4b2c1aff3ccf948f041a9f5729bab09a5b3e302178fd910537e7d",
+      "note": "abstained: stylized multilingual sign",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "en-d186aaeb-holdout-026",
+      "source_sha256": "5f52c95e86780def0de9f3ab7c7d6b634b297793d52ece3f5b282d63b51f6952",
+      "note": "clean crop",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "en-d186aaeb-holdout-019",
+      "source_sha256": "50562826fe36734cc0575007249b2759c5c77241617f1284e9c0a3aebb62a7bd",
+      "note": "clean crop",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "en-d186aaeb-holdout-039",
+      "source_sha256": "7978d399aaedda784c2f75064ea6cdd729394f4d8b0c873ec708f9210e12d7c1",
+      "note": "caption fit too small",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "en-d186aaeb-holdout-028",
+      "source_sha256": "5f52c95e86780def0de9f3ab7c7d6b634b297793d52ece3f5b282d63b51f6952",
+      "note": "false text detection on face",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "en-d186aaeb-holdout-029",
+      "source_sha256": "5cd4daec788187b640b36aa4d67bc803be48c0ebdf12f8607d33b22dcad40a3a",
+      "note": "abstained: retained source",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "en-d186aaeb-holdout-013",
+      "source_sha256": "811dc829181e00285f37112f116b7d2bc467bd29c1e8f646f656f64a76c73313",
+      "note": "abstained: retained source",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "ja-ad6defe1-calibration-000",
+      "source_sha256": "9cbdad2484235157399d498d1ea07419a52ff8e679e570b021f962c3fc71f036",
+      "note": "clean crop",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "ja-ad6defe1-calibration-010",
+      "source_sha256": "864a959e24b1e185f0d8d1375069bc24ce0cdf7633f39d6ca83afdf27f8445a0",
+      "note": "cleaning plate reaches surrounding art",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "ja-ad6defe1-calibration-037",
+      "source_sha256": "41c3a959c80ef2d785743c57aa530aa3ffa76ce1c5b08d067cf2e98877cb8ea2",
+      "note": "partial source text remains",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "ja-ad6defe1-calibration-033",
+      "source_sha256": "9a021ab73f8ead65827ad2f214eb49f64a3620122388f10eb2b8144aa01db97d",
+      "note": "partial source text remains and overlaps Arabic",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "ja-ad6defe1-calibration-039",
+      "source_sha256": "41c3a959c80ef2d785743c57aa530aa3ffa76ce1c5b08d067cf2e98877cb8ea2",
+      "note": "abstained: retained source",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "ja-ad6defe1-calibration-022",
+      "source_sha256": "de9f7598e9b6cbca4cc34b954dde199ba3d3e659b0b720b59de9ed97ff22ad08",
+      "note": "abstained: stylized SFX",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "ja-9708bf5a-holdout-025",
+      "source_sha256": "9ab077739d0b0565992c316b6a01356320310161fe3368f2b8a43a3685486a1e",
+      "note": "clean crop",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "ja-9708bf5a-holdout-023",
+      "source_sha256": "9ab077739d0b0565992c316b6a01356320310161fe3368f2b8a43a3685486a1e",
+      "note": "clean crop",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "ja-9708bf5a-holdout-010",
+      "source_sha256": "61a3978fbf1631f3823559e607e70fa0348b59e9a8f9e06f5b3721bc4d12024e",
+      "note": "clean crop",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "ja-9708bf5a-holdout-021",
+      "source_sha256": "9ab077739d0b0565992c316b6a01356320310161fe3368f2b8a43a3685486a1e",
+      "note": "clean crop",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "ja-9708bf5a-holdout-039",
+      "source_sha256": "0bb438abd1c96dd90242d87dd3b50031ae776649e9ee9ae3e5a844601204a6cd",
+      "note": "abstained: retained source",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "ja-9708bf5a-holdout-030",
+      "source_sha256": "c8be3c12586b854fa14f3a90d48d0bf3ba3f319b579334c2470deb8a6a8a7081",
+      "note": "abstained: retained source",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "ko-7d0c0550-calibration-031",
+      "source_sha256": "98dc3fbb1d592c5a9adb439ac4bc040b1934152ec035f488fc3877d5b9d24d73",
+      "note": "clean crop",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "ko-7d0c0550-calibration-032",
+      "source_sha256": "98dc3fbb1d592c5a9adb439ac4bc040b1934152ec035f488fc3877d5b9d24d73",
+      "note": "clean crop",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "ko-7d0c0550-calibration-018",
+      "source_sha256": "29203e3850ffcfc8d2c3d184fcfdd6e66feb7a23e041aab3f2b475cb49142c78",
+      "note": "clean crop",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "ko-7d0c0550-calibration-025",
+      "source_sha256": "adf8bb3bdfc3f44f9fc10a507fd38522966e86bddfe78f208aa9237cf35e5c55",
+      "note": "clean crop",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "ko-7d0c0550-calibration-037",
+      "source_sha256": "8693d578629fc0969ab1e92d5bfcf2a9ecf21d8bbd9651d9a43367050dbf92c2",
+      "note": "abstained: retained source",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "ko-7d0c0550-calibration-023",
+      "source_sha256": "d703d628cf2b230ac5eccd0eb816716dccc93860df7b7151774160f8a1580400",
+      "note": "abstained: retained source",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "ko-82c68de5-holdout-029",
+      "source_sha256": "20357cf8833c3dbe35e7299ffed9e0afb85f17d16f58162bda7f56887081ffff",
+      "note": "clean crop",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "ko-82c68de5-holdout-025",
+      "source_sha256": "61c249c4ac19f29b9483abe471c5026f2361cd2dcbcf12ad0ca760cc482d8886",
+      "note": "clean crop",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "ko-82c68de5-holdout-030",
+      "source_sha256": "20357cf8833c3dbe35e7299ffed9e0afb85f17d16f58162bda7f56887081ffff",
+      "note": "abstained: false detection on eye",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "ko-82c68de5-holdout-013",
+      "source_sha256": "6ec76f3cc97e796b35e76340fcaa151591f676e4c538ef5c8e7e9ac501929d59",
+      "note": "abstained: stylized SFX",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "zh-496bd311-calibration-016",
+      "source_sha256": "0dd359d9c36eda9c4ae1b47bc2a362c72e8040ece908fecb23360f6efb25d72c",
+      "note": "clean crop",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "zh-496bd311-calibration-026",
+      "source_sha256": "eb70d7df24df3108feb7ab21382d524355976162a632bf65a391e5525c8ac5d9",
+      "note": "clean crop",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "zh-496bd311-calibration-002",
+      "source_sha256": "84976a8547ca7c923d06a6fd33c24baf7500b3982ec47ef8b6c03ebcec503194",
+      "note": "layout failed after erasure; fixed by preflight",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "zh-496bd311-calibration-033",
+      "source_sha256": "e19671ef06dd450c32a6eb27278a495f23328c6ccf5cdcc754d6942a1c5c31aa",
+      "note": "clean crop",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "zh-496bd311-calibration-027",
+      "source_sha256": "eb70d7df24df3108feb7ab21382d524355976162a632bf65a391e5525c8ac5d9",
+      "note": "abstained: retained source",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "zh-496bd311-calibration-017",
+      "source_sha256": "8955e912b70375b34706f524f75c6866d495b138f202f308c3eb08da92c93433",
+      "note": "abstained: stylized lettering",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "zh-22bc4eb8-holdout-018",
+      "source_sha256": "12ab8ef1c09be2b9bc5bd27abe503600226187668e2a1f42ecff435bd5afaf58",
+      "note": "clean crop",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "zh-22bc4eb8-holdout-031",
+      "source_sha256": "dc78e14eb554ac2cf620bce520c315691dbe2d6d961c2580bfe6868dcc269713",
+      "note": "clean crop",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "zh-22bc4eb8-holdout-028",
+      "source_sha256": "e8376f63244ecbbc60c98f4b91ada2695f8070d00b7048a605fd72d834646b56",
+      "note": "layout failed after erasure; fixed by preflight",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "zh-22bc4eb8-holdout-035",
+      "source_sha256": "627908e1009a7fe315267f4a1ea94f83f9da800e7d8bdbbb3ddf27da7bc6f3e1",
+      "note": "clean crop",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "zh-22bc4eb8-holdout-034",
+      "source_sha256": "dc78e14eb554ac2cf620bce520c315691dbe2d6d961c2580bfe6868dcc269713",
+      "note": "abstained: stylized SFX",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "zh-22bc4eb8-holdout-030",
+      "source_sha256": "dc78e14eb554ac2cf620bce520c315691dbe2d6d961c2580bfe6868dcc269713",
+      "note": "abstained: retained source",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "ar-e11b2b83-calibration-011",
+      "source_sha256": "4acde74983a24e87117ce4c4929b9979c94a2b3a667602f6e6bcc557d6fb9b06",
+      "note": "layout failed after erasure; fixed by preflight",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "ar-e11b2b83-calibration-037",
+      "source_sha256": "ef9daf3b82ac83a3dec9c0012fe92bcefc4e799eff317d44b49f306ffd00d70a",
+      "note": "Linux Latin font missing; fixed",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "ar-e11b2b83-calibration-038",
+      "source_sha256": "ef9daf3b82ac83a3dec9c0012fe92bcefc4e799eff317d44b49f306ffd00d70a",
+      "note": "Linux Latin font missing; fixed",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "ar-e11b2b83-calibration-005",
+      "source_sha256": "44a534fffc9c300ade18f8f014e80e70103f9c68c10d7aa300298d5349607aa3",
+      "note": "abstained: false detection on face",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "ar-e11b2b83-calibration-027",
+      "source_sha256": "9f928be0bd0c6cde2a0b04fc90226abf74eac30229b671e0e5b56be706a05505",
+      "note": "abstained: retained source",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "ar-81355b0b-holdout-012",
+      "source_sha256": "d44868e294141b0245ddc4e13e9e7f79eda7780b5eabfae11bc3fa305af16c03",
+      "note": "Linux Latin font missing; fixed",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "ar-81355b0b-holdout-010",
+      "source_sha256": "44f8501bc6dcd1b8f7c063d413509bd920c969d18355850f2288e9772d39a384",
+      "note": "layout failed after erasure; fixed by preflight",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "ar-81355b0b-holdout-018",
+      "source_sha256": "189a7346a00c558c8e14a07805d06829a7641acfb7ddeae07bc069cb1e4a597a",
+      "note": "Linux Latin font missing; fixed",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "ar-81355b0b-holdout-022",
+      "source_sha256": "189a7346a00c558c8e14a07805d06829a7641acfb7ddeae07bc069cb1e4a597a",
+      "note": "layout failed after erasure; fixed by preflight",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "ar-81355b0b-holdout-031",
+      "source_sha256": "905323425e3a6236023722c0a7bf11b1069f7723e26b3bb0ae9fad9db9f0f094",
+      "note": "abstained: product photo",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    },
+    {
+      "id": "ar-81355b0b-holdout-007",
+      "source_sha256": "44f8501bc6dcd1b8f7c063d413509bd920c969d18355850f2288e9772d39a384",
+      "note": "abstained: retained source",
+      "scope": "contact-sheet triage; not full-resolution gold acceptance"
+    }
+  ]
+}

@@ -1,5 +1,10 @@
 import XCTest
+import WebKit
+#if canImport(ZEUSBrowser)
 @testable import ZEUSBrowser
+#else
+@testable import ZEUSNext
+#endif
 
 @MainActor final class NativeCloudAccountTests: XCTestCase {
     private func temporary() throws -> URL {
@@ -7,6 +12,48 @@ import XCTest
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         addTeardownBlock { try? FileManager.default.removeItem(at: root) }
         return root
+    }
+    func testFreshGuestNeedsNoAccountAndPersistsWithoutClaimingDevice()throws{
+        let root=try temporary(),defaults=try XCTUnwrap(UserDefaults(suiteName:UUID().uuidString))
+        let owner=CloudLocalOwner(root:root),previous=NativeLocalExecutionBoundary.shared.isAllowed
+        defer{NativeLocalExecutionBoundary.shared.setAllowed(previous)}
+        let guest=CloudAccount(owner:owner,defaults:defaults);guest.enterGuest()
+        XCTAssertEqual(guest.phase,.guest);XCTAssertNil(guest.identity);XCTAssertNil(try owner.read())
+        XCTAssertTrue(guest.allowsGuestLocalExecution)
+        let reopened=CloudAccount(owner:owner,defaults:defaults);reopened.start()
+        XCTAssertEqual(reopened.phase,.guest);XCTAssertTrue(reopened.allowsGuestLocalExecution)
+    }
+    func testGuestCannotOpenOwnedAgentOrAuthorizeCloudRequests()async throws{
+        let root=try temporary(),owner=CloudLocalOwner(root:root),id=UUID()
+        try owner.claim(id)
+        let previous=NativeLocalExecutionBoundary.shared.isAllowed
+        defer{NativeLocalExecutionBoundary.shared.setAllowed(previous)}
+        let guest=CloudAccount(owner:owner,defaults:try XCTUnwrap(UserDefaults(suiteName:UUID().uuidString)))
+        guest.enterGuest();XCTAssertTrue(guest.guestIsolated);XCTAssertFalse(guest.allowsGuestLocalExecution)
+        XCTAssertFalse(NativeLocalExecutionBoundary.shared.isAllowed);XCTAssertEqual(try owner.read(),id)
+        do{_ = try await guest.authorization(for:id);XCTFail("Guest must not authorize owner's data")}catch{}
+        XCTAssertFalse(CloudGuestStorage.root.path.hasPrefix(BrowserDisk.applicationRoot.path+"/"))
+    }
+    func testIsolatedGuestDoesNotImportLegacyOwnerTabsOrCookies()async throws{
+        let defaults=UserDefaults.standard,legacy=defaults.data(forKey:"browser_saved_tabs_list")
+        defer{if let legacy{defaults.set(legacy,forKey:"browser_saved_tabs_list")}else{defaults.removeObject(forKey:"browser_saved_tabs_list")}}
+        var tab=SavedTab();tab.url="https://owner-private.example/";tab.title="Owner's legacy tab"
+        let legacyPayload=try JSONEncoder().encode([tab])
+        defaults.set(legacyPayload,forKey:"browser_saved_tabs_list")
+        let root=try temporary(),guest=ProfileStore(root:root,downloadsRoot:root.appendingPathComponent("Downloads"),allowLegacyImport:false)
+        XCTAssertEqual(guest.active.legacyWebsiteStore,false)
+        XCTAssertFalse(guest.load(guest.active).tabs.contains{$0.url==tab.url})
+        let cookie=try XCTUnwrap(HTTPCookie(properties:[.domain:"guest-isolation.example",.path:"/",.name:UUID().uuidString,.value:"owner-test-only"]))
+        let ownerStore=WKWebsiteDataStore.default().httpCookieStore
+        await withCheckedContinuation{(c:CheckedContinuation<Void,Never>)in ownerStore.setCookie(cookie){c.resume()}}
+        let cookies=await withCheckedContinuation{c in guest.websiteDataStore(for:guest.active).httpCookieStore.getAllCookies{c.resume(returning:$0)}}
+        let model=BrowserModel(profiles:guest,useBackgroundDownloads:false)
+        await model.resetApplication()
+        let remaining=await withCheckedContinuation{c in ownerStore.getAllCookies{c.resume(returning:$0)}}
+        XCTAssertTrue(remaining.contains{$0.name==cookie.name},"Resetting the guest must not erase owner's legacy cookies")
+        XCTAssertEqual(defaults.data(forKey:"browser_saved_tabs_list"),legacyPayload,"Guest reset must not clear owner's legacy settings")
+        await withCheckedContinuation{(c:CheckedContinuation<Void,Never>)in ownerStore.delete(cookie){c.resume()}}
+        XCTAssertFalse(cookies.contains{$0.name==cookie.name},"An owned legacy cookie store must not be reused by a guest")
     }
     func testCloudIsDefaultForFreshAndOldUncommittedPreference() {
         let owner = UUID()
